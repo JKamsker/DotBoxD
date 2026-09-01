@@ -31,7 +31,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private bool TryLowerConstantExpression(ExpressionSyntax expression, out string lowered)
     {
         lowered = string.Empty;
-        if (_model.GetConstantValue(expression, _cancellationToken) is not { HasValue: true } constant)
+        if (ModelFor(expression).GetConstantValue(expression, _cancellationToken) is not { HasValue: true } constant)
         {
             return false;
         }
@@ -106,7 +106,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LiteralJson(ExpressionSyntax expression, object? value)
     {
-        var converted = _model.GetTypeInfo(expression, _cancellationToken).ConvertedType;
+        var converted = ModelFor(expression).GetTypeInfo(expression, _cancellationToken).ConvertedType;
         if (converted is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType)
         {
             return EnumLiteralJson(enumType, value);
@@ -236,6 +236,45 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal bool IsStringExpression(ExpressionSyntax expression)
         => TypeOf(expression).SpecialType == SpecialType.System_String;
+
+    private string? TryLowerDerivedListCount(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Count" } count ||
+            DotBoxDRpcTypeMapper.ListElementType(TypeOf(count.Expression)) is null)
+        {
+            return null;
+        }
+
+        return Call("list.count", null, LowerDerivedExpression(count.Expression, memberBindings, named, derived));
+    }
+
+    private string? LowerDerivedMemberAccess(
+        MemberAccessExpressionSyntax member,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (TypeOf(member.Expression) is not INamedTypeSymbol receiver ||
+            !DotBoxDRpcTypeMapper.IsRecordDto(receiver))
+        {
+            return null;
+        }
+
+        var fields = DotBoxDRpcTypeMapper.RecordFields(receiver);
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (string.Equals(fields[i].Name, member.Name.Identifier.ValueText, StringComparison.Ordinal))
+            {
+                return RecordGet(LowerDerivedExpression(member.Expression, memberBindings, named, derived), i);
+            }
+        }
+
+        return null;
+    }
 
     private static bool HasRpcServiceAttribute(ITypeSymbol type)
     {

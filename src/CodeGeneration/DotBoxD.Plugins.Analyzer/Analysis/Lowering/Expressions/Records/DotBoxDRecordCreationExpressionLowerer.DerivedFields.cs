@@ -62,7 +62,12 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned[i] ||
-                !DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, recordType))
+                !DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(
+                    fields[i],
+                    fields,
+                    assigned,
+                    recordType,
+                    context.SemanticModel.Compilation))
             {
                 continue;
             }

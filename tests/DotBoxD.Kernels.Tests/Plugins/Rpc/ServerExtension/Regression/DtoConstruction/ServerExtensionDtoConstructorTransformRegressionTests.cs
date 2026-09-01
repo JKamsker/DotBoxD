@@ -51,6 +51,31 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
             """);
 
     [Fact]
+    public void Server_extension_rejects_dto_constructor_that_hides_matching_member_assignment_in_lambda()
+        => AssertConstructorRejected(
+            """
+                public Score(int value)
+                {
+                    System.Action assign = () => Value = value;
+                }
+            """,
+            "public int Value { get; private set; }");
+
+    [Fact]
+    public void Server_extension_rejects_dto_constructor_that_hides_matching_member_assignment_in_local_function()
+        => AssertConstructorRejected(
+            """
+                public Score(int value)
+                {
+                    void Assign()
+                    {
+                        Value = value;
+                    }
+                }
+            """,
+            "public int Value { get; private set; }");
+
+    [Fact]
     public void Constructor_assignment_verification_handles_symbol_from_another_compilation()
     {
         var sourceTree = CSharpSyntaxTree.ParseText("""
@@ -88,7 +113,83 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
         Assert.True(preservesMember);
     }
 
-    private static void AssertConstructorRejected(string constructor)
+    [Fact]
+    public void Constructor_assignment_verification_treats_identity_cast_as_parameter_preserving()
+    {
+        var sourceTree = CSharpSyntaxTree.ParseText("""
+            public sealed class Score
+            {
+                public Score(int value)
+                {
+                    Value = (int)value;
+                }
+
+                public int Value { get; }
+            }
+            """);
+        var sourceCompilation = CSharpCompilation.Create(
+            "Source",
+            [sourceTree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            sourceCompilation.GetTypeByMetadataName("Score"));
+        var constructor = Assert.Single(type.InstanceConstructors, candidate => candidate.Parameters.Length == 1);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            type.GetMembers("Value").Single());
+        var member = new RecordMember(property.Name, property.Type, property);
+
+        var preservesMember = RpcDtoConstructorAssignmentVerifier.ConstructorPreservesMember(
+            constructor,
+            member,
+            constructor.Parameters[0],
+            sourceCompilation);
+
+        Assert.True(preservesMember);
+    }
+
+    [Fact]
+    public void Constructor_assignment_verification_accepts_direct_assignment_after_safe_constructor_chain()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+            public sealed class Score
+            {
+                public Score()
+                {
+                }
+
+                public Score(int value)
+                    : this()
+                {
+                    Value = value;
+                }
+
+                public int Value { get; }
+            }
+            """);
+        var compilation = CSharpCompilation.Create(
+            "Source",
+            [tree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            compilation.GetTypeByMetadataName("Score"));
+        var constructor = Assert.Single(type.InstanceConstructors, candidate => candidate.Parameters.Length == 1);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            type.GetMembers("Value").Single());
+
+        var preservesMember = RpcDtoConstructorAssignmentVerifier.ConstructorPreservesMember(
+            constructor,
+            new RecordMember(property.Name, property.Type, property),
+            constructor.Parameters[0],
+            compilation);
+
+        Assert.True(preservesMember);
+    }
+
+    private static void AssertConstructorRejected(
+        string constructor,
+        string member = "public int Value { get; }")
     {
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator($$"""
             using DotBoxD.Kernels;
@@ -102,7 +203,7 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
             {
             {{constructor}}
 
-                public int Value { get; }
+            {{member}}
             }
 
             [ServerExtension("score-transform")]

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Runtime.ExceptionServices;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
@@ -158,30 +157,25 @@ public sealed class RemoteLocalHandlerRegistry
         ReadOnlyMemory<byte> projectedValue,
         HookContext context,
         CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
-            ArgumentNullException.ThrowIfNull(context);
-            ThrowIfDispatchCanceled(context, cancellationToken);
-            if (!_handlers.TryGetValue(subscriptionId, out var handler))
-            {
-                throw new InvalidOperationException(
-                    $"No remote local handler is registered for subscription '{subscriptionId}'.");
-            }
-            return handler.Invoke(projectedValue, context);
-        }
-        catch (Exception ex)
-        {
-            // The former async method captured synchronous validation and decoder failures in its ValueTask.
-            return CaptureDispatchExceptionAsync(ex);
-        }
-    }
+        => DispatchCoreAsync(subscriptionId, projectedValue, context, cancellationToken);
 
-    private static async ValueTask CaptureDispatchExceptionAsync(Exception exception)
+    private async ValueTask DispatchCoreAsync(
+        string subscriptionId,
+        ReadOnlyMemory<byte> projectedValue,
+        HookContext context,
+        CancellationToken cancellationToken)
     {
-        await Task.CompletedTask.ConfigureAwait(false);
-        ExceptionDispatchInfo.Capture(exception).Throw();
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(context);
+        ThrowIfDispatchCanceled(context, cancellationToken);
+        if (!_handlers.TryGetValue(subscriptionId, out var handler))
+        {
+            throw new InvalidOperationException(
+                $"No remote local handler is registered for subscription '{subscriptionId}'.");
+        }
+
+        await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+        ThrowIfDispatchCanceled(context, cancellationToken);
     }
 
     public async ValueTask<byte[]> DispatchResultAsync(

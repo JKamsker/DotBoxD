@@ -22,6 +22,7 @@ public bool IsConnected => Peer.IsConnected && _transport.IsConnected
 public bool IsConnected => Volatile.Read(ref _disposed) == 0 && _connection.IsConnected
 public bool IsSuccess { get; set; }
 public bool RejectInboundCalls { get; init; }
+public bool TryAcquire(string serviceName, string instanceId, out object instance, out IAsyncDisposable lease)
 public bool TryGet(string serviceName, string instanceId, out object instance)
 public class RemoteServiceException : ServiceException
 public class RpcMethodAttribute : Attribute

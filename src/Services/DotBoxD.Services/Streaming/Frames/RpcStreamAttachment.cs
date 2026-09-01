@@ -58,7 +58,7 @@ public abstract class RpcStreamAttachment
         }
 
         RequireHandle(handle, RpcStreamKind.Items);
-        return new AsyncEnumerableAttachment<T>(handle, source);
+        return new RpcAsyncEnumerableAttachment<T>(handle, source);
     }
 
     internal abstract Task PumpCoreAsync(
@@ -247,25 +247,6 @@ public abstract class RpcStreamAttachment
         private protected override bool OwnsSource => _completeReader;
     }
 
-    private sealed class AsyncEnumerableAttachment<T> : RpcStreamAttachment
-    {
-        private readonly IAsyncEnumerable<T> _source;
-
-        public AsyncEnumerableAttachment(RpcStreamHandle handle, IAsyncEnumerable<T> source)
-            : base(handle) =>
-            _source = source;
-
-        internal override async Task PumpCoreAsync(
-            RpcStreamManager streams,
-            ISerializer serializer,
-            CancellationToken ct)
-        {
-            await foreach (var item in _source.WithCancellation(ct).ConfigureAwait(false))
-            {
-                await streams.SendStreamItemAsync(Handle.StreamId, item, serializer, ct).ConfigureAwait(false);
-            }
-        }
-    }
 
     private static async ValueTask DisposeStreamAsync(Stream stream)
     {

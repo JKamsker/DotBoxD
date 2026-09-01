@@ -47,16 +47,35 @@ public sealed class ServerExtensionComputedVirtualDispatchSurpriseTests
             protected override int Calculate() => Value + 3;
         }
 
+        public record NestedBaseDto(int Value)
+        {
+            protected virtual int Calculate() => Value + 1;
+        }
+
+        public record NestedMiddleDto(int Value) : NestedBaseDto(Value)
+        {
+            public int Computed => Calculate();
+
+            protected override int Calculate() => Value + 2;
+        }
+
+        public sealed record NestedDerivedDto(int Value) : NestedMiddleDto(Value)
+        {
+            protected override int Calculate() => base.Calculate();
+        }
+
         [ServerExtension("computed-virtual-dispatch")]
         public sealed partial class ComputedVirtualDispatchKernel
         {
             public int Read(int value, HookContext ctx)
-                => (new AbstractDerivedDto(value).Computed * 10) + new DerivedDto(value).Computed;
+                => (new AbstractDerivedDto(value).Computed * 100) +
+                    (new DerivedDto(value).Computed * 10) +
+                    new NestedDerivedDto(value).Computed;
         }
         """;
 
     [Fact]
-    public async Task Computed_dto_helper_preserves_virtual_override_dispatch()
+    public async Task Computed_dto_helper_preserves_virtual_override_and_nested_base_dispatch()
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(
             Source,
@@ -65,6 +84,6 @@ public sealed class ServerExtensionComputedVirtualDispatchSurpriseTests
         var kernel = await server.InstallServerExtensionAsync(package);
         var service = ServerExtensionProxy.Create<IComputedVirtualDispatchService>(kernel);
 
-        Assert.Equal(56, service.Read(3));
+        Assert.Equal(565, service.Read(3));
     }
 }

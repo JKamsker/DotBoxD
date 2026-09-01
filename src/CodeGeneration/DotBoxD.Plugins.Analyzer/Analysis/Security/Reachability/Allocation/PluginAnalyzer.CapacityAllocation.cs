@@ -25,6 +25,17 @@ public sealed partial class PluginAnalyzer
         IInvocationOperation invocation)
         => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, invocation.TargetMethod);
 
+    private static void ReportAndRecordCollectionScanInvocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IInvocationOperation invocation)
+    {
+        if (ForbiddenCollectionScanPolicy.TryGetDisplayName(invocation.TargetMethod, out var forbidden))
+        {
+            ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+        }
+    }
+
     private static void ReportAndRecordCollectionCapacityAllocation(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,

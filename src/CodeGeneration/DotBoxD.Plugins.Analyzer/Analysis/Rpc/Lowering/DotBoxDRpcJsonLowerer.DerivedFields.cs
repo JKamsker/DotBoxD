@@ -30,7 +30,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, named))
+            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(
+                    fields[i],
+                    fields,
+                    assigned,
+                    named,
+                    _model.Compilation))
             {
                 args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
                 assigned[i] = true;
@@ -88,8 +93,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         RecordMember derived)
     {
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedListCount(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedCreation(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedCast(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedControlFlow(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
 
         return ApplyNumericConversion(expression, lowered);
@@ -100,15 +109,54 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
+        => TryLowerDerivedWrapper(expression, memberBindings, named, derived) ??
+           TryLowerDerivedConstant(expression) ??
+           TryLowerDerivedMember(expression, memberBindings, named, derived);
+
+    private string? TryLowerDerivedWrapper(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
                 LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
+            PostfixUnaryExpressionSyntax postfix
+                when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) =>
+                LowerDerivedExpression(postfix.Operand, memberBindings, named, derived),
+            _ => null
+        };
+
+    private string? TryLowerDerivedConstant(ExpressionSyntax expression)
+        => expression switch
+        {
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
+            InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameofExpression when
+                ModelFor(nameofExpression).GetConstantValue(nameofExpression, _cancellationToken) is { HasValue: true, Value: string name } =>
+                LiteralJson(name),
+            InterpolatedStringExpressionSyntax { Contents: var contents } when
+                contents.All(static content => content is InterpolatedStringTextSyntax) =>
+                LiteralJson(string.Concat(contents.Select(static content =>
+                    ((InterpolatedStringTextSyntax)content).TextToken.ValueText))),
+            _ => null
+        };
+
+    private string? TryLowerDerivedMember(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression switch
+        {
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 BoundDerivedMember(memberBindings, thisMember),
+            MemberAccessExpressionSyntax { Expression: BaseExpressionSyntax } baseMember =>
+                BoundDerivedMember(memberBindings, baseMember),
+            MemberAccessExpressionSyntax member =>
+                LowerDerivedMemberAccess(member, memberBindings, named, derived),
             _ => null
         };
 
@@ -116,10 +164,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         ExpressionSyntax expression)
     {
-        return ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol is { } member &&
-           memberBindings.TryGetValue(member, out var bound)
+        var member = ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol;
+        return member is { } && memberBindings.TryGetValue(member, out var bound)
             ? bound
-            : null;
+            : member is IFieldSymbol { IsConst: true, HasConstantValue: true } constant
+                ? LiteralJson(expression, constant.ConstantValue)
+                : null;
     }
 
     private void AddIgnoredDefaultBindings(
@@ -189,9 +239,45 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             ? LowerBinary(binary, part => LowerDerivedExpression(part, memberBindings, named, derived))
             : null;
 
-    private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
+    private string? TryLowerDerivedCast(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not CastExpressionSyntax cast)
+        {
+            return null;
+        }
+
+        var targetType = ModelFor(cast).GetTypeInfo(cast, _cancellationToken).Type
+                         ?? ModelFor(cast).GetTypeInfo(cast, _cancellationToken).ConvertedType
+                         ?? throw DerivedNotSupported(named, derived);
+        return ApplyRequiredConversion(
+            cast.Expression,
+            targetType,
+            LowerDerivedExpression(cast.Expression, memberBindings, named, derived),
+            $"Server extension derived member '{derived.Name}' cast '{cast}'");
+    }
+
+    private string? TryLowerDerivedControlFlow(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => new DotBoxDRpcDerivedControlFlowLowerer(
+            part => LowerDerivedExpression(part, memberBindings, named, derived),
+            ReserveGeneratedLocal,
+            AddExpressionPrelude,
+            () => DerivedNotSupported(named, derived)).TryLower(expression);
+
+    private static System.NotSupportedException DerivedNotSupported(
+        INamedTypeSymbol named,
+        RecordMember derived,
+        Exception? innerException = null)
         => new(
             $"Server extension constructor for '{named.Name}' cannot build the derived member '{derived.Name}' in the " +
             "sandbox: its getter is not a simple expression over the constructor's parameters. Pass the value as a " +
-            $"constructor parameter, or construct '{named.Name}' where the value is available.");
+            $"constructor parameter, or construct '{named.Name}' where the value is available.",
+            innerException);
 }

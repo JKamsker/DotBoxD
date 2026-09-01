@@ -61,12 +61,66 @@ public sealed class MessageFramerCancellationRegressionTests
         }
     }
 
+    [Fact]
+    public async Task ReadMessageAsync_CancellationDuringCompletedHeaderRead_DoesNotPublishMessage()
+    {
+        using var frame = MessageFramer.FrameToPayload(35, MessageType.Cancel, ReadOnlySpan<byte>.Empty);
+        using var cts = new CancellationTokenSource();
+        using var stream = new NonCooperativeReadStream(frame.Memory.ToArray(), cts);
+
+        MessageFramer.FramedMessage? message = null;
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            message = await MessageFramer.ReadMessageAsync(stream, cts.Token);
+        });
+
+        try
+        {
+            var cancellation = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+            Assert.Equal(cts.Token, cancellation.CancellationToken);
+            Assert.Null(message);
+            Assert.Equal(1, stream.ReadCalls);
+        }
+        finally
+        {
+            if (message is { } completed)
+            {
+                completed.Body.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task WriteMessageAsync_CancellationDuringCompletedWrite_DoesNotFlush()
+    {
+        using var cts = new CancellationTokenSource();
+        using var stream = new NonCooperativeWriteStream(cts);
+
+        var exception = await Record.ExceptionAsync(
+            () => MessageFramer.WriteMessageAsync(
+                stream,
+                messageId: 13,
+                MessageType.Request,
+                new byte[] { 4, 5, 6 },
+                cts.Token));
+
+        var cancellation = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cts.Token, cancellation.CancellationToken);
+        Assert.Equal(1, stream.WriteCalls);
+        Assert.Equal(0, stream.FlushCalls);
+    }
+
     private sealed class NonCooperativeReadStream : Stream
     {
         private readonly byte[] _buffer;
+        private readonly CancellationTokenSource? _cancellationSource;
         private int _offset;
 
-        public NonCooperativeReadStream(byte[] buffer) => _buffer = buffer;
+        public NonCooperativeReadStream(byte[] buffer, CancellationTokenSource? cancellationSource = null)
+        {
+            _buffer = buffer;
+            _cancellationSource = cancellationSource;
+        }
 
         public int ReadCalls { get; private set; }
 
@@ -104,6 +158,7 @@ public sealed class MessageFramerCancellationRegressionTests
             _buffer.AsMemory(_offset, count).CopyTo(buffer);
             _offset += count;
             BytesRead += count;
+            _cancellationSource?.Cancel();
             return ValueTask.FromResult(count);
         }
 
@@ -116,6 +171,11 @@ public sealed class MessageFramerCancellationRegressionTests
 
     private sealed class NonCooperativeWriteStream : Stream
     {
+        private readonly CancellationTokenSource? _cancellationSource;
+
+        public NonCooperativeWriteStream(CancellationTokenSource? cancellationSource = null) =>
+            _cancellationSource = cancellationSource;
+
         public int WriteCalls { get; private set; }
 
         public int BytesWritten { get; private set; }
@@ -154,12 +214,14 @@ public sealed class MessageFramerCancellationRegressionTests
         {
             WriteCalls++;
             BytesWritten += count;
+            _cancellationSource?.Cancel();
         }
 
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             WriteCalls++;
             BytesWritten += buffer.Length;
+            _cancellationSource?.Cancel();
             return ValueTask.CompletedTask;
         }
     }

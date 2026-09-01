@@ -102,10 +102,11 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         self._host = listen(peer =>
         {
             // Single-connection contract: service only the FIRST peer. The transport may accept more (a named
-            // pipe allows multiple instances by default), so a later peer is left un-provisioned — no session,
-            // no services — and can therefore neither install nor invoke anything.
+            // pipe allows multiple instances by default), so actively close later peers instead of leaving a
+            // live, un-provisioned connection parked in the host.
             if (Interlocked.Exchange(ref self._accepted, 1) != 0)
             {
+                _ = peer.DisposeAsync();
                 return;
             }
 
