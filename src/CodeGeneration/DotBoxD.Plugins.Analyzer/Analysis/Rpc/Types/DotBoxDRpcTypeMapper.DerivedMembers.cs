@@ -204,7 +204,7 @@ internal static partial class DotBoxDRpcTypeMapper
                 var dispatchTarget = isBaseQualified ? method : ResolveDispatchTarget(method, dispatchType);
                 if (TryGetMethodReturnExpression(dispatchTarget) is { } expression)
                 {
-                    return (currentType, expression);
+                    return (dispatchTarget.ContainingType, expression);
                 }
             }
         }
