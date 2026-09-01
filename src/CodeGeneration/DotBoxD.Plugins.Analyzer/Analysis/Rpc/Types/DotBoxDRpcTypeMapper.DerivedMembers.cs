@@ -25,7 +25,7 @@ internal static partial class DotBoxDRpcTypeMapper
         Compilation? compilation = null)
     {
         var reconstructable = ObjectInitializerAssigned(fields, assigned, compilation);
-        while (TryMarkDerivedField(fields, reconstructable))
+        while (TryMarkDerivedField(fields, reconstructable, compilation))
         {
         }
 
@@ -36,7 +36,8 @@ internal static partial class DotBoxDRpcTypeMapper
         RecordMember member,
         IReadOnlyList<RecordMember> fields,
         bool[] assigned,
-        INamedTypeSymbol? dispatchType = null)
+        INamedTypeSymbol? dispatchType = null,
+        Compilation? compilation = null)
     {
         if (member.Symbol is not IPropertySymbol
             {
@@ -61,7 +62,7 @@ internal static partial class DotBoxDRpcTypeMapper
             }
         }
 
-        return IsExpressionOverAssignedFields(body, assignedFields);
+        return IsExpressionOverAssignedFields(body, assignedFields, compilation);
     }
 
     private static bool[] ObjectInitializerAssigned(
@@ -91,11 +92,14 @@ internal static partial class DotBoxDRpcTypeMapper
         return assigned;
     }
 
-    private static bool TryMarkDerivedField(IReadOnlyList<RecordMember> fields, bool[] assigned)
+    private static bool TryMarkDerivedField(
+        IReadOnlyList<RecordMember> fields,
+        bool[] assigned,
+        Compilation? compilation)
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && IsDerivedFromAssignedFields(fields[i], fields, assigned))
+            if (!assigned[i] && IsDerivedFromAssignedFields(fields[i], fields, assigned, compilation: compilation))
             {
                 assigned[i] = true;
                 return true;
@@ -112,11 +116,13 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
-        IReadOnlyDictionary<string, ITypeSymbol> assignedFields)
-        => new AssignedFieldExpressionVisitor(assignedFields).Visit(expression);
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields,
+        Compilation? compilation)
+        => new AssignedFieldExpressionVisitor(assignedFields, compilation).Visit(expression);
 
     private sealed class AssignedFieldExpressionVisitor(
-        IReadOnlyDictionary<string, ITypeSymbol> assignedFields) : CSharpSyntaxVisitor<bool>
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields,
+        Compilation? compilation) : CSharpSyntaxVisitor<bool>
     {
         public override bool DefaultVisit(SyntaxNode node) => false;
 
@@ -129,13 +135,13 @@ internal static partial class DotBoxDRpcTypeMapper
             => node.Contents.All(static content => content is InterpolatedStringTextSyntax);
 
         public override bool VisitIdentifierName(IdentifierNameSyntax node)
-            => assignedFields.ContainsKey(node.Identifier.ValueText);
+            => IsAssignedOrConstant(node, node.Identifier.ValueText);
 
         public override bool VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
             if (node.Expression is ThisExpressionSyntax or BaseExpressionSyntax)
             {
-                return assignedFields.ContainsKey(node.Name.Identifier.ValueText);
+                return IsAssignedOrConstant(node, node.Name.Identifier.ValueText);
             }
 
             if (node.Name.Identifier.ValueText == "Count" &&
@@ -180,6 +186,16 @@ internal static partial class DotBoxDRpcTypeMapper
             => node.IsKind(SyntaxKind.LogicalNotExpression) ||
                node.IsKind(SyntaxKind.UnaryMinusExpression) ||
                node.IsKind(SyntaxKind.UnaryPlusExpression);
+
+        private bool IsAssignedOrConstant(ExpressionSyntax expression, string name)
+            => assignedFields.ContainsKey(name) || IsConstant(expression);
+
+        private bool IsConstant(ExpressionSyntax expression)
+            => compilation?.GetSemanticModel(expression.SyntaxTree).GetSymbolInfo(expression).Symbol is IFieldSymbol
+            {
+                IsConst: true,
+                HasConstantValue: true
+            };
     }
 
     private static bool TryGetAssignedFieldType(
@@ -202,7 +218,6 @@ internal static partial class DotBoxDRpcTypeMapper
                 member.Name.Identifier.ValueText,
             _ => null
         };
-
     internal static ExpressionSyntax? TryGetDerivedGetterExpression(
         IPropertySymbol property,
         INamedTypeSymbol? dispatchType = null)
