@@ -131,7 +131,8 @@ internal static partial class DotBoxDRpcTypeMapper
             => assignedNames.Contains(node.Identifier.ValueText);
 
         public override bool VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
-            => node.Expression is ThisExpressionSyntax && assignedNames.Contains(node.Name.Identifier.ValueText);
+            => (node.Expression is ThisExpressionSyntax or BaseExpressionSyntax) &&
+               assignedNames.Contains(node.Name.Identifier.ValueText);
 
         public override bool VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
             => IsSupportedUnary(node) && Visit(node.Operand);

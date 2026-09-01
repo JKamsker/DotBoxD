@@ -122,6 +122,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 BoundDerivedMember(memberBindings, thisMember),
+            MemberAccessExpressionSyntax { Expression: BaseExpressionSyntax } baseMember =>
+                BoundDerivedMember(memberBindings, baseMember),
             _ => null
         };
 
