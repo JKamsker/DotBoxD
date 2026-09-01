@@ -38,7 +38,10 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
                 continue;
             }
 
-            if (matched || source is null || !PreservesParameter(source, parameter, declaration, model))
+            if (matched ||
+                RpcDtoConstructorControlFlowInspector.CanSkipAssignment(declaration, assignment) ||
+                source is null ||
+                !PreservesParameter(source, parameter, declaration, model))
             {
                 return false;
             }
@@ -58,6 +61,7 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
         bool alreadyMatched)
         => !alreadyMatched &&
             IsDirectConstructorAssignment(declaration, assignment) &&
+            !RpcDtoConstructorControlFlowInspector.CanSkipAssignment(declaration, assignment) &&
             assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
             PreservesParameterOrDefaultState(assignment.Right, member, parameter, declaration, model);
 
