@@ -142,6 +142,17 @@ internal static partial class DotBoxDRpcTypeMapper
         public override bool VisitConditionalExpression(ConditionalExpressionSyntax node)
             => Visit(node.Condition) && Visit(node.WhenTrue) && Visit(node.WhenFalse);
 
+        public override bool VisitSwitchExpression(SwitchExpressionSyntax node)
+            => Visit(node.GoverningExpression) &&
+               node.Arms.Count > 0 &&
+               node.Arms[node.Arms.Count - 1].Pattern is DiscardPatternSyntax &&
+               node.Arms.All(arm => arm.WhenClause is null &&
+                                    IsSupportedSwitchPattern(arm.Pattern) &&
+                                    Visit(arm.Expression));
+
+        private static bool IsSupportedSwitchPattern(PatternSyntax pattern)
+            => pattern is DiscardPatternSyntax or ConstantPatternSyntax or RelationalPatternSyntax;
+
         private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax node)
             => node.IsKind(SyntaxKind.LogicalNotExpression) ||
                node.IsKind(SyntaxKind.UnaryMinusExpression) ||
