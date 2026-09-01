@@ -95,7 +95,8 @@ internal static class RpcDtoConstructorAssignmentVerifier
         var matched = false;
         foreach (var assignment in ConstructorAssignments(declaration))
         {
-            if (!IsMemberTarget(assignment.Left, member, model))
+            if (!IsMemberTarget(assignment.Left, member, model) &&
+                !IsBackingFieldTarget(assignment.Left, member, model))
             {
                 continue;
             }
@@ -253,4 +254,37 @@ internal static class RpcDtoConstructorAssignmentVerifier
                 name.Identifier.ValueText,
             _ => null,
         };
+
+    private static bool IsBackingFieldTarget(
+        ExpressionSyntax target,
+        RecordMember member,
+        SemanticModel? model)
+    {
+        if (member.Symbol is not IPropertySymbol { SetMethod: null } property ||
+            model?.GetSymbolInfo(target).Symbol is not IFieldSymbol targetField ||
+            DirectBackingField(property, model) is not { } backingField)
+        {
+            return false;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(targetField, backingField);
+    }
+
+    private static IFieldSymbol? DirectBackingField(IPropertySymbol property, SemanticModel model)
+    {
+        if (DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property) is not { } expression)
+        {
+            return null;
+        }
+
+        expression = StripParentheses(expression);
+        var expressionModel = model.Compilation.ContainsSyntaxTree(expression.SyntaxTree)
+            ? model.Compilation.GetSemanticModel(expression.SyntaxTree)
+            : null;
+
+        return expressionModel?.GetSymbolInfo(expression).Symbol is IFieldSymbol field &&
+            SymbolEqualityComparer.Default.Equals(field.ContainingType, property.ContainingType)
+                ? field
+                : null;
+    }
 }
