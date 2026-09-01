@@ -73,6 +73,7 @@ internal static class ForbiddenApiNamePolicy
         "System.String.Create",
         "System.Collections.Generic.List<T>.EnsureCapacity",
         "System.Collections.Generic.List<T>.RemoveAll",
+        "System.Collections.Generic.List<T>.ForEach",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
         "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
         "System.Linq.Enumerable.ToDictionary",
@@ -97,6 +98,7 @@ internal static class ForbiddenApiNamePolicy
         displayName = name switch
         {
             "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set" => "Microsoft.Extensions.Caching.Memory.MemoryCache",
+            "System.Collections.Generic.List<T>.ForEach" => "System.Collections.Generic.List.ForEach",
             "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary" => "System.Linq.Enumerable.ToFrozenDictionary",
             "System.Collections.Generic.List<T>.RemoveAll" => "System.Collections.Generic.List.RemoveAll",
             _ => name
