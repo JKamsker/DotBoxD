@@ -113,38 +113,40 @@ internal static partial class DotBoxDRpcTypeMapper
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
         ISet<string> assignedNames)
-        => expression switch
-        {
-            ParenthesizedExpressionSyntax parenthesized =>
-                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
-            LiteralExpressionSyntax => true,
-            IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
-            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                assignedNames.Contains(thisMember.Name.Identifier.ValueText),
-            PrefixUnaryExpressionSyntax unary => IsSupportedDerivedUnary(unary, assignedNames),
-            BinaryExpressionSyntax binary => IsSupportedDerivedBinary(binary, assignedNames),
-            ConditionalExpressionSyntax conditional => IsSupportedDerivedConditional(conditional, assignedNames),
-            _ => false
-        };
+        => new AssignedFieldExpressionVisitor(assignedNames).Visit(expression);
 
-    private static bool IsSupportedDerivedUnary(PrefixUnaryExpressionSyntax unary, ISet<string> assignedNames)
-        => IsSupportedUnary(unary) && IsExpressionOverAssignedFields(unary.Operand, assignedNames);
+    private sealed class AssignedFieldExpressionVisitor(ISet<string> assignedNames) : CSharpSyntaxVisitor<bool>
+    {
+        public override bool DefaultVisit(SyntaxNode node) => false;
 
-    private static bool IsSupportedDerivedBinary(BinaryExpressionSyntax binary, ISet<string> assignedNames)
-        => IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-           IsExpressionOverAssignedFields(binary.Right, assignedNames);
+        public override bool VisitParenthesizedExpression(ParenthesizedExpressionSyntax node)
+            => Visit(node.Expression);
 
-    private static bool IsSupportedDerivedConditional(
-        ConditionalExpressionSyntax conditional,
-        ISet<string> assignedNames)
-        => IsExpressionOverAssignedFields(conditional.Condition, assignedNames) &&
-           IsExpressionOverAssignedFields(conditional.WhenTrue, assignedNames) &&
-           IsExpressionOverAssignedFields(conditional.WhenFalse, assignedNames);
+        public override bool VisitLiteralExpression(LiteralExpressionSyntax node) => true;
 
-    private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
-        => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
-           unary.IsKind(SyntaxKind.UnaryMinusExpression) ||
-           unary.IsKind(SyntaxKind.UnaryPlusExpression);
+        public override bool VisitIdentifierName(IdentifierNameSyntax node)
+            => assignedNames.Contains(node.Identifier.ValueText);
+
+        public override bool VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+            => node.Expression is ThisExpressionSyntax && assignedNames.Contains(node.Name.Identifier.ValueText);
+
+        public override bool VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
+            => IsSupportedUnary(node) && Visit(node.Operand);
+
+        public override bool VisitCastExpression(CastExpressionSyntax node)
+            => Visit(node.Expression);
+
+        public override bool VisitBinaryExpression(BinaryExpressionSyntax node)
+            => Visit(node.Left) && Visit(node.Right);
+
+        public override bool VisitConditionalExpression(ConditionalExpressionSyntax node)
+            => Visit(node.Condition) && Visit(node.WhenTrue) && Visit(node.WhenFalse);
+
+        private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax node)
+            => node.IsKind(SyntaxKind.LogicalNotExpression) ||
+               node.IsKind(SyntaxKind.UnaryMinusExpression) ||
+               node.IsKind(SyntaxKind.UnaryPlusExpression);
+    }
 
     internal static ExpressionSyntax? TryGetDerivedGetterExpression(
         IPropertySymbol property,
