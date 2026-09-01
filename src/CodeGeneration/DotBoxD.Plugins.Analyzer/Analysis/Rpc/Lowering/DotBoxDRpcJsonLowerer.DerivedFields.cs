@@ -125,6 +125,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 BoundDerivedMember(memberBindings, thisMember),
             MemberAccessExpressionSyntax { Expression: BaseExpressionSyntax } baseMember =>
                 BoundDerivedMember(memberBindings, baseMember),
+            MemberAccessExpressionSyntax member =>
+                LowerDerivedMemberAccess(member, memberBindings, named, derived),
             _ => null
         };
 
@@ -141,6 +143,30 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         return Call("list.count", null, LowerDerivedExpression(count.Expression, memberBindings, named, derived));
+    }
+
+    private string? LowerDerivedMemberAccess(
+        MemberAccessExpressionSyntax member,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (TypeOf(member.Expression) is not INamedTypeSymbol receiver ||
+             !DotBoxDRpcTypeMapper.IsRecordDto(receiver))
+        {
+            return null;
+        }
+
+        var fields = DotBoxDRpcTypeMapper.RecordFields(receiver);
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (string.Equals(fields[i].Name, member.Name.Identifier.ValueText, StringComparison.Ordinal))
+            {
+                return RecordGet(LowerDerivedExpression(member.Expression, memberBindings, named, derived), i);
+            }
+        }
+
+        return null;
     }
 
     private string? BoundDerivedMember(

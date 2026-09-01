@@ -138,10 +138,13 @@ internal static partial class DotBoxDRpcTypeMapper
                 return assignedFields.ContainsKey(node.Name.Identifier.ValueText);
             }
 
-            return node.Name.Identifier.ValueText == "Count" &&
-                   TryGetAssignedFieldType(node.Expression, assignedFields, out var type) &&
-                   ListElementType(type) is not null &&
-                   Visit(node.Expression);
+            if (node.Name.Identifier.ValueText == "Count" &&
+                TryGetAssignedFieldType(node.Expression, assignedFields, out var type))
+            {
+                return ListElementType(type) is not null && Visit(node.Expression);
+            }
+
+            return Visit(node.Expression);
         }
 
         public override bool VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
