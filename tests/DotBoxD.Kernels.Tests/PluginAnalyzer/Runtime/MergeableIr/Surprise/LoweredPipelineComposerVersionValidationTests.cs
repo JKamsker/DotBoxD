@@ -31,10 +31,15 @@ public sealed class LoweredPipelineComposerVersionValidationTests
     [Fact]
     public void Valid_composition_versions_still_compose()
     {
-        var module = LoweredPipelineComposer.Compose(ValidComposition());
+        var composition = ValidComposition() with
+        {
+            Version = new(2, 3, 4),
+            TargetSandboxVersion = new(5, 6, 7),
+        };
+        var module = LoweredPipelineComposer.Compose(composition);
 
-        Assert.Equal(new SemVersion(1, 0, 0), module.Version);
-        Assert.Equal(new SemVersion(1, 0, 0), module.TargetSandboxVersion);
+        Assert.Equal(new SemVersion(2, 3, 4), module.Version);
+        Assert.Equal(new SemVersion(5, 6, 7), module.TargetSandboxVersion);
     }
 
     private static LoweredPipelineComposition ValidComposition()
