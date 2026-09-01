@@ -58,6 +58,8 @@ internal static class CollectionMaterializationPolicy
         {
             ("ConvertAll", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.ConvertAll",
+            ("Find", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.Find",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
             ("FindIndex", ListTypeName) when !method.IsStatic =>
