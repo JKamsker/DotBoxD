@@ -63,22 +63,35 @@ public sealed class FaultInjectingRpcChannel : IRpcChannel
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<bool> completion;
+        Task disposeTask;
+
         lock (_disposeGate)
         {
-            _disposeTask ??= DisposeInnerAsync();
-            return new ValueTask(_disposeTask);
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
+
+            completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            disposeTask = completion.Task;
+            _disposeTask = disposeTask;
         }
+
+        _ = CompleteDisposeAsync(completion);
+        return new ValueTask(disposeTask);
     }
 
-    private Task DisposeInnerAsync()
+    private async Task CompleteDisposeAsync(TaskCompletionSource<bool> completion)
     {
         try
         {
-            return _inner.DisposeAsync().AsTask();
+            await _inner.DisposeAsync().ConfigureAwait(false);
+            completion.TrySetResult(true);
         }
         catch (Exception ex)
         {
-            return Task.FromException(ex);
+            completion.TrySetException(ex);
         }
     }
 }
