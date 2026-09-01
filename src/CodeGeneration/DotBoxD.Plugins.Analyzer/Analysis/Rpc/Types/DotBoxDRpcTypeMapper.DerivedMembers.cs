@@ -142,6 +142,9 @@ internal static partial class DotBoxDRpcTypeMapper
         public override bool VisitConditionalExpression(ConditionalExpressionSyntax node)
             => Visit(node.Condition) && Visit(node.WhenTrue) && Visit(node.WhenFalse);
 
+        public override bool VisitInvocationExpression(InvocationExpressionSyntax node)
+            => node.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" };
+
         public override bool VisitSwitchExpression(SwitchExpressionSyntax node)
             => Visit(node.GoverningExpression) &&
                node.Arms.Count > 0 &&
