@@ -9,6 +9,18 @@ internal static class CollectionMaterializationPolicy
     private const string ImmutableDictionaryTypeName = "System.Collections.Immutable.ImmutableDictionary";
     private const string ImmutableListTypeName = "System.Collections.Immutable.ImmutableList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private static readonly IReadOnlyDictionary<string, string> ListDisplayNames =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ConvertAll"] = "System.Collections.Generic.List.ConvertAll",
+            ["Find"] = "System.Collections.Generic.List.Find",
+            ["GetRange"] = "System.Collections.Generic.List.GetRange",
+            ["LastIndexOf"] = "System.Collections.Generic.List.LastIndexOf",
+            ["FindIndex"] = "System.Collections.Generic.List.FindIndex",
+            ["FindLastIndex"] = "System.Collections.Generic.List.FindLastIndex",
+            ["RemoveRange"] = "System.Collections.Generic.List.RemoveRange",
+            ["Reverse"] = "System.Collections.Generic.List.Reverse"
+        };
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
@@ -54,28 +66,14 @@ internal static class CollectionMaterializationPolicy
 
     private static bool TryGetListDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
-        forbidden = (method.Name, typeName) switch
+        if (method.IsStatic ||
+            !string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
-            ("ConvertAll", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.ConvertAll",
-            ("Find", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.Find",
-            ("GetRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.GetRange",
-            ("LastIndexOf", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.LastIndexOf",
-            ("FindIndex", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.FindIndex",
-            ("FindLastIndex", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.FindLastIndex",
-            ("RemoveRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.RemoveRange",
-            ("Reverse", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.Reverse",
-            _ => null!
-        };
+            forbidden = null!;
+            return false;
+        }
 
-        return forbidden is not null;
+        return ListDisplayNames.TryGetValue(method.Name, out forbidden!);
     }
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)

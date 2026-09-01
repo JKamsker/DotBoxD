@@ -38,7 +38,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public string Register(string serviceName, object instance)
     {
-        ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
+        InstanceRegistryPolicy.ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
 
         if (instance is null)
             throw new ArgumentNullException(nameof(instance));
@@ -50,7 +50,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
                 throw new InvalidOperationException("Instance registry is closed.");
             }
 
-            if (ContainsReference(_disposing, instance) || ContainsPendingDisposal(instance))
+            if (InstanceRegistryPolicy.ContainsReference(_disposing, instance) ||
+                InstanceRegistryPolicy.ContainsPendingDisposal(_pendingDisposals, instance))
             {
                 throw new InvalidOperationException("Cannot register an instance while it is being disposed.");
             }
@@ -71,7 +72,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public bool TryGet(string serviceName, string instanceId, out object instance)
     {
-        if (IsInvalidKey(serviceName) || IsInvalidKey(instanceId))
+        if (InstanceRegistryPolicy.IsInvalidKey(serviceName) ||
+            InstanceRegistryPolicy.IsInvalidKey(instanceId))
         {
             instance = null!;
             return false;
@@ -91,7 +93,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         lock (_gate)
         {
-            if (IsInvalidKey(serviceName) || IsInvalidKey(instanceId) ||
+            if (InstanceRegistryPolicy.IsInvalidKey(serviceName) ||
+                InstanceRegistryPolicy.IsInvalidKey(instanceId) ||
                 !_entries.TryGetValue((serviceName, instanceId), out instance!))
             {
                 instance = null!;
@@ -108,7 +111,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public void Release(string serviceName, string instanceId)
     {
-        ValidateKeys(serviceName, instanceId);
+        InstanceRegistryPolicy.ValidateKeys(serviceName, instanceId);
 
         var disposal = RemoveForDisposal(serviceName, instanceId);
 
@@ -124,7 +127,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public async ValueTask ReleaseAsync(string serviceName, string instanceId)
     {
-        ValidateKeys(serviceName, instanceId);
+        InstanceRegistryPolicy.ValidateKeys(serviceName, instanceId);
 
         var disposal = RemoveForDisposal(serviceName, instanceId);
 
@@ -168,7 +171,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
             var instances = new List<object>(_entries.Count);
             foreach (var instance in _entries.Values)
             {
-                if (!ContainsReference(instances, instance))
+                if (!InstanceRegistryPolicy.ContainsReference(instances, instance))
                 {
                     instances.Add(instance);
                 }
@@ -185,8 +188,9 @@ public sealed class InstanceRegistry : IInstanceRegistry
         InstanceRegistryDisposal? disposal = null;
         lock (_gate)
         {
-            RemoveReference(_activeInstances, instance);
-            if (!ContainsReference(_activeInstances, instance) && !ContainsReference(_entries.Values, instance))
+            InstanceRegistryPolicy.RemoveReference(_activeInstances, instance);
+            if (!InstanceRegistryPolicy.ContainsReference(_activeInstances, instance) &&
+                !InstanceRegistryPolicy.ContainsReference(_entries.Values, instance))
             {
                 disposal = TakePendingDisposal(instance);
             }
@@ -208,13 +212,13 @@ public sealed class InstanceRegistry : IInstanceRegistry
             }
 
             _count--;
-            if (ContainsReference(_entries.Values, instance))
+            if (InstanceRegistryPolicy.ContainsReference(_entries.Values, instance))
             {
                 return null;
             }
 
             var disposal = new InstanceRegistryDisposal(instance);
-            if (ContainsReference(_activeInstances, instance))
+            if (InstanceRegistryPolicy.ContainsReference(_activeInstances, instance))
             {
                 _pendingDisposals.Add(disposal);
                 return disposal;
@@ -224,19 +228,6 @@ public sealed class InstanceRegistry : IInstanceRegistry
             disposal.MarkReady();
             return disposal;
         }
-    }
-
-    private bool ContainsPendingDisposal(object instance)
-    {
-        foreach (var disposal in _pendingDisposals)
-        {
-            if (ReferenceEquals(disposal.Instance, instance))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private InstanceRegistryDisposal? TakePendingDisposal(object instance)
@@ -262,7 +253,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         lock (_gate)
         {
-            RemoveReference(_disposing, instance);
+            InstanceRegistryPolicy.RemoveReference(_disposing, instance);
         }
     }
 
@@ -299,46 +290,6 @@ public sealed class InstanceRegistry : IInstanceRegistry
         finally
         {
             CompleteDisposal(disposal.Instance);
-        }
-    }
-
-    private static void ValidateKeys(string serviceName, string instanceId)
-    {
-        ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
-        ThrowIfInvalidKey(instanceId, nameof(instanceId), "Instance id");
-    }
-
-    private static void ThrowIfInvalidKey(string value, string paramName, string label)
-    {
-        if (IsInvalidKey(value))
-        {
-            throw new ArgumentException(label + " must not be null, empty, or whitespace.", paramName);
-        }
-    }
-
-    private static bool IsInvalidKey(string? value) => string.IsNullOrWhiteSpace(value);
-
-    private static bool ContainsReference(IEnumerable<object> instances, object candidate)
-    {
-        foreach (var instance in instances)
-        {
-            if (ReferenceEquals(instance, candidate))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void RemoveReference(List<object> instances, object candidate)
-    {
-        for (var index = 0; index < instances.Count; index++)
-        {
-            if (ReferenceEquals(instances[index], candidate))
-            {
-                instances.RemoveAt(index);
-                return;
-            }
         }
     }
 

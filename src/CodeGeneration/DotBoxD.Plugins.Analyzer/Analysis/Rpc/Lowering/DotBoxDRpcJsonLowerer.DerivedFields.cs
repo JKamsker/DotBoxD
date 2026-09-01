@@ -109,6 +109,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
+        => TryLowerDerivedWrapper(expression, memberBindings, named, derived) ??
+           TryLowerDerivedConstant(expression) ??
+           TryLowerDerivedMember(expression, memberBindings, named, derived);
+
+    private string? TryLowerDerivedWrapper(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
@@ -116,6 +125,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             PostfixUnaryExpressionSyntax postfix
                 when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) =>
                 LowerDerivedExpression(postfix.Operand, memberBindings, named, derived),
+            _ => null
+        };
+
+    private string? TryLowerDerivedConstant(ExpressionSyntax expression)
+        => expression switch
+        {
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
             InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameofExpression when
@@ -125,6 +140,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 contents.All(static content => content is InterpolatedStringTextSyntax) =>
                 LiteralJson(string.Concat(contents.Select(static content =>
                     ((InterpolatedStringTextSyntax)content).TextToken.ValueText))),
+            _ => null
+        };
+
+    private string? TryLowerDerivedMember(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression switch
+        {
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 BoundDerivedMember(memberBindings, thisMember),
