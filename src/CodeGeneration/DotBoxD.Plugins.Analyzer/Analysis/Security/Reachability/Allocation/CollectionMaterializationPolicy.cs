@@ -62,6 +62,8 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Generic.List.Find",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
+            ("LastIndexOf", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.LastIndexOf",
             ("FindIndex", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.FindIndex",
             ("FindLastIndex", ListTypeName) when !method.IsStatic =>
