@@ -52,16 +52,16 @@ internal static partial class DotBoxDRpcTypeMapper
             return false;
         }
 
-        var assignedNames = new HashSet<string>(StringComparer.Ordinal);
+        var assignedFields = new Dictionary<string, ITypeSymbol>(StringComparer.Ordinal);
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned[i])
             {
-                assignedNames.Add(fields[i].Name);
+                assignedFields.Add(fields[i].Name, fields[i].Type);
             }
         }
 
-        return IsExpressionOverAssignedFields(body, assignedNames);
+        return IsExpressionOverAssignedFields(body, assignedFields);
     }
 
     private static bool[] ObjectInitializerAssigned(
@@ -112,10 +112,11 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
-        ISet<string> assignedNames)
-        => new AssignedFieldExpressionVisitor(assignedNames).Visit(expression);
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields)
+        => new AssignedFieldExpressionVisitor(assignedFields).Visit(expression);
 
-    private sealed class AssignedFieldExpressionVisitor(ISet<string> assignedNames) : CSharpSyntaxVisitor<bool>
+    private sealed class AssignedFieldExpressionVisitor(
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields) : CSharpSyntaxVisitor<bool>
     {
         public override bool DefaultVisit(SyntaxNode node) => false;
 
@@ -128,11 +129,20 @@ internal static partial class DotBoxDRpcTypeMapper
             => node.Contents.All(static content => content is InterpolatedStringTextSyntax);
 
         public override bool VisitIdentifierName(IdentifierNameSyntax node)
-            => assignedNames.Contains(node.Identifier.ValueText);
+            => assignedFields.ContainsKey(node.Identifier.ValueText);
 
         public override bool VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
-            => (node.Expression is ThisExpressionSyntax or BaseExpressionSyntax) &&
-               assignedNames.Contains(node.Name.Identifier.ValueText);
+        {
+            if (node.Expression is ThisExpressionSyntax or BaseExpressionSyntax)
+            {
+                return assignedFields.ContainsKey(node.Name.Identifier.ValueText);
+            }
+
+            return node.Name.Identifier.ValueText == "Count" &&
+                   TryGetAssignedFieldType(node.Expression, assignedFields, out var type) &&
+                   ListElementType(type) is not null &&
+                   Visit(node.Expression);
+        }
 
         public override bool VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
             => IsSupportedUnary(node) && Visit(node.Operand);
@@ -168,6 +178,27 @@ internal static partial class DotBoxDRpcTypeMapper
                node.IsKind(SyntaxKind.UnaryMinusExpression) ||
                node.IsKind(SyntaxKind.UnaryPlusExpression);
     }
+
+    private static bool TryGetAssignedFieldType(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields,
+        out ITypeSymbol type)
+    {
+        type = null!;
+        var name = GetAssignedFieldName(expression);
+
+        return name is not null && assignedFields.TryGetValue(name, out type);
+    }
+
+    private static string? GetAssignedFieldName(ExpressionSyntax expression)
+        => expression switch
+        {
+            ParenthesizedExpressionSyntax parenthesized => GetAssignedFieldName(parenthesized.Expression),
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax or BaseExpressionSyntax } member =>
+                member.Name.Identifier.ValueText,
+            _ => null
+        };
 
     internal static ExpressionSyntax? TryGetDerivedGetterExpression(
         IPropertySymbol property,
