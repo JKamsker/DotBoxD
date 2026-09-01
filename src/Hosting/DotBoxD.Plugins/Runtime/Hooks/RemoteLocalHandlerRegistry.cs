@@ -152,11 +152,18 @@ public sealed class RemoteLocalHandlerRegistry
     /// native delegate. <paramref name="context"/> is the client-side <see cref="HookContext"/> the delegate
     /// runs against. Throws if no handler is registered for <paramref name="subscriptionId"/>.
     /// </summary>
-    public async ValueTask DispatchAsync(
+    public ValueTask DispatchAsync(
         string subscriptionId,
         ReadOnlyMemory<byte> projectedValue,
         HookContext context,
         CancellationToken cancellationToken = default)
+        => DispatchCoreAsync(subscriptionId, projectedValue, context, cancellationToken);
+
+    private async ValueTask DispatchCoreAsync(
+        string subscriptionId,
+        ReadOnlyMemory<byte> projectedValue,
+        HookContext context,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(context);
