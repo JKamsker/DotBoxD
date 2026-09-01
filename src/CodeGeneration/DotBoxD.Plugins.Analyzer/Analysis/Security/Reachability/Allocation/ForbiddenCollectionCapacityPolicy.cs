@@ -72,7 +72,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         if (CollectionMaterializationPolicy.TryGetDisplayName(method, typeName, out forbidden) ||
-            CollectionBulkGrowthPolicy.TryGetDisplayName(method, typeName, out forbidden))
+            CollectionBulkGrowthPolicy.TryGetDisplayName(method, typeName, out forbidden) ||
+            CollectionScanPolicy.TryGetDisplayName(method, typeName, out forbidden))
         {
             return true;
         }
