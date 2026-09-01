@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Runtime.ExceptionServices;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
@@ -153,35 +152,23 @@ public sealed class RemoteLocalHandlerRegistry
     /// native delegate. <paramref name="context"/> is the client-side <see cref="HookContext"/> the delegate
     /// runs against. Throws if no handler is registered for <paramref name="subscriptionId"/>.
     /// </summary>
-    public ValueTask DispatchAsync(
+    public async ValueTask DispatchAsync(
         string subscriptionId,
         ReadOnlyMemory<byte> projectedValue,
         HookContext context,
         CancellationToken cancellationToken = default)
     {
-        try
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(context);
+        ThrowIfDispatchCanceled(context, cancellationToken);
+        if (!_handlers.TryGetValue(subscriptionId, out var handler))
         {
-            ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
-            ArgumentNullException.ThrowIfNull(context);
-            ThrowIfDispatchCanceled(context, cancellationToken);
-            if (!_handlers.TryGetValue(subscriptionId, out var handler))
-            {
-                throw new InvalidOperationException(
-                    $"No remote local handler is registered for subscription '{subscriptionId}'.");
-            }
-            return handler.Invoke(projectedValue, context);
+            throw new InvalidOperationException(
+                $"No remote local handler is registered for subscription '{subscriptionId}'.");
         }
-        catch (Exception ex)
-        {
-            // The former async method captured synchronous validation and decoder failures in its ValueTask.
-            return CaptureDispatchExceptionAsync(ex);
-        }
-    }
 
-    private static async ValueTask CaptureDispatchExceptionAsync(Exception exception)
-    {
-        await Task.CompletedTask.ConfigureAwait(false);
-        ExceptionDispatchInfo.Capture(exception).Throw();
+        await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+        ThrowIfDispatchCanceled(context, cancellationToken);
     }
 
     public async ValueTask<byte[]> DispatchResultAsync(
