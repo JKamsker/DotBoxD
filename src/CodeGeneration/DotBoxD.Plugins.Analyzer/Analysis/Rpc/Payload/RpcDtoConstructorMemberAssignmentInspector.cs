@@ -58,6 +58,7 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
         bool alreadyMatched)
         => !alreadyMatched &&
             IsDirectConstructorAssignment(declaration, assignment) &&
+            !RpcDtoConstructorControlFlowInspector.CanSkipAssignment(declaration, assignment) &&
             assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
             PreservesParameterOrDefaultState(assignment.Right, member, parameter, declaration, model);
 
