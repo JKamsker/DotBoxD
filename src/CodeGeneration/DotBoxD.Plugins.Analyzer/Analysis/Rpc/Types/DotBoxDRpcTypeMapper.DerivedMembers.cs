@@ -136,6 +136,9 @@ internal static partial class DotBoxDRpcTypeMapper
         public override bool VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
             => IsSupportedUnary(node) && Visit(node.Operand);
 
+        public override bool VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
+            => node.IsKind(SyntaxKind.SuppressNullableWarningExpression) && Visit(node.Operand);
+
         public override bool VisitCastExpression(CastExpressionSyntax node)
             => Visit(node.Expression);
 
