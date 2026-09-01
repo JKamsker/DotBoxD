@@ -87,11 +87,6 @@ internal static class RpcDtoConstructorAssignmentVerifier
         IParameterSymbol parameter,
         SemanticModel? model)
     {
-        if (declaration.Initializer?.IsKind(SyntaxKind.ThisConstructorInitializer) == true)
-        {
-            return false;
-        }
-
         var matched = false;
         foreach (var assignment in ConstructorAssignments(declaration))
         {
