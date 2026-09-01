@@ -23,13 +23,31 @@ public interface IInstanceRegistry
     bool TryGet(string serviceName, string instanceId, out object instance);
 
     /// <summary>
+    /// Acquires an instance for an in-flight operation. Dispose <paramref name="lease"/> after the
+    /// operation completes so a concurrent release cannot dispose the instance while it is in use.
+    /// The default implementation preserves the lookup behavior for custom registries that do not
+    /// own instance lifetimes.
+    /// </summary>
+    bool TryAcquire(string serviceName, string instanceId, out object instance, out IAsyncDisposable lease)
+    {
+        if (TryGet(serviceName, instanceId, out instance))
+        {
+            lease = EmptyInstanceLease.Instance;
+            return true;
+        }
+
+        lease = null!;
+        return false;
+    }
+
+    /// <summary>
     /// Releases an instance early (the connection-teardown path also clears it). Keys must be
     /// non-empty and non-whitespace.
     /// </summary>
     void Release(string serviceName, string instanceId);
 
     /// <summary>
-    /// Releases an instance early, awaiting async disposal when the instance supports it. Keys must
+    /// Releases an instance early and awaits async disposal when no in-flight operation still holds it. Keys must
     /// be non-empty and non-whitespace.
     /// </summary>
     ValueTask ReleaseAsync(string serviceName, string instanceId);

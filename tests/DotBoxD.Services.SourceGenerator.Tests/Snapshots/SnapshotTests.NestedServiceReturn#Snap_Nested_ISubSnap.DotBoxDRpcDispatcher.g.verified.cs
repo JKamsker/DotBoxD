@@ -42,12 +42,24 @@ namespace Snap.Nested
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!registry.TryGet("ISubSnap", instanceId, out var __obj) || __obj is not global::Snap.Nested.ISubSnap __inst)
+            if (!registry.TryAcquire("ISubSnap", instanceId, out var __obj, out var __lease) || __obj is not global::Snap.Nested.ISubSnap __inst)
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'ISubSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
             }
 
-            return DispatchCoreAsync(__inst, instanceId, method, payload, serializer, registry, output, streaming, ct);
+            return DispatchWithLeaseAsync(__inst, __lease, instanceId, method, payload, serializer, registry, output, streaming, ct);
+        }
+
+        private async global::System.Threading.Tasks.Task DispatchWithLeaseAsync(global::Snap.Nested.ISubSnap receiver, global::System.IAsyncDisposable lease, string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
+        {
+            try
+            {
+                await DispatchCoreAsync(receiver, instanceId, method, payload, serializer, registry, output, streaming, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
 #pragma warning disable CS1998
