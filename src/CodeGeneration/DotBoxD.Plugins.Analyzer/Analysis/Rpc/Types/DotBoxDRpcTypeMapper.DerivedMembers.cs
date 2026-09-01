@@ -124,6 +124,9 @@ internal static partial class DotBoxDRpcTypeMapper
 
         public override bool VisitLiteralExpression(LiteralExpressionSyntax node) => true;
 
+        public override bool VisitInterpolatedStringExpression(InterpolatedStringExpressionSyntax node)
+            => node.Contents.All(static content => content is InterpolatedStringTextSyntax);
+
         public override bool VisitIdentifierName(IdentifierNameSyntax node)
             => assignedNames.Contains(node.Identifier.ValueText);
 
