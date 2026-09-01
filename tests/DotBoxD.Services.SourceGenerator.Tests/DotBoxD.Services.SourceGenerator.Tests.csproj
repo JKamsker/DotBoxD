@@ -5,6 +5,8 @@
     <RollForward>LatestMajor</RollForward>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- CI is a mixed xUnit v2/v3 solution and still uses the VSTest orchestration path. -->
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <SolutionDir>$(MSBuildThisFileDirectory)../../</SolutionDir>

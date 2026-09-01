@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using DotBoxD.Services.Diagnostics;
 
 namespace DotBoxD.Services.Server;
 
@@ -13,7 +12,9 @@ public sealed class InstanceRegistry : IInstanceRegistry
     internal const int DefaultMaxInstances = 1024;
 
     private readonly ConcurrentDictionary<(string Service, string Id), object> _entries = new();
+    private readonly List<object> _activeInstances = [];
     private readonly List<object> _disposing = [];
+    private readonly List<InstanceRegistryDisposal> _pendingDisposals = [];
     private readonly object _gate = new();
     private readonly int _maxInstances;
     private int _count;
@@ -37,7 +38,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public string Register(string serviceName, object instance)
     {
-        ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
+        InstanceRegistryPolicy.ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
 
         if (instance is null)
             throw new ArgumentNullException(nameof(instance));
@@ -49,7 +50,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
                 throw new InvalidOperationException("Instance registry is closed.");
             }
 
-            if (ContainsReference(_disposing, instance))
+            if (InstanceRegistryPolicy.ContainsReference(_disposing, instance) ||
+                InstanceRegistryPolicy.ContainsPendingDisposal(_pendingDisposals, instance))
             {
                 throw new InvalidOperationException("Cannot register an instance while it is being disposed.");
             }
@@ -70,7 +72,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public bool TryGet(string serviceName, string instanceId, out object instance)
     {
-        if (IsInvalidKey(serviceName) || IsInvalidKey(instanceId))
+        if (InstanceRegistryPolicy.IsInvalidKey(serviceName) ||
+            InstanceRegistryPolicy.IsInvalidKey(instanceId))
         {
             instance = null!;
             return false;
@@ -86,21 +89,37 @@ public sealed class InstanceRegistry : IInstanceRegistry
     }
 
     /// <inheritdoc />
+    public bool TryAcquire(string serviceName, string instanceId, out object instance, out IAsyncDisposable lease)
+    {
+        lock (_gate)
+        {
+            if (InstanceRegistryPolicy.IsInvalidKey(serviceName) ||
+                InstanceRegistryPolicy.IsInvalidKey(instanceId) ||
+                !_entries.TryGetValue((serviceName, instanceId), out instance!))
+            {
+                instance = null!;
+                lease = null!;
+                return false;
+            }
+
+            _activeInstances.Add(instance);
+            lease = new InstanceRegistryLease(this, instance);
+            return true;
+        }
+    }
+
+    /// <inheritdoc />
     public void Release(string serviceName, string instanceId)
     {
-        ValidateKeys(serviceName, instanceId);
+        InstanceRegistryPolicy.ValidateKeys(serviceName, instanceId);
 
-        var instance = RemoveForDisposal(serviceName, instanceId);
+        var disposal = RemoveForDisposal(serviceName, instanceId);
 
-        if (instance is not null)
+        if (disposal is not null)
         {
-            try
+            if (disposal.IsReady)
             {
-                DisposeInstance(instance);
-            }
-            finally
-            {
-                CompleteDisposal(instance);
+                DisposeAndComplete(disposal);
             }
         }
     }
@@ -108,19 +127,15 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public async ValueTask ReleaseAsync(string serviceName, string instanceId)
     {
-        ValidateKeys(serviceName, instanceId);
+        InstanceRegistryPolicy.ValidateKeys(serviceName, instanceId);
 
-        var instance = RemoveForDisposal(serviceName, instanceId);
+        var disposal = RemoveForDisposal(serviceName, instanceId);
 
-        if (instance is not null)
+        if (disposal is not null)
         {
-            try
+            if (disposal.IsReady)
             {
-                await DisposeInstanceAsync(instance).ConfigureAwait(false);
-            }
-            finally
-            {
-                CompleteDisposal(instance);
+                await DisposeAndCompleteAsync(disposal).ConfigureAwait(false);
             }
         }
     }
@@ -130,7 +145,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var instance in DrainAll())
         {
-            DisposeInstanceBestEffort(instance);
+            InstanceRegistryDisposer.DisposeBestEffort(instance);
         }
     }
 
@@ -144,7 +159,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var instance in DrainAll())
         {
-            await DisposeInstanceAsyncBestEffort(instance).ConfigureAwait(false);
+            await InstanceRegistryDisposer.DisposeAsyncBestEffort(instance).ConfigureAwait(false);
         }
     }
 
@@ -156,7 +171,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
             var instances = new List<object>(_entries.Count);
             foreach (var instance in _entries.Values)
             {
-                if (!ContainsReference(instances, instance))
+                if (!InstanceRegistryPolicy.ContainsReference(instances, instance))
                 {
                     instances.Add(instance);
                 }
@@ -168,7 +183,26 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
     }
 
-    private object? RemoveForDisposal(string serviceName, string instanceId)
+    internal async ValueTask ReleaseLeaseAsync(object instance)
+    {
+        InstanceRegistryDisposal? disposal = null;
+        lock (_gate)
+        {
+            InstanceRegistryPolicy.RemoveReference(_activeInstances, instance);
+            if (!InstanceRegistryPolicy.ContainsReference(_activeInstances, instance) &&
+                !InstanceRegistryPolicy.ContainsReference(_entries.Values, instance))
+            {
+                disposal = TakePendingDisposal(instance);
+            }
+        }
+
+        if (disposal is not null)
+        {
+            await DisposeAndCompleteAsync(disposal).ConfigureAwait(false);
+        }
+    }
+
+    private InstanceRegistryDisposal? RemoveForDisposal(string serviceName, string instanceId)
     {
         lock (_gate)
         {
@@ -178,123 +212,85 @@ public sealed class InstanceRegistry : IInstanceRegistry
             }
 
             _count--;
-            if (ContainsReference(_entries.Values, instance))
+            if (InstanceRegistryPolicy.ContainsReference(_entries.Values, instance))
             {
                 return null;
             }
 
+            var disposal = new InstanceRegistryDisposal(instance);
+            if (InstanceRegistryPolicy.ContainsReference(_activeInstances, instance))
+            {
+                _pendingDisposals.Add(disposal);
+                return disposal;
+            }
+
             _disposing.Add(instance);
-            return instance;
+            disposal.MarkReady();
+            return disposal;
         }
+    }
+
+    private InstanceRegistryDisposal? TakePendingDisposal(object instance)
+    {
+        for (var index = 0; index < _pendingDisposals.Count; index++)
+        {
+            var disposal = _pendingDisposals[index];
+            if (!ReferenceEquals(disposal.Instance, instance))
+            {
+                continue;
+            }
+
+            _pendingDisposals.RemoveAt(index);
+            _disposing.Add(instance);
+            disposal.MarkReady();
+            return disposal;
+        }
+
+        return null;
     }
 
     private void CompleteDisposal(object instance)
     {
         lock (_gate)
         {
-            RemoveReference(_disposing, instance);
+            InstanceRegistryPolicy.RemoveReference(_disposing, instance);
         }
     }
 
-    private static void ValidateKeys(string serviceName, string instanceId)
-    {
-        ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
-        ThrowIfInvalidKey(instanceId, nameof(instanceId), "Instance id");
-    }
-
-    private static void ThrowIfInvalidKey(string value, string paramName, string label)
-    {
-        if (IsInvalidKey(value))
-        {
-            throw new ArgumentException(label + " must not be null, empty, or whitespace.", paramName);
-        }
-    }
-
-    private static bool IsInvalidKey(string? value) => string.IsNullOrWhiteSpace(value);
-
-    private static bool ContainsReference(IEnumerable<object> instances, object candidate)
-    {
-        foreach (var instance in instances)
-        {
-            if (ReferenceEquals(instance, candidate))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void RemoveReference(List<object> instances, object candidate)
-    {
-        for (var index = 0; index < instances.Count; index++)
-        {
-            if (ReferenceEquals(instances[index], candidate))
-            {
-                instances.RemoveAt(index);
-                return;
-            }
-        }
-    }
-
-    // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
-    // so they are disposed when released. IAsyncDisposable is preferred when present; run it away from
-    // the caller's SynchronizationContext before blocking so user disposers that capture context can finish.
-    private static void DisposeInstance(object instance)
-    {
-        switch (instance)
-        {
-            case IAsyncDisposable asyncDisposable:
-                DisposeAsyncSynchronously(asyncDisposable);
-                break;
-            case IDisposable disposable:
-                disposable.Dispose();
-                break;
-        }
-    }
-
-    private static void DisposeInstanceBestEffort(object instance)
+    private void DisposeAndComplete(InstanceRegistryDisposal disposal)
     {
         try
         {
-            DisposeInstance(instance);
+            InstanceRegistryDisposer.Dispose(disposal.Instance);
+            disposal.Completion.SetResult(true);
         }
         catch (Exception ex)
         {
-            RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            disposal.Completion.SetException(ex);
+            throw;
         }
-    }
-
-    private static void DisposeAsyncSynchronously(IAsyncDisposable asyncDisposable)
-    {
-        Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false))
-            .GetAwaiter()
-            .GetResult();
-    }
-
-    // Async counterpart of DisposeInstance: awaits IAsyncDisposable.DisposeAsync (preferred when present)
-    // instead of blocking on it, so a suspending user disposer never sync-blocks a pooled thread.
-    private static async Task DisposeInstanceAsync(object instance)
-    {
-        switch (instance)
+        finally
         {
-            case IAsyncDisposable asyncDisposable:
-                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                break;
-            case IDisposable disposable:
-                disposable.Dispose();
-                break;
+            CompleteDisposal(disposal.Instance);
         }
     }
 
-    private static async Task DisposeInstanceAsyncBestEffort(object instance)
+    private async Task DisposeAndCompleteAsync(InstanceRegistryDisposal disposal)
     {
         try
         {
-            await DisposeInstanceAsync(instance).ConfigureAwait(false);
+            await InstanceRegistryDisposer.DisposeAsync(disposal.Instance).ConfigureAwait(false);
+            disposal.Completion.SetResult(true);
         }
         catch (Exception ex)
         {
-            RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            disposal.Completion.SetException(ex);
+            throw;
+        }
+        finally
+        {
+            CompleteDisposal(disposal.Instance);
         }
     }
+
 }

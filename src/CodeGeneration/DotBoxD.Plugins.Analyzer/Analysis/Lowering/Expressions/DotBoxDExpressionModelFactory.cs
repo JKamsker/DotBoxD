@@ -194,7 +194,7 @@ internal static partial class DotBoxDExpressionModelFactory
             }
         }
 
-        if (member.Expression is ThisExpressionSyntax)
+        if (member.Expression is ThisExpressionSyntax or BaseExpressionSyntax)
         {
             return LowerThisMemberAccess(member, memberName, context);
         }

@@ -89,12 +89,24 @@ internal static class DispatcherGenerator
             sb.AppendLine("        {");
             sb.AppendLine("            ct.ThrowIfCancellationRequested();");
             sb.AppendLine();
-            sb.AppendLine($"            if (!registry.{ServicesGeneratorMemberNames.InstanceRegistry.TryGet}(\"{service.ServiceName}\", instanceId, out var __obj) || __obj is not {qualifiedInterface} __inst)");
+            sb.AppendLine($"            if (!registry.{ServicesGeneratorMemberNames.InstanceRegistry.TryAcquire}(\"{service.ServiceName}\", instanceId, out var __obj, out var __lease) || __obj is not {qualifiedInterface} __inst)");
             sb.AppendLine("            {");
             sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Instance});");
             sb.AppendLine("            }");
             sb.AppendLine();
-            sb.AppendLine("            return DispatchCoreAsync(__inst, instanceId, method, payload, serializer, registry, output, streaming, ct);");
+            sb.AppendLine("            return DispatchWithLeaseAsync(__inst, __lease, instanceId, method, payload, serializer, registry, output, streaming, ct);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine($"        private async {ServicesGeneratorTypeNames.GlobalTask} DispatchWithLeaseAsync({qualifiedInterface} receiver, global::System.IAsyncDisposable lease, string instanceId, string method, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyMemory, "byte")} payload, {ServicesGeneratorTypeNames.GlobalSerializer} serializer, {ServicesGeneratorTypeNames.GlobalInstanceRegistry} registry, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalBufferWriter, "byte")} output, {ServicesGeneratorTypeNames.GlobalRpcStreamingContextInterface} streaming, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            try");
+            sb.AppendLine("            {");
+            sb.AppendLine("                await DispatchCoreAsync(receiver, instanceId, method, payload, serializer, registry, output, streaming, ct).ConfigureAwait(false);");
+            sb.AppendLine("            }");
+            sb.AppendLine("            finally");
+            sb.AppendLine("            {");
+            sb.AppendLine("                await lease.DisposeAsync().ConfigureAwait(false);");
+            sb.AppendLine("            }");
             sb.AppendLine("        }");
             return;
         }

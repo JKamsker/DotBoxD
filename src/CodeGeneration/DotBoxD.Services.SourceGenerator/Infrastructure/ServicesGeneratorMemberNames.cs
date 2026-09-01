@@ -39,6 +39,7 @@ internal static class ServicesGeneratorMemberNames
     public static class InstanceRegistry
     {
         public const string TryGet = "TryGet";
+        public const string TryAcquire = "TryAcquire";
         public const string Register = "Register";
         public const string Release = "Release";
         public const string ReleaseAsync = "ReleaseAsync";
