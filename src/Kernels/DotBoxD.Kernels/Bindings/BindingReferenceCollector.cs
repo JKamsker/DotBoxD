@@ -20,9 +20,10 @@ public static class BindingReferenceCollector
             return Collect(module, bindings);
         }
 
-        return CollectByFunction(module, bindings).TryGetValue(entrypoint, out var ids)
+        var references = CollectByFunction(module, bindings);
+        return references.TryGetValue(entrypoint, out var ids)
             ? ids
-            : new HashSet<string>(StringComparer.Ordinal);
+            : throw new ArgumentException("Entrypoint must identify a function in the module.", nameof(entrypoint));
     }
 
     public static IReadOnlyDictionary<string, IReadOnlySet<string>> CollectByFunction(
