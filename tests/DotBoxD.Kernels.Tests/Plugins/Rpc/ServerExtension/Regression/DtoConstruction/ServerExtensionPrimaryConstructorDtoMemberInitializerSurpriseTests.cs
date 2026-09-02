@@ -24,10 +24,10 @@ public sealed class ServerExtensionPrimaryConstructorDtoMemberInitializerSurpris
 
             public sealed class RemoteControl : IRemoteControl, IServerExtensionClientAccessor
             {
-                public RemoteControl(IServerExtensionClientRegistry serverExtensions)
+                public RemoteControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions)
                     => ServerExtensions = serverExtensions;
 
-                public IServerExtensionClientRegistry ServerExtensions { get; }
+                public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
             }
 
             public sealed class Profile(string name)

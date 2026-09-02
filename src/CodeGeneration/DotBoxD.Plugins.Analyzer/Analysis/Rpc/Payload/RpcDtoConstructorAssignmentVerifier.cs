@@ -80,6 +80,10 @@ internal static class RpcDtoConstructorAssignmentVerifier
             }
         }
 
-        return false;
+        return RpcDtoPrimaryConstructorMemberAssignmentInspector.InitializerPreservesMember(
+            constructor,
+            member,
+            parameter,
+            compilation);
     }
 }
