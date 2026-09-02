@@ -62,43 +62,78 @@ internal static class RpcDtoConstructorAssignmentVerifier
 
         foreach (var reference in constructor.DeclaringSyntaxReferences)
         {
-            var syntax = reference.GetSyntax();
-            var model = compilation?.ContainsSyntaxTree(syntax.SyntaxTree) == true
-                ? compilation.GetSemanticModel(syntax.SyntaxTree)
-                : null;
-            if (syntax is ConstructorDeclarationSyntax declaration &&
-                (RpcDtoConstructorMemberAssignmentInspector.BodyPreservesMember(
-                    declaration,
-                    member,
-                    parameter,
-                    model) ||
-                 BaseConstructorPreservesMember(
-                    declaration.Initializer?.ArgumentList,
-                    declaration.Initializer,
-                    member,
-                    parameter,
-                    model,
-                    compilation)))
+            if (SyntaxPreservesMember(reference.GetSyntax(), member, parameter, compilation))
             {
                 return true;
             }
+        }
 
-            if (syntax is TypeDeclarationSyntax typeDeclaration &&
-                typeDeclaration.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>() is { } baseTypes)
+        return false;
+    }
+
+    private static bool SyntaxPreservesMember(
+        SyntaxNode syntax,
+        RecordMember member,
+        IParameterSymbol parameter,
+        Compilation? compilation)
+    {
+        var model = compilation?.ContainsSyntaxTree(syntax.SyntaxTree) == true
+            ? compilation.GetSemanticModel(syntax.SyntaxTree)
+            : null;
+
+        return syntax switch
+        {
+            ConstructorDeclarationSyntax declaration =>
+                ConstructorDeclarationPreservesMember(declaration, member, parameter, model, compilation),
+            TypeDeclarationSyntax typeDeclaration =>
+                PrimaryConstructorPreservesMember(typeDeclaration, member, parameter, model, compilation),
+            _ => false
+        };
+    }
+
+    private static bool ConstructorDeclarationPreservesMember(
+        ConstructorDeclarationSyntax declaration,
+        RecordMember member,
+        IParameterSymbol parameter,
+        SemanticModel? model,
+        Compilation? compilation)
+        => RpcDtoConstructorMemberAssignmentInspector.BodyPreservesMember(
+            declaration,
+            member,
+            parameter,
+            model) ||
+           BaseConstructorPreservesMember(
+               declaration.Initializer?.ArgumentList,
+               declaration.Initializer,
+               member,
+               parameter,
+               model,
+               compilation);
+
+    private static bool PrimaryConstructorPreservesMember(
+        TypeDeclarationSyntax typeDeclaration,
+        RecordMember member,
+        IParameterSymbol parameter,
+        SemanticModel? model,
+        Compilation? compilation)
+    {
+        var baseTypes = typeDeclaration.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>();
+        if (baseTypes is null)
+        {
+            return false;
+        }
+
+        foreach (var baseType in baseTypes)
+        {
+            if (BaseConstructorPreservesMember(
+                    baseType.ArgumentList,
+                    baseType,
+                    member,
+                    parameter,
+                    model,
+                    compilation))
             {
-                foreach (var baseType in baseTypes)
-                {
-                    if (BaseConstructorPreservesMember(
-                            baseType.ArgumentList,
-                            baseType,
-                            member,
-                            parameter,
-                            model,
-                            compilation))
-                    {
-                        return true;
-                    }
-                }
+                return true;
             }
         }
 
@@ -113,38 +148,72 @@ internal static class RpcDtoConstructorAssignmentVerifier
         SemanticModel? model,
         Compilation? compilation)
     {
-        if (arguments is null ||
-            invocation is null ||
-            model?.GetSymbolInfo(invocation).Symbol is not IMethodSymbol baseConstructor)
+        if (arguments is null || invocation is null)
         {
             return false;
         }
 
+        var baseConstructor = model?.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        return baseConstructor is not null &&
+            ForwardedParameterPreservesMember(
+                arguments,
+                baseConstructor,
+                member,
+                parameter,
+                model,
+                compilation);
+    }
+
+    private static bool ForwardedParameterPreservesMember(
+        ArgumentListSyntax arguments,
+        IMethodSymbol baseConstructor,
+        RecordMember member,
+        IParameterSymbol parameter,
+        SemanticModel? model,
+        Compilation? compilation)
+    {
         for (var index = 0; index < arguments.Arguments.Count; index++)
         {
             var argument = arguments.Arguments[index];
-            if (model.GetSymbolInfo(argument.Expression).Symbol is not IParameterSymbol source ||
-                !SymbolEqualityComparer.Default.Equals(source, parameter))
+            if (!IsForwardedParameter(argument, parameter, model) ||
+                !TryGetTargetParameter(baseConstructor, argument, index, out var targetParameter))
             {
                 continue;
             }
 
-            var targetIndex = argument.NameColon is null
-                ? index
-                : ParameterIndex(baseConstructor, argument.NameColon.Name.Identifier.ValueText);
-            if (targetIndex >= 0 &&
-                targetIndex < baseConstructor.Parameters.Length &&
-                ConstructorPreservesMember(
-                    baseConstructor,
-                    member,
-                    baseConstructor.Parameters[targetIndex],
-                    compilation))
+            if (ConstructorPreservesMember(baseConstructor, member, targetParameter, compilation))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsForwardedParameter(
+        ArgumentSyntax argument,
+        IParameterSymbol parameter,
+        SemanticModel? model)
+        => model?.GetSymbolInfo(argument.Expression).Symbol is IParameterSymbol source &&
+           SymbolEqualityComparer.Default.Equals(source, parameter);
+
+    private static bool TryGetTargetParameter(
+        IMethodSymbol constructor,
+        ArgumentSyntax argument,
+        int positionalIndex,
+        out IParameterSymbol parameter)
+    {
+        var index = argument.NameColon is null
+            ? positionalIndex
+            : ParameterIndex(constructor, argument.NameColon.Name.Identifier.ValueText);
+        if ((uint)index >= (uint)constructor.Parameters.Length)
+        {
+            parameter = null!;
+            return false;
+        }
+
+        parameter = constructor.Parameters[index];
+        return true;
     }
 
     private static int ParameterIndex(IMethodSymbol constructor, string name)
