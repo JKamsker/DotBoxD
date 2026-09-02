@@ -23,13 +23,10 @@ internal sealed class ResultHookEntryInvoker<TEvent, TContext>(Action<ResultHook
         timeoutCts.CancelAfter(options.RemoteHandlerTimeout);
         try
         {
-            var pending = entry.Invoke(e, rawContext, context, timeoutCts.Token);
-            if (pending.IsCompletedSuccessfully)
-            {
-                return pending.Result;
-            }
-
-            return await pending.AsTask()
+            var pending = Task.Run(
+                () => entry.Invoke(e, rawContext, context, timeoutCts.Token).AsTask(),
+                CancellationToken.None);
+            return await pending
                 .WaitAsync(timeoutCts.Token)
                 .ConfigureAwait(false);
         }
