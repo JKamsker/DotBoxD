@@ -129,6 +129,7 @@ public sealed class RemoteLocalHandlerRegistry
             ThrowIfDispatchCanceled(hookContext, cancellationToken);
             return RemoteLocalResultEncoder.Encode(result);
         });
+        _handlers.TryRemove(subscriptionId, out _);
         _resultHandlers[subscriptionId] = entry;
         return new ResultRegistration(this, subscriptionId, entry);
     }
@@ -143,6 +144,7 @@ public sealed class RemoteLocalHandlerRegistry
     private IDisposable RegisterRawHandler(string subscriptionId, Func<ReadOnlyMemory<byte>, HookContext, ValueTask> invoke)
     {
         var entry = new Handler(invoke);
+        _resultHandlers.TryRemove(subscriptionId, out _);
         _handlers[subscriptionId] = entry;
         return new Registration(this, subscriptionId, entry);
     }
