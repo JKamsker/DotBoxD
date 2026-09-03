@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DotBoxD.Hosting.Execution.Compiled;
 using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -101,6 +102,8 @@ public sealed partial class SandboxHost
         CancellationToken cancellationToken,
         CompiledNoAuditRunState? reusableNoAuditState)
     {
+        CompiledEntrypointSupport.EnsureCanCompile(plan, entrypoint);
+
         var executableCached = false;
         CompiledExecutable executable = default;
         if (reusableNoAuditState is not null)
