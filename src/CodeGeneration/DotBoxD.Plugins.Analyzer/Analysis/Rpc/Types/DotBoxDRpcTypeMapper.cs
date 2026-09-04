@@ -40,11 +40,12 @@ internal static partial class DotBoxDRpcTypeMapper
         if (type is INamedTypeSymbol { IsGenericType: true } named)
         {
             var definition = named.ConstructedFrom.ToDisplayString();
-            if (definition is TypeNames.ListOriginal
-                or TypeNames.ReadOnlyListOriginal
-                or TypeNames.ListInterfaceOriginal
-                or TypeNames.EnumerableOriginal
-                or TypeNames.ReadOnlyCollectionOriginal)
+            if (IsFrameworkCollectionType(named) &&
+                (definition is TypeNames.ListOriginal
+                    or TypeNames.ReadOnlyListOriginal
+                    or TypeNames.ListInterfaceOriginal
+                    or TypeNames.EnumerableOriginal
+                    or TypeNames.ReadOnlyCollectionOriginal))
             {
                 return named.TypeArguments[0];
             }
@@ -60,9 +61,10 @@ internal static partial class DotBoxDRpcTypeMapper
         if (type is INamedTypeSymbol { IsGenericType: true } named && named.TypeArguments.Length == 2)
         {
             var definition = named.ConstructedFrom.ToDisplayString();
-            if (definition is TypeNames.DictionaryOriginal
-                or TypeNames.ReadOnlyDictionaryOriginal
-                or TypeNames.DictionaryInterfaceOriginal)
+            if (IsFrameworkCollectionType(named) &&
+                (definition is TypeNames.DictionaryOriginal
+                    or TypeNames.ReadOnlyDictionaryOriginal
+                    or TypeNames.DictionaryInterfaceOriginal))
             {
                 return (named.TypeArguments[0], named.TypeArguments[1]);
             }
@@ -84,10 +86,15 @@ internal static partial class DotBoxDRpcTypeMapper
         }
 
         var definition = named.ConstructedFrom.ToDisplayString();
-        return definition is TypeNames.ListOriginal
-            or TypeNames.ReadOnlyListOriginal
-            or TypeNames.ListInterfaceOriginal;
+        return IsFrameworkCollectionType(named) &&
+               (definition is TypeNames.ListOriginal
+                   or TypeNames.ReadOnlyListOriginal
+                   or TypeNames.ListInterfaceOriginal);
     }
+
+    private static bool IsFrameworkCollectionType(INamedTypeSymbol type)
+        => type.ConstructedFrom.Locations.Any(static location => location.IsInMetadata) &&
+           HasFrameworkPublicKeyToken(type.ConstructedFrom.ContainingAssembly.Identity.PublicKeyToken);
 
     public static bool IsRecordDto(INamedTypeSymbol type)
         => type.TypeKind is TypeKind.Class or TypeKind.Struct &&
