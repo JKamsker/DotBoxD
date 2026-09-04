@@ -38,7 +38,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
         var fields = DotBoxDRpcTypeMapper.RecordFields(recordType);
         var arguments = creation.ArgumentList?.Arguments ?? default;
 
-        var allowStoredZero = HasHookResultAttribute(recordType);
+        var allowStoredZero = HasHookResultAttribute(recordType, context.SemanticModel.Compilation);
 
         // Object-initializer construction (e.g. `new() { Success = true, Damage = x }`) lowers each assigned
         // field. Hook-result records keep their documented zero-fill convention for omitted fields; ordinary DTOs
@@ -243,12 +243,13 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             allocates);
     }
 
-    private static bool HasHookResultAttribute(INamedTypeSymbol type)
-        => type.GetAttributes().Any(attribute =>
-            string.Equals(
-                attribute.AttributeClass?.ToDisplayString(),
-                DotBoxDMetadataNames.HookResultAttribute,
-                StringComparison.Ordinal));
+    private static bool HasHookResultAttribute(INamedTypeSymbol type, Compilation compilation)
+    {
+        var hookResultAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HookResultAttribute);
+        return hookResultAttribute is not null &&
+            type.GetAttributes().Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, hookResultAttribute));
+    }
 
     private static DotBoxDExpressionModel LowerFieldValue(
         ExpressionSyntax expression,
