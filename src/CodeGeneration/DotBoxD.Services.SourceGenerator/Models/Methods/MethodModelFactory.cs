@@ -38,6 +38,10 @@ internal static partial class MethodModelFactory
         }
         var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
         var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, ct);
+        if (returnKind == MethodReturnKind.Sync && declaredReturn.ExternAliases.Array.Length > 0)
+        {
+            metadataTypes = metadataTypes with { ReturnType = declaredReturn.Type };
+        }
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
         var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol, ct);
         string? unsupportedReason = null;
@@ -84,6 +88,11 @@ internal static partial class MethodModelFactory
         var parameters = parameterResult.Parameters;
         var hasCancellationToken = parameterResult.HasCancellationToken;
         requiresUnsafeSignature |= parameterResult.RequiresUnsafeSignature;
+        var externAliases = new HashSet<string>(declaredReturn.ExternAliases.Array, StringComparer.Ordinal);
+        foreach (var externAlias in parameterResult.ExternAliases.Array)
+        {
+            externAliases.Add(externAlias);
+        }
 
         if (unsupportedReason is not null)
         {
@@ -100,7 +109,7 @@ internal static partial class MethodModelFactory
             Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
             ExplicitImplementationType: GetExplicitImplementationType(methodSymbol.ContainingType),
             RpcName: LiteralHelpers.EscapeStringLiteral(configuredRpcName),
-            ExternAliases: declaredReturn.ExternAliases,
+            ExternAliases: externAliases.ToEquatableArray(),
             ReturnKind: returnKind,
             DeclaredReturnType: declaredReturn.Type,
             UnwrappedReturnType: unwrappedReturnType,
@@ -131,7 +140,6 @@ internal static partial class MethodModelFactory
         ITypeSymbol returnType,
         CancellationToken ct)
     {
-        var declaredReturnType = returnType.ToDisplayString(s_qualifiedFormat);
         foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
         {
             ct.ThrowIfCancellationRequested();
@@ -140,33 +148,55 @@ internal static partial class MethodModelFactory
                 continue;
             }
 
-            var aliases = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var externAlias in declaration.SyntaxTree.GetRoot(ct)
-                         .DescendantNodes()
-                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExternAliasDirectiveSyntax>())
-            {
-                aliases.Add(externAlias.Identifier.ValueText);
-            }
+            return GetDeclaredType(declaration.ReturnType, returnType, ct);
+        }
 
-            var usedAliases = new List<string>();
-            foreach (var aliasName in declaration.ReturnType
-                         .DescendantNodesAndSelf()
-                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
-            {
-                var alias = aliasName.Alias.Identifier.ValueText;
-                if (aliases.Contains(alias) && !usedAliases.Contains(alias, StringComparer.Ordinal))
-                {
-                    usedAliases.Add(alias);
-                }
-            }
+        return (returnType.ToDisplayString(s_qualifiedFormat), EquatableArray<string>.Empty);
+    }
 
-            if (usedAliases.Count > 0)
+    private static (string Type, EquatableArray<string> ExternAliases) GetDeclaredParameterType(
+        IParameterSymbol parameter,
+        CancellationToken ct)
+    {
+        foreach (var syntaxReference in parameter.DeclaringSyntaxReferences)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(ct) is Microsoft.CodeAnalysis.CSharp.Syntax.ParameterSyntax { Type: { } typeSyntax })
             {
-                return (declaration.ReturnType.ToString(), usedAliases.ToEquatableArray());
+                return GetDeclaredType(typeSyntax, parameter.Type, ct);
             }
         }
 
-        return (declaredReturnType, EquatableArray<string>.Empty);
+        return (parameter.Type.ToDisplayString(s_qualifiedFormat), EquatableArray<string>.Empty);
+    }
+
+    private static (string Type, EquatableArray<string> ExternAliases) GetDeclaredType(
+        Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax typeSyntax,
+        ITypeSymbol symbol,
+        CancellationToken ct)
+    {
+        var aliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var externAlias in typeSyntax.SyntaxTree.GetRoot(ct)
+                     .DescendantNodes()
+                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExternAliasDirectiveSyntax>())
+        {
+            aliases.Add(externAlias.Identifier.ValueText);
+        }
+
+        var usedAliases = new List<string>();
+        foreach (var aliasName in typeSyntax.DescendantNodesAndSelf()
+                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
+        {
+            var alias = aliasName.Alias.Identifier.ValueText;
+            if (aliases.Contains(alias) && !usedAliases.Contains(alias, StringComparer.Ordinal))
+            {
+                usedAliases.Add(alias);
+            }
+        }
+
+        return usedAliases.Count > 0
+            ? (typeSyntax.ToString(), usedAliases.ToEquatableArray())
+            : (symbol.ToDisplayString(s_qualifiedFormat), EquatableArray<string>.Empty);
     }
 
     private static string? GetConfiguredMethodName(IMethodSymbol methodSymbol)
