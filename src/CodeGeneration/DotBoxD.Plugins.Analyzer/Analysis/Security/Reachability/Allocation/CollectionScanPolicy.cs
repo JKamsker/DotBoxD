@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class CollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
@@ -12,6 +13,13 @@ internal static class CollectionScanPolicy
             string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
             forbidden = "System.Collections.Generic.List.TrueForAll";
+            return true;
+        }
+
+        if (method is { IsStatic: false, Name: "TrimExcess" } &&
+            string.Equals(typeName, QueueTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.Queue.TrimExcess";
             return true;
         }
 
