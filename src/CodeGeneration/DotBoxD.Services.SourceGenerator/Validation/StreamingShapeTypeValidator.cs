@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
+using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
@@ -94,6 +95,5 @@ internal static class StreamingShapeTypeValidator
         type.ContainingNamespace?.ToDisplayString() == ServicesGeneratorTypeNames.SystemIoPipelinesNamespace;
 
     private static bool IsAsyncEnumerable(INamedTypeSymbol type) =>
-        type.Name == "IAsyncEnumerable" &&
-        type.ContainingNamespace?.ToDisplayString() == ServicesGeneratorTypeNames.SystemCollectionsGenericNamespace;
+        ReturnTypeClassifier.TryGetAsyncEnumerableItemType(type, out _);
 }
