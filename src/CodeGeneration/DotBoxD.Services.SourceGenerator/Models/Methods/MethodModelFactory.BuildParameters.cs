@@ -21,6 +21,7 @@ internal static partial class MethodModelFactory
         ref DiagnosticLocation unsupportedLocation)
     {
         var parameters = new List<ParameterModel>();
+        var externAliases = new HashSet<string>(System.StringComparer.Ordinal);
         var hasCancellationToken = false;
         var cancellationTokenCount = 0;
         var requiresUnsafeSignature = false;
@@ -38,11 +39,15 @@ internal static partial class MethodModelFactory
                 ref unsupportedReason,
                 ref unsupportedLocation);
             parameters.Add(parameter.Model);
+            foreach (var externAlias in parameter.ExternAliases.Array)
+            {
+                externAliases.Add(externAlias);
+            }
             hasCancellationToken |= parameter.IsCancellationToken;
             requiresUnsafeSignature |= parameter.RequiresUnsafeSignature;
         }
 
-        return new ParameterBuildResult(parameters, hasCancellationToken, requiresUnsafeSignature);
+        return new ParameterBuildResult(parameters, externAliases.ToEquatableArray(), hasCancellationToken, requiresUnsafeSignature);
     }
 
     private static ParameterBuildItem BuildParameter(
@@ -57,6 +62,7 @@ internal static partial class MethodModelFactory
         ref DiagnosticLocation unsupportedLocation)
     {
         var parameter = methodSymbol.Parameters[parameterIndex];
+        var declaredType = GetDeclaredParameterType(parameter, ct);
         var parameterLocation = DiagnosticLocationFactory.FromSymbol(parameter);
         var requiresUnsafeSignature = RpcTypeValidator.RequiresUnsafeContext(parameter.Type, ct);
         var isCancellationToken = cancellationTokenSymbol is not null &&
@@ -77,9 +83,10 @@ internal static partial class MethodModelFactory
             ref unsupportedLocation);
 
         return new ParameterBuildItem(
-            CreateParameterModel(methodSymbol, parameterIndex, parameter, isCancellationToken, streamKind, streamItemType, ct),
+            CreateParameterModel(methodSymbol, parameterIndex, parameter, declaredType.Type, isCancellationToken, streamKind, streamItemType, ct),
             isCancellationToken,
-            requiresUnsafeSignature);
+            requiresUnsafeSignature,
+            declaredType.ExternAliases);
     }
 
     private static void ValidateParameter(
@@ -164,6 +171,7 @@ internal static partial class MethodModelFactory
         IMethodSymbol methodSymbol,
         int parameterIndex,
         IParameterSymbol parameter,
+        string declaredType,
         bool isCancellationToken,
         ParameterStreamKind streamKind,
         ITypeSymbol? streamItemType,
@@ -187,7 +195,7 @@ internal static partial class MethodModelFactory
 
         return new ParameterModel(
             IdentifierHelpers.EscapeIdentifier(parameter.Name),
-            parameter.Type.ToDisplayString(s_qualifiedFormat),
+            declaredType,
             MethodSignatureFacts.GetCanonicalType(parameter.Type, methodSymbol, ct),
             ParameterRefKindKeyword(parameter.RefKind),
             parameter.IsParams,
@@ -197,7 +205,9 @@ internal static partial class MethodModelFactory
             metadataDefaultValueExpression,
             streamKind,
             streamItemType?.ToDisplayString(s_qualifiedFormat),
-            MetadataType: TypeOfExpressionFormatter.Format(parameter.Type, ct),
+            MetadataType: declaredType.IndexOf("::", System.StringComparison.Ordinal) >= 0
+                ? declaredType
+                : TypeOfExpressionFormatter.Format(parameter.Type, ct),
             CallerInfoAttributePrefix: BuildCallerInfoAttributePrefix(
                 parameter,
                 ct,
@@ -206,7 +216,7 @@ internal static partial class MethodModelFactory
             ScopeKeyword: ParameterScopeKeyword(parameter, ct));
     }
 
-    private sealed record ParameterBuildResult(List<ParameterModel> Parameters, bool HasCancellationToken, bool RequiresUnsafeSignature);
+    private sealed record ParameterBuildResult(List<ParameterModel> Parameters, EquatableArray<string> ExternAliases, bool HasCancellationToken, bool RequiresUnsafeSignature);
 
-    private sealed record ParameterBuildItem(ParameterModel Model, bool IsCancellationToken, bool RequiresUnsafeSignature);
+    private sealed record ParameterBuildItem(ParameterModel Model, bool IsCancellationToken, bool RequiresUnsafeSignature, EquatableArray<string> ExternAliases);
 }
