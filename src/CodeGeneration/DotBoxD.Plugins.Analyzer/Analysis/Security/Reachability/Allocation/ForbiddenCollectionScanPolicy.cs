@@ -5,18 +5,29 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
     {
-        if (method is { IsStatic: false, MethodKind: MethodKind.Ordinary } &&
-            method.Name is "Contains" or "IndexOf" &&
-            string.Equals(
-                method.ContainingType.OriginalDefinition.ToDisplayString(
-                    SymbolDisplayFormat.CSharpErrorMessageFormat),
-                ListTypeName,
-                StringComparison.Ordinal))
+        if (method is not { IsStatic: false, MethodKind: MethodKind.Ordinary })
+        {
+            forbidden = null!;
+            return false;
+        }
+
+        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (method.Name is "Contains" or "IndexOf" &&
+            string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        if (method.Name == "TrimExcess" &&
+            string.Equals(typeName, StackTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.Stack.TrimExcess";
             return true;
         }
 
