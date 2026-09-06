@@ -7,6 +7,49 @@ namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 public sealed class RemoteLocalCrossKindRegistrationSurpriseTests
 {
     [Fact]
+    public async Task Concurrent_cross_kind_registration_never_leaves_both_terminal_kinds_dispatchable()
+    {
+        const string subscriptionId = "shared-id";
+        var registry = new RemoteLocalHandlerRegistry();
+
+        for (var attempt = 0; attempt < 10_000; attempt++)
+        {
+            registry.Clear();
+            using var start = new Barrier(2);
+            var pushRegistrationTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                return registry.Register<int>(
+                    subscriptionId,
+                    static (_, _) => ValueTask.CompletedTask,
+                    (Func<ReadOnlyMemory<byte>, int>)(static _ => 0));
+            });
+            var resultRegistrationTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                return registry.RegisterResult<int, TestResult>(
+                    subscriptionId,
+                    static (_, _) => new TestResult(true, "accepted"));
+            });
+            await Task.WhenAll(pushRegistrationTask, resultRegistrationTask);
+            var pushRegistration = await pushRegistrationTask;
+            var resultRegistration = await resultRegistrationTask;
+
+            var pushDispatch = await Record.ExceptionAsync(
+                async () => await registry.DispatchAsync(subscriptionId, ReadOnlyMemory<byte>.Empty, Context()));
+            var resultDispatch = await Record.ExceptionAsync(
+                async () => await registry.DispatchResultAsync(subscriptionId, EncodeProjected(0), Context()));
+
+            pushRegistration.Dispose();
+            resultRegistration.Dispose();
+
+            Assert.False(
+                pushDispatch is null && resultDispatch is null,
+                $"Both terminal kinds remained dispatchable after concurrent registration on attempt {attempt}.");
+        }
+    }
+
+    [Fact]
     public async Task RegisterResult_replaces_a_push_handler_with_the_same_subscription_id()
     {
         var registry = new RemoteLocalHandlerRegistry();
