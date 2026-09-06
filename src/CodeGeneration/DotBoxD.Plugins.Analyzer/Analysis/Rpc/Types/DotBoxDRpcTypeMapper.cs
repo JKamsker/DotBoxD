@@ -40,11 +40,12 @@ internal static partial class DotBoxDRpcTypeMapper
         if (type is INamedTypeSymbol { IsGenericType: true } named)
         {
             var definition = named.ConstructedFrom.ToDisplayString();
-            if (definition is TypeNames.ListOriginal
-                or TypeNames.ReadOnlyListOriginal
-                or TypeNames.ListInterfaceOriginal
-                or TypeNames.EnumerableOriginal
-                or TypeNames.ReadOnlyCollectionOriginal)
+            if (IsFrameworkCollectionType(named) &&
+                (definition is TypeNames.ListOriginal
+                    or TypeNames.ReadOnlyListOriginal
+                    or TypeNames.ListInterfaceOriginal
+                    or TypeNames.EnumerableOriginal
+                    or TypeNames.ReadOnlyCollectionOriginal))
             {
                 return named.TypeArguments[0];
             }
@@ -60,9 +61,10 @@ internal static partial class DotBoxDRpcTypeMapper
         if (type is INamedTypeSymbol { IsGenericType: true } named && named.TypeArguments.Length == 2)
         {
             var definition = named.ConstructedFrom.ToDisplayString();
-            if (definition is TypeNames.DictionaryOriginal
-                or TypeNames.ReadOnlyDictionaryOriginal
-                or TypeNames.DictionaryInterfaceOriginal)
+            if (IsFrameworkCollectionType(named) &&
+                (definition is TypeNames.DictionaryOriginal
+                    or TypeNames.ReadOnlyDictionaryOriginal
+                    or TypeNames.DictionaryInterfaceOriginal))
             {
                 return (named.TypeArguments[0], named.TypeArguments[1]);
             }
@@ -84,10 +86,15 @@ internal static partial class DotBoxDRpcTypeMapper
         }
 
         var definition = named.ConstructedFrom.ToDisplayString();
-        return definition is TypeNames.ListOriginal
-            or TypeNames.ReadOnlyListOriginal
-            or TypeNames.ListInterfaceOriginal;
+        return IsFrameworkCollectionType(named) &&
+               (definition is TypeNames.ListOriginal
+                   or TypeNames.ReadOnlyListOriginal
+                   or TypeNames.ListInterfaceOriginal);
     }
+
+    private static bool IsFrameworkCollectionType(INamedTypeSymbol type)
+        => type.ConstructedFrom.Locations.Any(static location => location.IsInMetadata) &&
+           HasFrameworkPublicKeyToken(type.ConstructedFrom.ContainingAssembly.Identity.PublicKeyToken);
 
     public static bool IsRecordDto(INamedTypeSymbol type)
         => type.TypeKind is TypeKind.Class or TypeKind.Struct &&
@@ -245,12 +252,19 @@ internal static partial class DotBoxDRpcTypeMapper
         token[4] == 0x45 && token[5] == 0xf0 && token[6] == 0xa1 && token[7] == 0xbe;
 
     private static bool HasFrameworkPublicKeyToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
-        HasMicrosoftPublicKeyToken(token) || HasEcmaPublicKeyToken(token);
+        HasMicrosoftPublicKeyToken(token) ||
+        HasSharedFrameworkPublicKeyToken(token) ||
+        HasEcmaPublicKeyToken(token);
 
     private static bool HasMicrosoftPublicKeyToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
         token.Length == 8 &&
         token[0] == 0xb0 && token[1] == 0x3f && token[2] == 0x5f && token[3] == 0x7f &&
         token[4] == 0x11 && token[5] == 0xd5 && token[6] == 0x0a && token[7] == 0x3a;
+
+    private static bool HasSharedFrameworkPublicKeyToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0x7c && token[1] == 0xec && token[2] == 0x85 && token[3] == 0xd7 &&
+        token[4] == 0xbe && token[5] == 0xa7 && token[6] == 0x79 && token[7] == 0x8e;
 
     private static bool HasEcmaPublicKeyToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
         token.Length == 8 &&
