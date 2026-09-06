@@ -155,7 +155,8 @@ internal sealed record ParameterModel(
     string? StreamItemType = null,
     string MetadataType = "",
     string CallerInfoAttributePrefix = "",
-    string ScopeKeyword = "");
+    string ScopeKeyword = "",
+    EquatableArray<string> ExternAliases = default);
 
 /// <summary>
 /// A <see cref="ServiceModel"/> paired with its computed async-sibling projection. Lives

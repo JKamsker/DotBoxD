@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.CodeGeneration.Shared.Defaults;
-using DotBoxD.Services.SourceGenerator.Generation;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Validation;
 using Microsoft.CodeAnalysis;
@@ -169,6 +168,7 @@ internal static partial class MethodModelFactory
         ITypeSymbol? streamItemType,
         CancellationToken ct)
     {
+        var declaredType = GetDeclaredParameterType(parameter, ct);
         var hasDefaultValue = ParameterDefaultValueEmitter.HasDefaultValue(parameter);
         var preserveOptionalAttributeDefault =
             ParameterDefaultValueEmitter.ShouldPreserveOptionalAttributeDefault(methodSymbol, parameterIndex);
@@ -187,7 +187,7 @@ internal static partial class MethodModelFactory
 
         return new ParameterModel(
             IdentifierHelpers.EscapeIdentifier(parameter.Name),
-            parameter.Type.ToDisplayString(s_qualifiedFormat),
+            declaredType.Type,
             MethodSignatureFacts.GetCanonicalType(parameter.Type, methodSymbol, ct),
             ParameterRefKindKeyword(parameter.RefKind),
             parameter.IsParams,
@@ -197,13 +197,14 @@ internal static partial class MethodModelFactory
             metadataDefaultValueExpression,
             streamKind,
             streamItemType?.ToDisplayString(s_qualifiedFormat),
-            MetadataType: TypeOfExpressionFormatter.Format(parameter.Type, ct),
+            MetadataType: declaredType.MetadataType,
             CallerInfoAttributePrefix: BuildCallerInfoAttributePrefix(
                 parameter,
                 ct,
                 preserveOptionalAttributeDefault,
                 preserveMetadataDefaultAttributes: defaultValueLiteral.Length == 0),
-            ScopeKeyword: ParameterScopeKeyword(parameter, ct));
+            ScopeKeyword: ParameterScopeKeyword(parameter, ct),
+            ExternAliases: declaredType.ExternAliases);
     }
 
     private sealed record ParameterBuildResult(List<ParameterModel> Parameters, bool HasCancellationToken, bool RequiresUnsafeSignature);

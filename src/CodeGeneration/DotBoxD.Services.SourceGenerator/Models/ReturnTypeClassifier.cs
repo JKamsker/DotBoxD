@@ -194,7 +194,7 @@ internal static partial class ReturnTypeClassifier
         return false;
     }
 
-    private static bool IsFrameworkTaskLike(INamedTypeSymbol type)
+    internal static bool IsFrameworkTaskLike(INamedTypeSymbol type)
     {
         if (type.ContainingAssembly is not { } assembly)
         {
