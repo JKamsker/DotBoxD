@@ -26,7 +26,10 @@ public sealed class PluginAnalyzerForbiddenApiStackTrimExcessReachabilityTests
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
             Source(
                 """
-                Retained.Push(e);
+                if (Retained.Count < 4)
+                {
+                    Retained.Push(e);
+                }
                 _ = Retained.Count;
                 """),
             "DotBoxDPluginAnalyzerStackPushAndCountReachabilityTest");
