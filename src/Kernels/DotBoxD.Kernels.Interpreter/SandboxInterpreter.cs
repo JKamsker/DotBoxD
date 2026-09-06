@@ -49,6 +49,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             budget.CheckDeadline();
             InterpreterNestingGuard.ThrowIfExceeded(plan);
             var frameLayouts = _frameLayouts.GetValue(plan, static _ => new FunctionFrameLayoutCache());
