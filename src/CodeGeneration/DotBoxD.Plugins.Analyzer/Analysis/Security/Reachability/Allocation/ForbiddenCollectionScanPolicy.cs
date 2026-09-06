@@ -17,7 +17,7 @@ internal static class ForbiddenCollectionScanPolicy
 
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (method.Name is "Clear" or "Contains" or "IndexOf" or "Remove" &&
+        if (method.Name is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
             string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
