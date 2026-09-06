@@ -120,6 +120,13 @@ public sealed class ExternAliasTaskLikePayloadValidationTests
             .Should()
             .Contain("case \"SendNestedAsync\":");
 
+        runResult.Results.Single().GeneratedSources
+            .Single(source => source.HintName == "DotBoxDGenerated.g.cs")
+            .SourceText
+            .ToString()
+            .Should()
+            .Contain("typeof(global::Regress.ExternAliasTaskLikePayload.Box<Foreign::System.Threading.Tasks.ValueTask<int>>)");
+
         var final = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         final.GetDiagnostics()
             .Where(d => d.Severity == DiagnosticSeverity.Error)

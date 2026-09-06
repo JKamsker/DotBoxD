@@ -241,6 +241,7 @@ internal static partial class RpcTypeValidator
 
     private static bool IsTaskLike(INamedTypeSymbol type) =>
         (type.Name == "Task" || type.Name == "ValueTask") &&
-        type.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
+        type.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks" &&
+        ReturnTypeClassifier.IsFrameworkTaskLike(type);
 
 }
