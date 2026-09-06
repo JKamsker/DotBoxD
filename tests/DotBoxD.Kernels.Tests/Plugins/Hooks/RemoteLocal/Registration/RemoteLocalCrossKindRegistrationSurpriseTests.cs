@@ -12,13 +12,14 @@ public sealed class RemoteLocalCrossKindRegistrationSurpriseTests
         const string subscriptionId = "shared-id";
         var registry = new RemoteLocalHandlerRegistry();
 
-        for (var attempt = 0; attempt < 10_000; attempt++)
+        using var publication = new Barrier(2);
+        registry.BeforeRegistrationPublished = publication.SignalAndWait;
+
+        for (var attempt = 0; attempt < 10; attempt++)
         {
             registry.Clear();
-            using var start = new Barrier(2);
             var pushRegistrationTask = Task.Run(() =>
             {
-                start.SignalAndWait();
                 return registry.Register<int>(
                     subscriptionId,
                     static (_, _) => ValueTask.CompletedTask,
@@ -26,7 +27,6 @@ public sealed class RemoteLocalCrossKindRegistrationSurpriseTests
             });
             var resultRegistrationTask = Task.Run(() =>
             {
-                start.SignalAndWait();
                 return registry.RegisterResult<int, TestResult>(
                     subscriptionId,
                     static (_, _) => new TestResult(true, "accepted"));
@@ -43,9 +43,9 @@ public sealed class RemoteLocalCrossKindRegistrationSurpriseTests
             pushRegistration.Dispose();
             resultRegistration.Dispose();
 
-            Assert.False(
-                pushDispatch is null && resultDispatch is null,
-                $"Both terminal kinds remained dispatchable after concurrent registration on attempt {attempt}.");
+            Assert.True(
+                (pushDispatch is null) ^ (resultDispatch is null),
+                $"Expected exactly one terminal kind to remain dispatchable after concurrent registration on attempt {attempt}.");
         }
     }
 
