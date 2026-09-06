@@ -6,7 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal static class RpcDtoPrimaryConstructorMemberAssignmentInspector
 {
-    public static bool GetterPreservesMember(
+    public static bool PreservesMember(
         IMethodSymbol constructor,
         RecordMember member,
         IParameterSymbol parameter,
@@ -19,15 +19,9 @@ internal static class RpcDtoPrimaryConstructorMemberAssignmentInspector
 
         foreach (var reference in member.Symbol.DeclaringSyntaxReferences)
         {
-            if (GetterValue(reference.GetSyntax()) is not { } value ||
-                !compilation.ContainsSyntaxTree(value.SyntaxTree))
-            {
-                continue;
-            }
-
-            var model = compilation.GetSemanticModel(value.SyntaxTree);
-            if (model.GetSymbolInfo(value).Symbol is IParameterSymbol source &&
-                SymbolEqualityComparer.Default.Equals(source, parameter))
+            var declaration = reference.GetSyntax();
+            if (ReferencesParameter(InitializerValue(declaration), parameter, compilation) ||
+                ReferencesParameter(GetterValue(declaration), parameter, compilation))
             {
                 return true;
             }
@@ -53,7 +47,7 @@ internal static class RpcDtoPrimaryConstructorMemberAssignmentInspector
             foreach (var candidate in parameters.Parameters)
             {
                 if (model.GetDeclaredSymbol(candidate) is IParameterSymbol source &&
-                    SymbolEqualityComparer.Default.Equals(source, parameter))
+                    MatchesParameter(source, parameter))
                 {
                     return true;
                 }
@@ -62,6 +56,35 @@ internal static class RpcDtoPrimaryConstructorMemberAssignmentInspector
 
         return false;
     }
+
+    private static bool ReferencesParameter(
+        ExpressionSyntax? expression,
+        IParameterSymbol parameter,
+        Compilation compilation)
+    {
+        if (expression is null || !compilation.ContainsSyntaxTree(expression.SyntaxTree))
+        {
+            return false;
+        }
+
+        var model = compilation.GetSemanticModel(expression.SyntaxTree);
+        return model.GetSymbolInfo(expression).Symbol is IParameterSymbol source &&
+               MatchesParameter(source, parameter);
+    }
+
+    private static bool MatchesParameter(IParameterSymbol source, IParameterSymbol parameter)
+        => SymbolEqualityComparer.Default.Equals(source, parameter) ||
+           (string.Equals(source.Name, parameter.Name, StringComparison.Ordinal) &&
+            SymbolEqualityComparer.Default.Equals(source.Type, parameter.Type) &&
+            SymbolEqualityComparer.Default.Equals(source.ContainingType, parameter.ContainingType));
+
+    private static ExpressionSyntax? InitializerValue(SyntaxNode declaration)
+        => declaration switch
+        {
+            PropertyDeclarationSyntax { Initializer.Value: { } value } => value,
+            VariableDeclaratorSyntax { Initializer.Value: { } value } => value,
+            _ => null,
+        };
 
     private static ExpressionSyntax? GetterValue(SyntaxNode declaration)
         => declaration switch

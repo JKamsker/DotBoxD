@@ -80,7 +80,7 @@ internal static class RpcDtoConstructorAssignmentVerifier
             }
         }
 
-        return RpcDtoPrimaryConstructorMemberAssignmentInspector.GetterPreservesMember(
+        return RpcDtoPrimaryConstructorMemberAssignmentInspector.PreservesMember(
             constructor,
             member,
             parameter,
