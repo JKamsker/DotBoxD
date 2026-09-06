@@ -235,12 +235,21 @@ internal static partial class MethodModelFactory
         Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax declaration,
         CancellationToken ct)
     {
+        var searchStart = 0;
         foreach (var aliasName in declaration.DescendantNodesAndSelf()
                      .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
         {
             ct.ThrowIfCancellationRequested();
             var globalName = ServicesGeneratorTypeNames.GlobalPrefix + aliasName.Name;
-            type = type.Replace(globalName, aliasName.ToString());
+            var match = type.IndexOf(globalName, searchStart, StringComparison.Ordinal);
+            if (match < 0)
+            {
+                continue;
+            }
+
+            var declaredName = aliasName.ToString();
+            type = type.Substring(0, match) + declaredName + type.Substring(match + globalName.Length);
+            searchStart = match + declaredName.Length;
         }
 
         return type;
