@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -87,12 +86,10 @@ internal static class StreamingShapeTypeValidator
     }
 
     private static bool IsStream(INamedTypeSymbol type) =>
-        type.Name == "Stream" &&
-        type.ContainingNamespace?.ToDisplayString() == ServicesGeneratorTypeNames.SystemIoNamespace;
+        ReturnTypeClassifier.IsStream(type);
 
     private static bool IsPipe(INamedTypeSymbol type) =>
-        type.Name == "Pipe" &&
-        type.ContainingNamespace?.ToDisplayString() == ServicesGeneratorTypeNames.SystemIoPipelinesNamespace;
+        ReturnTypeClassifier.IsPipe(type);
 
     private static bool IsAsyncEnumerable(INamedTypeSymbol type) =>
         ReturnTypeClassifier.TryGetAsyncEnumerableItemType(type, out _);
