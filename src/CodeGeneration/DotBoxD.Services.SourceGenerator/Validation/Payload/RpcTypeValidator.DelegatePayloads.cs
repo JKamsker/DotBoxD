@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
@@ -37,6 +36,5 @@ internal static partial class RpcTypeValidator
     }
 
     private static bool IsDelegateBaseType(INamedTypeSymbol type) =>
-        (type.Name == nameof(Delegate) || type.Name == nameof(MulticastDelegate)) &&
-        type.ContainingNamespace?.ToDisplayString() == "System";
+        type.SpecialType is SpecialType.System_Delegate or SpecialType.System_MulticastDelegate;
 }
