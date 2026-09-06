@@ -32,4 +32,22 @@ public sealed class SandboxInterpreterPreCanceledMissingEntrypointTests
         Assert.False(summary.Success);
         Assert.Equal(SandboxErrorCode.Cancelled, summary.ErrorCode);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_reports_validation_error_for_missing_entrypoint_without_cancellation()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await new SandboxInterpreter().ExecuteAsync(
+            plan,
+            "missing",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions(),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
+    }
 }
