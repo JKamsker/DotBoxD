@@ -162,6 +162,19 @@ internal sealed partial class RpcPeerOutboundInvoker
             await sendTask.ConfigureAwait(false);
             requestSent = true;
 
+            // A synchronous send can complete the response and cancel the caller before this
+            // continuation gets a chance to register the token callback. Cancellation still
+            // wins while the send is in progress, even when the response was delivered inline.
+            if (ct.IsCancellationRequested)
+            {
+                if (_pending.TryCancel(messageId, pending, PendingCancellationKind.Caller))
+                {
+                    _cancelFrames.TrySend(messageId);
+                }
+
+                ct.ThrowIfCancellationRequested();
+            }
+
             var callerCancellation = ct.CanBeCanceled
                 ? ct.Register(static state => ((IPendingResponse)state!).CancelByCaller(), pending)
                 : default;

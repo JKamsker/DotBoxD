@@ -18,6 +18,7 @@ internal static class CollectionMaterializationPolicy
             ["LastIndexOf"] = "System.Collections.Generic.List.LastIndexOf",
             ["FindIndex"] = "System.Collections.Generic.List.FindIndex",
             ["FindLastIndex"] = "System.Collections.Generic.List.FindLastIndex",
+            ["RemoveAt"] = "System.Collections.Generic.List.RemoveAt",
             ["RemoveRange"] = "System.Collections.Generic.List.RemoveRange",
             ["Reverse"] = "System.Collections.Generic.List.Reverse"
         };

@@ -58,6 +58,8 @@ public static class InMemoryRpcChannel
                 throw new ObjectDisposedException(nameof(Endpoint));
             }
 
+            ct.ThrowIfCancellationRequested();
+
             if (data.IsEmpty)
             {
                 throw new ArgumentException("An empty payload is reserved to signal a closed channel.", nameof(data));

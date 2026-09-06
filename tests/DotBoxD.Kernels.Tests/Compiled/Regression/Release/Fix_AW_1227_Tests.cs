@@ -46,12 +46,16 @@ public sealed class Fix_AW_1227_Tests
     }
 
     [Fact]
-    public void Explore_worker_emits_its_ledger_comment_once_with_json_stdin()
+    public void Explore_worker_emits_its_ledger_comment_once_with_named_arguments()
     {
         var source = ReadRepositoryText(".github/workflows/library-surprise-explore.md");
 
         Assert.Contains("Safe-output declarations are immutable", source, StringComparison.Ordinal);
-        Assert.Contains("safeoutputs add_comment .", source, StringComparison.Ordinal);
+        Assert.Contains("test -s /tmp/gh-aw/agent/lens-comment.md", source, StringComparison.Ordinal);
+        Assert.Contains("safeoutputs add_comment --item_number", source, StringComparison.Ordinal);
+        Assert.Contains("--body \"$(cat /tmp/gh-aw/agent/lens-comment.md)\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("safeoutputs add_comment .", source, StringComparison.Ordinal);
+        Assert.Contains("Do not use JSON stdin", source, StringComparison.Ordinal);
         Assert.Contains("never pass a safe-output", source, StringComparison.Ordinal);
         Assert.Contains("temporary_id` as `comment_id`", source, StringComparison.Ordinal);
     }

@@ -27,6 +27,8 @@ public static class LoweredPipelineComposer
             composition.ShouldHandleFunctionId, nameof(LoweredPipelineComposition.ShouldHandleFunctionId));
         ArgumentException.ThrowIfNullOrWhiteSpace(
             composition.HandleFunctionId, nameof(LoweredPipelineComposition.HandleFunctionId));
+        RequireVersion(composition.Version, nameof(LoweredPipelineComposition.Version));
+        RequireVersion(composition.TargetSandboxVersion, nameof(LoweredPipelineComposition.TargetSandboxVersion));
         if (string.Equals(composition.ShouldHandleFunctionId, composition.HandleFunctionId, StringComparison.Ordinal))
         {
             throw new ArgumentException(
@@ -124,6 +126,14 @@ public static class LoweredPipelineComposer
     }
 
     private static Parameter InputParameter(SandboxType type) => new(InitialVariable(), type);
+    private static void RequireVersion(SemVersion? version, string paramName)
+    {
+        if (version is null)
+        {
+            throw new ArgumentException("A composition version is required.", paramName);
+        }
+    }
+
     private static string InitialVariable() => CurrentVariablePrefix + "0";
     private static string NextVariable(string current)
         => CurrentVariablePrefix + (int.Parse(current[CurrentVariablePrefix.Length..], System.Globalization.CultureInfo.InvariantCulture) + 1);

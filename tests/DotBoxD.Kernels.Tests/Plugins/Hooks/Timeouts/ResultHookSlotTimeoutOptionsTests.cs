@@ -97,6 +97,30 @@ public sealed class ResultHookSlotTimeoutOptionsTests
             });
     }
 
+    [Fact]
+    public async Task Remote_synchronously_completed_late_success_returns_timeout_result_and_reports_fault()
+    {
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        slot.AddDirect(
+            0,
+            (_, _, _) =>
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(160));
+                return Ok(7);
+            },
+            remote: true);
+        var options = ResultHookDispatchOptions<TestResult>.FailClosedAfter(
+            TimeSpan.FromMilliseconds(20),
+            new TestResult(true, "timeout", -1));
+
+        var context = Context();
+        var result = await slot.FireAsync(new DamageCtx(10), context, context, options, CancellationToken.None);
+
+        Assert.Equal(-1, result!.Value.Value);
+        Assert.IsType<TimeoutException>(Assert.Single(faults).Exception);
+    }
+
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>
     {
         public string EventName => "test.damage";

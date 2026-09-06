@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
@@ -171,5 +172,6 @@ internal static class RpcPayloadMemberInspector
 
     private static bool IsTaskLike(INamedTypeSymbol type)
         => (type.Name == "Task" || type.Name == "ValueTask") &&
-            type.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
+            type.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks" &&
+            ReturnTypeClassifier.IsFrameworkTaskLike(type);
 }

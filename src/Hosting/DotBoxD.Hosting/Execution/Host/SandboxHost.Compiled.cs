@@ -1,3 +1,4 @@
+using DotBoxD.Hosting.Execution.Compiled;
 using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
@@ -94,6 +95,7 @@ public sealed partial class SandboxHost
     {
         try
         {
+            CompiledEntrypointSupport.EnsureCanCompile(plan, entrypoint);
             var executable = await GetCompiledExecutableAsync(
                     plan,
                     entrypoint,
