@@ -1,12 +1,21 @@
 using System.Threading;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ReturnTypeClassifier
 {
+    private const string RpcInvokerMetadata = "DotBoxD.Services.Server.IRpcInvoker";
+
     internal static bool HasGeneratedProxyCompanion(INamedTypeSymbol serviceType, CancellationToken ct)
     {
+        var rpcInvokerType = GetRpcInvokerType(serviceType, ct);
+        if (rpcInvokerType is null)
+        {
+            return false;
+        }
+
         var proxyName = NamingHelpers.StripInterfacePrefix(serviceType.Name) + "Proxy";
         foreach (var candidate in serviceType.ContainingNamespace.GetTypeMembers(proxyName))
         {
@@ -23,7 +32,7 @@ internal static partial class ReturnTypeClassifier
                 ct.ThrowIfCancellationRequested();
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
-                    SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
+                    SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type, rpcInvokerType) &&
                     constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
                 {
                     return true;
@@ -32,6 +41,25 @@ internal static partial class ReturnTypeClassifier
         }
 
         return false;
+    }
+
+    private static INamedTypeSymbol? GetRpcInvokerType(INamedTypeSymbol serviceType, CancellationToken ct)
+    {
+        foreach (var attribute in serviceType.GetAttributes())
+        {
+            for (var type = attribute.AttributeClass; type is not null; type = type.BaseType)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (type.ToDisplayString() == ServicesGeneratorTypeNames.RpcServiceAttribute &&
+                    ServicesGeneratorTypeNames.IsRpcServiceAttribute(type))
+                {
+                    return type.ContainingAssembly.GetTypeByMetadataName(RpcInvokerMetadata);
+                }
+            }
+        }
+
+        return null;
     }
 
     private static bool ImplementsService(

@@ -53,8 +53,8 @@ internal static class SubServiceReturnTypeReader
         return false;
     }
 
-    public static bool IsRpcInvokerType(ITypeSymbol type)
-        => type.ToDisplayString(s_qualifiedIdentityFormat) == ServicesGeneratorTypeNames.GlobalRpcInvoker;
+    public static bool IsRpcInvokerType(ITypeSymbol type, INamedTypeSymbol rpcInvokerType)
+        => SymbolEqualityComparer.Default.Equals(type, rpcInvokerType);
 
     public static bool TryGetSubServiceInfo(ITypeSymbol type, CancellationToken ct, out SubServiceInfo info)
     {

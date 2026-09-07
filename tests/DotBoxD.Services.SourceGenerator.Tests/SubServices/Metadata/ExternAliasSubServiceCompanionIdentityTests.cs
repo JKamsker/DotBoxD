@@ -126,7 +126,8 @@ public sealed class ExternAliasSubServiceCompanionIdentityTests
         => CSharpCompilation.Create(
             "ExternAliasSubServiceCompanionIdentity_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source, s_parseOptions)],
-            CreateBaseReferences().Append(referencedContracts).Append(foreignInvokerReference),
+            CreateBaseReferences().Append(referencedContracts).Append(
+                foreignInvokerReference.WithAliases(ImmutableArray.Create("Foreign"))),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static IEnumerable<MetadataReference> CreateBaseReferences()
