@@ -77,6 +77,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Collections.Generic.List<T>.ForEach",
         "System.Collections.Generic.List<T>.Exists",
         "System.Collections.Generic.List<T>.FindLast",
+        "System.Collections.Generic.HashSet<T>.TrimExcess",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
         "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
         "System.Linq.Enumerable.ToDictionary",
