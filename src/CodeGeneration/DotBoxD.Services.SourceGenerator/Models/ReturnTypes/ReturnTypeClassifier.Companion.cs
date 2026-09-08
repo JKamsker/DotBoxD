@@ -23,8 +23,10 @@ internal static partial class ReturnTypeClassifier
                 ct.ThrowIfCancellationRequested();
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
-                    SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
-                    constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
+                    constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
+                    constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
+                    SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type) &&
+                    instanceId.Type.SpecialType == SpecialType.System_String)
                 {
                     return true;
                 }
