@@ -13,6 +13,8 @@ internal static partial class ReturnTypeClassifier
             ct.ThrowIfCancellationRequested();
 
             if (candidate.DeclaredAccessibility != Accessibility.Public ||
+                candidate.IsAbstract ||
+                candidate.IsGenericType ||
                 !ImplementsService(candidate, serviceType, ct))
             {
                 continue;
