@@ -31,7 +31,7 @@ public sealed class PluginAnalyzerForbiddenApiHashSetSymmetricExceptWithReachabi
                 """),
             "DotBoxDPluginAnalyzerHashSetAddAndCountReachabilityTest");
 
-        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+        Assert.Empty(diagnostics);
     }
 
     private static string Source(string shouldHandleBody)

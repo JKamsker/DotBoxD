@@ -9,6 +9,7 @@ internal static class CollectionBulkGrowthPolicy
     private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string SortedDictionaryTypeName =
@@ -44,6 +45,13 @@ internal static class CollectionBulkGrowthPolicy
         if (IsListRangeMutator(method, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        if (method is { IsStatic: false, Name: "SymmetricExceptWith" } &&
+            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.HashSet.SymmetricExceptWith";
             return true;
         }
 
