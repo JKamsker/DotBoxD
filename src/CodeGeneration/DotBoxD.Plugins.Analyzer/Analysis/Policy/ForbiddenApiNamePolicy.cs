@@ -77,6 +77,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Collections.Generic.List<T>.ForEach",
         "System.Collections.Generic.List<T>.Exists",
         "System.Collections.Generic.List<T>.FindLast",
+        "System.Collections.Generic.HashSet<T>.RemoveWhere",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
         "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
         "System.Linq.Enumerable.ToDictionary",
@@ -107,6 +108,7 @@ internal static class ForbiddenApiNamePolicy
             "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary" => "System.Linq.Enumerable.ToFrozenDictionary",
             "System.Collections.Generic.List<T>.RemoveAll" => "System.Collections.Generic.List.RemoveAll",
             "System.Collections.Generic.List<T>.FindLast" => "System.Collections.Generic.List.FindLast",
+            "System.Collections.Generic.HashSet<T>.RemoveWhere" => "System.Collections.Generic.HashSet.RemoveWhere",
             _ => name
         };
         return true;
