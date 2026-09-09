@@ -24,10 +24,71 @@ internal static partial class ReturnTypeClassifier
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
                     SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
-                    constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
+                    constructor.Parameters[1].Type.SpecialType == SpecialType.System_String &&
+                    CanConstructProxy(candidate, constructor, ct))
                 {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CanConstructProxy(
+        INamedTypeSymbol candidate,
+        IMethodSymbol constructor,
+        CancellationToken ct)
+        => !HasRequiredMembers(candidate, ct) ||
+           HasSetsRequiredMembersAttribute(constructor);
+
+    private static bool HasRequiredMembers(INamedTypeSymbol candidate, CancellationToken ct)
+    {
+        for (var current = candidate; current is not null; current = current.BaseType)
+        {
+            foreach (var member in current.GetMembers())
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (member is IPropertySymbol { IsRequired: true } or IFieldSymbol { IsRequired: true })
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasSetsRequiredMembersAttribute(IMethodSymbol constructor)
+    {
+        foreach (var attribute in constructor.GetAttributes())
+        {
+            var type = attribute.AttributeClass;
+            if (type?.ToDisplayString() != "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute" ||
+                !IsMetadataType(type))
+            {
+                continue;
+            }
+
+            var token = type.ContainingAssembly.Identity.PublicKeyToken;
+            if (token.Length == 8 &&
+                TokenEquals(token, 0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsMetadataType(INamedTypeSymbol type)
+    {
+        foreach (var location in type.Locations)
+        {
+            if (location.IsInMetadata)
+            {
+                return true;
             }
         }
 
