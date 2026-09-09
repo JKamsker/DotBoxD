@@ -6,6 +6,7 @@ internal static class CollectionBulkGrowthPolicy
 {
     private const string DictionaryInterfaceTypeName =
         "System.Collections.Generic.IDictionary<TKey, TValue>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
@@ -47,6 +48,12 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
+        if (IsHashSetBulkMutator(method, typeName))
+        {
+            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
+            return true;
+        }
+
         if (IsSortedDictionaryCopyConstructor(method, typeName))
         {
             forbidden = "System.Collections.Generic.SortedDictionary";
@@ -74,6 +81,14 @@ internal static class CollectionBulkGrowthPolicy
     private static bool IsListRangeMutator(IMethodSymbol method, string typeName)
         => method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
+
+    private static bool IsHashSetBulkMutator(IMethodSymbol method, string typeName)
+        => method is
+        {
+            IsStatic: false,
+            Name: "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
+        } &&
+           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
         IMethodSymbol method,
