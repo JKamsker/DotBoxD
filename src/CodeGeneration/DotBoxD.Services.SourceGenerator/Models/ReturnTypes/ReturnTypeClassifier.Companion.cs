@@ -13,6 +13,7 @@ internal static partial class ReturnTypeClassifier
             ct.ThrowIfCancellationRequested();
 
             if (candidate.DeclaredAccessibility != Accessibility.Public ||
+                HasErrorObsoleteAttribute(candidate, ct) ||
                 !ImplementsService(candidate, serviceType, ct))
             {
                 continue;
@@ -23,6 +24,7 @@ internal static partial class ReturnTypeClassifier
                 ct.ThrowIfCancellationRequested();
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
+                    !HasErrorObsoleteAttribute(constructor, ct) &&
                     SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
                     constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
                 {
@@ -33,6 +35,33 @@ internal static partial class ReturnTypeClassifier
 
         return false;
     }
+
+    private static bool HasErrorObsoleteAttribute(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass?.ToDisplayString() != "System.ObsoleteAttribute" ||
+                !IsFrameworkAssembly(attributeClass.ContainingAssembly.Name))
+            {
+                continue;
+            }
+
+            if (attribute.ConstructorArguments.Length > 1 &&
+                attribute.ConstructorArguments[1].Value is bool isError &&
+                isError)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsFrameworkAssembly(string assemblyName) =>
+        assemblyName is "mscorlib" or "netstandard" or "System.Private.CoreLib" or "System.Runtime";
 
     private static bool ImplementsService(
         INamedTypeSymbol candidate,
