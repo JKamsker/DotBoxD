@@ -13,42 +13,19 @@ internal static class CollectionScanPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
-        if (method is { IsStatic: false, Name: "SetEquals" } &&
-            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.HashSet.SetEquals";
-            return true;
-        }
-
-        if (method is { IsStatic: false, Name: "TrueForAll" } &&
-            string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.List.TrueForAll";
-            return true;
-        }
-
-        if (method is { IsStatic: false, Name: "TrimExcess" } &&
-            string.Equals(typeName, QueueTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.Queue.TrimExcess";
-            return true;
-        }
-
-        if (method is { IsStatic: false, MethodKind: MethodKind.Ordinary, Name: "TrimExcess" } &&
-            string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.PriorityQueue.TrimExcess";
-            return true;
-        }
-
-        if (method is { IsStatic: false, Name: "TrimExcess" } &&
-            string.Equals(typeName, SortedListTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.SortedList.TrimExcess";
-            return true;
-        }
-
-        forbidden = null!;
-        return false;
+        forbidden = method.IsStatic ? null! : GetDisplayName(method, typeName)!;
+        return forbidden is not null;
     }
+
+    private static string? GetDisplayName(IMethodSymbol method, string typeName)
+        => (typeName, method.Name, method.MethodKind) switch
+        {
+            (HashSetTypeName, "SetEquals", _) => "System.Collections.Generic.HashSet.SetEquals",
+            (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
+            (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
+            (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
+                "System.Collections.Generic.PriorityQueue.TrimExcess",
+            (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null
+        };
 }
