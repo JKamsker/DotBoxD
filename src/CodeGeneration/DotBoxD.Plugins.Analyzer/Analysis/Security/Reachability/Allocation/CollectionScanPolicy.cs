@@ -4,6 +4,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class CollectionScanPolicy
 {
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
@@ -12,6 +13,13 @@ internal static class CollectionScanPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
+        if (method is { IsStatic: false, Name: "SetEquals" } &&
+            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.HashSet.SetEquals";
+            return true;
+        }
+
         if (method is { IsStatic: false, Name: "TrueForAll" } &&
             string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
