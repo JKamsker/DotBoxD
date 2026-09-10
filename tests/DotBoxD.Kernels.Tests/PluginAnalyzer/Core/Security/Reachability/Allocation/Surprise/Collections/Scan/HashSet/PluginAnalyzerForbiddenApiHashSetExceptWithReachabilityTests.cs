@@ -20,6 +20,27 @@ public sealed class PluginAnalyzerForbiddenApiHashSetExceptWithReachabilityTests
             StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("UnionWith")]
+    [InlineData("IntersectWith")]
+    [InlineData("SymmetricExceptWith")]
+    public async Task Reports_other_unmetered_hash_set_bulk_mutators_in_reachable_should_handle(
+        string methodName)
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source($$"""
+                Retained.Add(e);
+                Retained.{{methodName}}(Enumerable.Range(0, int.MaxValue));
+                """),
+            $"DotBoxDPluginAnalyzerHashSet{methodName}ReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains(
+            $"System.Collections.Generic.HashSet.{methodName}",
+            diagnostic.GetMessage(),
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Does_not_report_hash_set_add_and_count_in_reachable_should_handle()
     {
