@@ -13,7 +13,8 @@ internal static partial class ReturnTypeClassifier
             ct.ThrowIfCancellationRequested();
 
             if (candidate.DeclaredAccessibility != Accessibility.Public ||
-                !ImplementsService(candidate, serviceType, ct))
+                !ImplementsService(candidate, serviceType, ct) ||
+                IsExperimental(candidate, ct))
             {
                 continue;
             }
@@ -23,11 +24,29 @@ internal static partial class ReturnTypeClassifier
                 ct.ThrowIfCancellationRequested();
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
+                    !IsExperimental(constructor, ct) &&
                     SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
                     constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
                 {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsExperimental(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (attribute.AttributeClass is { } attributeType &&
+                attributeType.ToDisplayString() == "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" &&
+                IsTrustedFrameworkType(attributeType))
+            {
+                return true;
             }
         }
 
