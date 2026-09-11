@@ -35,6 +35,32 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
+        if (TryGetKnownInstanceMethodDisplayName(method, typeName, out forbidden))
+        {
+            return true;
+        }
+
+        if (IsSortedDictionaryCopyConstructor(method, typeName))
+        {
+            forbidden = "System.Collections.Generic.SortedDictionary";
+            return true;
+        }
+
+        if (IsNonGenericSortedListDictionaryCopyConstructor(method, typeName))
+        {
+            forbidden = NonGenericSortedListTypeName;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool TryGetKnownInstanceMethodDisplayName(
+        IMethodSymbol method,
+        string typeName,
+        out string forbidden)
+    {
         if (method is { IsStatic: false, Name: "EnqueueRange" } &&
             string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal))
         {
@@ -54,15 +80,10 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
-        if (IsSortedDictionaryCopyConstructor(method, typeName))
+        if (method is { IsStatic: false, Name: "SymmetricExceptWith" } &&
+            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
         {
-            forbidden = "System.Collections.Generic.SortedDictionary";
-            return true;
-        }
-
-        if (IsNonGenericSortedListDictionaryCopyConstructor(method, typeName))
-        {
-            forbidden = NonGenericSortedListTypeName;
+            forbidden = "System.Collections.Generic.HashSet.SymmetricExceptWith";
             return true;
         }
 
