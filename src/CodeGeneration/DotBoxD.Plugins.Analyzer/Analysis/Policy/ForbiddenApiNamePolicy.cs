@@ -77,6 +77,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Collections.Generic.List<T>.ForEach",
         "System.Collections.Generic.List<T>.Exists",
         "System.Collections.Generic.List<T>.FindLast",
+        "System.Collections.Generic.HashSet<T>.TrimExcess",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
         "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
         "System.Linq.Enumerable.ToDictionary",
@@ -84,6 +85,19 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.RSA.Create",
         "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
+
+    private static readonly IReadOnlyDictionary<string, string> ExactMemberDisplayNames =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Microsoft.Extensions.Caching.Memory.CacheExtensions.Set"] = "Microsoft.Extensions.Caching.Memory.MemoryCache",
+            ["System.Collections.Generic.List<T>.TrimExcess"] = "System.Collections.Generic.List.TrimExcess",
+            ["System.Collections.Generic.HashSet<T>.TrimExcess"] = "System.Collections.Generic.HashSet.TrimExcess",
+            ["System.Collections.Generic.List<T>.ForEach"] = "System.Collections.Generic.List.ForEach",
+            ["System.Collections.Generic.List<T>.Exists"] = "System.Collections.Generic.List.Exists",
+            ["System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary"] = "System.Linq.Enumerable.ToFrozenDictionary",
+            ["System.Collections.Generic.List<T>.RemoveAll"] = "System.Collections.Generic.List.RemoveAll",
+            ["System.Collections.Generic.List<T>.FindLast"] = "System.Collections.Generic.List.FindLast"
+        };
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
 
@@ -98,17 +112,11 @@ internal static class ForbiddenApiNamePolicy
             return false;
         }
 
-        displayName = name switch
+        if (!ExactMemberDisplayNames.TryGetValue(name, out displayName))
         {
-            "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set" => "Microsoft.Extensions.Caching.Memory.MemoryCache",
-            "System.Collections.Generic.List<T>.TrimExcess" => "System.Collections.Generic.List.TrimExcess",
-            "System.Collections.Generic.List<T>.ForEach" => "System.Collections.Generic.List.ForEach",
-            "System.Collections.Generic.List<T>.Exists" => "System.Collections.Generic.List.Exists",
-            "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary" => "System.Linq.Enumerable.ToFrozenDictionary",
-            "System.Collections.Generic.List<T>.RemoveAll" => "System.Collections.Generic.List.RemoveAll",
-            "System.Collections.Generic.List<T>.FindLast" => "System.Collections.Generic.List.FindLast",
-            _ => name
-        };
+            displayName = name;
+        }
+
         return true;
     }
 }
