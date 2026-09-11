@@ -25,6 +25,7 @@ internal static partial class ReturnTypeClassifier
                 candidate.IsAbstract ||
                 candidate.IsGenericType ||
                 HasErrorObsoleteAttribute(candidate, ct) ||
+                IsExperimental(candidate, ct) ||
                 !ImplementsService(candidate, serviceType, ct))
             {
                 continue;
@@ -36,6 +37,7 @@ internal static partial class ReturnTypeClassifier
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
                     !HasErrorObsoleteAttribute(constructor, ct) &&
+                    !IsExperimental(constructor, ct) &&
                     constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
                     constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
                     SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
@@ -155,6 +157,23 @@ internal static partial class ReturnTypeClassifier
 
     private static bool IsFrameworkAssembly(string assemblyName) =>
         assemblyName is "mscorlib" or "netstandard" or "System.Private.CoreLib" or "System.Runtime";
+
+    private static bool IsExperimental(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (attribute.AttributeClass is { } attributeType &&
+                attributeType.ToDisplayString() == "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" &&
+                IsTrustedFrameworkType(attributeType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool ImplementsService(
         INamedTypeSymbol candidate,
