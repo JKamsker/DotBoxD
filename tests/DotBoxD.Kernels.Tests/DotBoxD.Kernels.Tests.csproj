@@ -24,7 +24,7 @@
     <PackageReference Include="Mono.Cecil" />
     <PackageReference Include="System.Threading.Tasks.Extensions" PrivateAssets="all" NoWarn="NU1510" />
     <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
-    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
