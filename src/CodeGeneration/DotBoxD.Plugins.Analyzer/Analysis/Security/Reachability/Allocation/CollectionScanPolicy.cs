@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class CollectionScanPolicy
 {
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
@@ -13,34 +14,20 @@ internal static class CollectionScanPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
-        if (method is { IsStatic: false, Name: "TrueForAll" } &&
-            string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.List.TrueForAll";
-            return true;
-        }
-
-        return TryGetTrimExcessDisplayName(method, typeName, out forbidden);
-    }
-
-    private static bool TryGetTrimExcessDisplayName(IMethodSymbol method, string typeName, out string forbidden)
-    {
-        if (method is not { IsStatic: false, Name: "TrimExcess" } ||
-            (method.MethodKind != MethodKind.Ordinary &&
-             string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal)))
-        {
-            forbidden = null!;
-            return false;
-        }
-
-        forbidden = typeName switch
-        {
-            DictionaryTypeName => "System.Collections.Generic.Dictionary.TrimExcess",
-            QueueTypeName => "System.Collections.Generic.Queue.TrimExcess",
-            PriorityQueueTypeName => "System.Collections.Generic.PriorityQueue.TrimExcess",
-            SortedListTypeName => "System.Collections.Generic.SortedList.TrimExcess",
-            _ => null!
-        };
+        forbidden = method.IsStatic ? null! : GetDisplayName(method, typeName)!;
         return forbidden is not null;
     }
+
+    private static string? GetDisplayName(IMethodSymbol method, string typeName)
+        => (typeName, method.Name, method.MethodKind) switch
+        {
+            (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
+            (HashSetTypeName, "SetEquals", _) => "System.Collections.Generic.HashSet.SetEquals",
+            (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
+            (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
+            (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
+                "System.Collections.Generic.PriorityQueue.TrimExcess",
+            (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null
+        };
 }
