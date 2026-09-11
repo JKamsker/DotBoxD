@@ -33,6 +33,7 @@
     <PackageReference Include="Verify.XunitV3" />
     <PackageReference Include="Verify.SourceGenerators" />
     <PackageReference Include="Verify.DiffPlex" />
+    <PackageReference Include="Mono.Cecil" />
   </ItemGroup>
 
   <ItemGroup>
