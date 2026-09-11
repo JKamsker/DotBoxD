@@ -21,37 +21,63 @@ internal static partial class ReturnTypeClassifier
         {
             ct.ThrowIfCancellationRequested();
 
-            if (candidate.HasUnsupportedMetadata ||
-                candidate.DeclaredAccessibility != Accessibility.Public ||
-                candidate.IsAbstract ||
-                candidate.IsGenericType ||
-                HasErrorObsoleteAttribute(candidate, ct) ||
-                IsExperimental(candidate, ct) ||
-                !ImplementsService(candidate, serviceType, ct))
+            if (!IsUsableProxyCandidate(candidate, serviceType, ct))
             {
                 continue;
             }
 
-            foreach (var constructor in candidate.InstanceConstructors)
+            if (HasUsableProxyConstructor(candidate, rpcInvokerType, ct))
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
-                    !HasErrorObsoleteAttribute(constructor, ct) &&
-                    !IsExperimental(constructor, ct) &&
-                    constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
-                    constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
-                    SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
-                    instanceId.Type.SpecialType == SpecialType.System_String &&
-                    CanConstructProxy(candidate, constructor, ct))
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
         return false;
     }
+
+    private static bool IsUsableProxyCandidate(
+        INamedTypeSymbol candidate,
+        INamedTypeSymbol serviceType,
+        CancellationToken ct)
+        => !candidate.HasUnsupportedMetadata &&
+           candidate.DeclaredAccessibility == Accessibility.Public &&
+           !candidate.IsAbstract &&
+           !candidate.IsGenericType &&
+           !HasErrorObsoleteAttribute(candidate, ct) &&
+           !IsExperimental(candidate, ct) &&
+           ImplementsService(candidate, serviceType, ct);
+
+    private static bool HasUsableProxyConstructor(
+        INamedTypeSymbol candidate,
+        INamedTypeSymbol rpcInvokerType,
+        CancellationToken ct)
+    {
+        foreach (var constructor in candidate.InstanceConstructors)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (IsUsableProxyConstructor(candidate, constructor, rpcInvokerType, ct))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsUsableProxyConstructor(
+        INamedTypeSymbol candidate,
+        IMethodSymbol constructor,
+        INamedTypeSymbol rpcInvokerType,
+        CancellationToken ct)
+        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
+           !HasErrorObsoleteAttribute(constructor, ct) &&
+           !IsExperimental(constructor, ct) &&
+           constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
+           constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
+           SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
+           instanceId.Type.SpecialType == SpecialType.System_String &&
+           CanConstructProxy(candidate, constructor, ct);
 
     private static INamedTypeSymbol? GetRpcInvokerType(INamedTypeSymbol serviceType, CancellationToken ct)
     {
