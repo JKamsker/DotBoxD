@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
@@ -21,6 +22,13 @@ internal static class ForbiddenCollectionScanPolicy
             string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        if (method.Name == "Overlaps" &&
+            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.HashSet.Overlaps";
             return true;
         }
 
