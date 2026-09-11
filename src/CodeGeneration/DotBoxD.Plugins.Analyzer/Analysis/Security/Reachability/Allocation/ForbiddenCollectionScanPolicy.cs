@@ -24,9 +24,9 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsHashSetOverlaps(method.Name, typeName))
+        if (IsForbiddenHashSetScan(method.Name, typeName))
         {
-            forbidden = "System.Collections.Generic.HashSet.Overlaps";
+            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
             return true;
         }
 
@@ -44,8 +44,9 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsHashSetOverlaps(string methodName, string typeName)
-        => methodName == "Overlaps" && string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+    private static bool IsForbiddenHashSetScan(string methodName, string typeName)
+        => methodName is "IsSubsetOf" or "Overlaps" &&
+           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
