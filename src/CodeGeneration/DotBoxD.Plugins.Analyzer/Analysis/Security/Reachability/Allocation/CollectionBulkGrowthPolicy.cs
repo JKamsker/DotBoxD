@@ -6,6 +6,7 @@ internal static class CollectionBulkGrowthPolicy
 {
     private const string DictionaryInterfaceTypeName =
         "System.Collections.Generic.IDictionary<TKey, TValue>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
@@ -34,16 +35,14 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
-        if (method is { IsStatic: false, Name: "EnqueueRange" } &&
-            string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal))
+        if (TryGetKnownInstanceMethodDisplayName(method, typeName, out forbidden))
         {
-            forbidden = "System.Collections.Generic.PriorityQueue.EnqueueRange";
             return true;
         }
 
-        if (IsListRangeMutator(method, typeName))
+        if (IsHashSetBulkMutator(method, typeName))
         {
-            forbidden = $"System.Collections.Generic.List.{method.Name}";
+            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
             return true;
         }
 
@@ -63,6 +62,28 @@ internal static class CollectionBulkGrowthPolicy
         return false;
     }
 
+    private static bool TryGetKnownInstanceMethodDisplayName(
+        IMethodSymbol method,
+        string typeName,
+        out string forbidden)
+    {
+        if (method is { IsStatic: false, Name: "EnqueueRange" } &&
+            string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Generic.PriorityQueue.EnqueueRange";
+            return true;
+        }
+
+        if (IsListRangeMutator(method, typeName))
+        {
+            forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
     private static bool IsSortedDictionaryCopyConstructor(IMethodSymbol method, string typeName)
         => method.MethodKind == MethodKind.Constructor &&
            string.Equals(typeName, SortedDictionaryTypeName, StringComparison.Ordinal) &&
@@ -74,6 +95,14 @@ internal static class CollectionBulkGrowthPolicy
     private static bool IsListRangeMutator(IMethodSymbol method, string typeName)
         => method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
+
+    private static bool IsHashSetBulkMutator(IMethodSymbol method, string typeName)
+        => method is
+        {
+            IsStatic: false,
+            Name: "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
+        } &&
+           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
         IMethodSymbol method,

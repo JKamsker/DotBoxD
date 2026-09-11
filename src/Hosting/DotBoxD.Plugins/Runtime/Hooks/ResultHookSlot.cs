@@ -20,23 +20,30 @@ internal sealed class ResultHookSlot<TEvent, TContext>
     private readonly IPluginEventAdapter<TEvent> _adapter;
     private readonly ResultHookEntryInvoker<TEvent, TContext> _invoker;
     private readonly Func<long> _nextOrder;
+    private readonly Action? _throwIfDisposed;
     private volatile Entry[] _entries = [];
 
     public ResultHookSlot(
         IPluginEventAdapter<TEvent> adapter,
         Action<ResultHookFault>? onFault = null,
-        Func<long>? nextOrder = null)
+        Func<long>? nextOrder = null,
+        Action? throwIfDisposed = null)
     {
         _adapter = adapter;
         _invoker = new ResultHookEntryInvoker<TEvent, TContext>(onFault);
         _nextOrder = nextOrder ?? NextLocalOrder;
+        _throwIfDisposed = throwIfDisposed;
     }
 
     public bool HasHandlers => _entries.Length > 0;
 
     internal Entry[] RegistrationEntries => _entries;
 
-    internal void ReportFault(Exception exception) => _invoker.Report(exception);
+    internal void ReportFault(Exception exception)
+    {
+        _invoker.Report(exception);
+        _throwIfDisposed?.Invoke();
+    }
 
     /// <summary>Installs a sandbox <c>Register</c> handler: the kernel's lowered <c>ShouldHandle</c> filter and
     /// result-producing <c>Handle</c> both run in the sandbox, and the returned value is decoded to the result
@@ -146,7 +153,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         }
         catch (Exception ex)
         {
-            _invoker.Report(ex);
+            ReportFault(ex);
             return null;
         }
 
@@ -160,7 +167,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             return typed;
         }
 
-        _invoker.Report(new InvalidCastException(
+        ReportFault(new InvalidCastException(
             $"Result hook for '{typeof(TEvent).FullName}' returned '{result.GetType().FullName}', " +
             $"but '{typeof(TResult).FullName}' was requested."));
         return null;

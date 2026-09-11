@@ -13,9 +13,11 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         Func<HookContext, TContext> createContext,
-        Action<SubscriptionDeliveryFault>? onFault)
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed = null)
     {
-        _ = Task.Run(() => PublishSafelyAsync(filters, handlers, e, rawContext, createContext, onFault).AsTask());
+        _ = Task.Run(() => PublishSafelyAsync(
+            filters, handlers, e, rawContext, createContext, onFault, throwIfDisposed).AsTask());
     }
 
     internal static void Queue<TEvent, TContext>(
@@ -24,23 +26,25 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         TContext context,
-        Action<SubscriptionDeliveryFault>? onFault)
-        => Queue(filters, handlers, e, rawContext, _ => context, onFault);
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed = null)
+        => Queue(filters, handlers, e, rawContext, _ => context, onFault, throwIfDisposed);
 
     // Delivery runs on a background task (it must not block the publishing game loop), so a throwing filter or
     // handler cannot propagate to a caller and is caught here. Swallowing it silently is what makes a broken
     // RunLocal subscription look like "it just does nothing", so every caught fault is reported to the optional
     // observer before delivery is abandoned. Control flow is unchanged: a failed filter still drops the event, a
-    // failed handler still lets the remaining handlers run.
+    // failed handler still lets the remaining handlers run unless the observer disposes the server.
     internal static async ValueTask PublishSafelyAsync<TEvent, TContext>(
         Func<TEvent, TContext, ValueTask<bool>>[] filters,
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
         HookContext rawContext,
         Func<HookContext, TContext> createContext,
-        Action<SubscriptionDeliveryFault>? onFault)
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed = null)
     {
-        if (rawContext.CancellationToken.IsCancellationRequested)
+        if (rawContext.CancellationToken.IsCancellationRequested || IsDisposed(throwIfDisposed))
         {
             return;
         }
@@ -69,7 +73,7 @@ internal static class SubscriptionDelivery
             return;
         }
 
-        await PublishHandlersSafelyAsync(handlers, e, rawContext, context, onFault).ConfigureAwait(false);
+        await PublishHandlersSafelyAsync(handlers, e, rawContext, context, onFault, throwIfDisposed).ConfigureAwait(false);
     }
 
     internal static ValueTask PublishSafelyAsync<TEvent, TContext>(
@@ -78,8 +82,9 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         TContext context,
-        Action<SubscriptionDeliveryFault>? onFault)
-        => PublishSafelyAsync(filters, handlers, e, rawContext, _ => context, onFault);
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed = null)
+        => PublishSafelyAsync(filters, handlers, e, rawContext, _ => context, onFault, throwIfDisposed);
 
     private static async ValueTask<bool> FiltersPassAsync<TEvent, TContext>(
         Func<TEvent, TContext, ValueTask<bool>>[] filters,
@@ -125,11 +130,12 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         TContext context,
-        Action<SubscriptionDeliveryFault>? onFault)
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed)
     {
         for (var i = 0; i < handlers.Length; i++)
         {
-            if (rawContext.CancellationToken.IsCancellationRequested)
+            if (rawContext.CancellationToken.IsCancellationRequested || IsDisposed(throwIfDisposed))
             {
                 return;
             }
@@ -155,6 +161,19 @@ internal static class SubscriptionDelivery
 
     private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
         => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
+
+    private static bool IsDisposed(Action? throwIfDisposed)
+    {
+        try
+        {
+            throwIfDisposed?.Invoke();
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
+    }
 
     private static void Report<TEvent>(
         Action<SubscriptionDeliveryFault>? onFault,
