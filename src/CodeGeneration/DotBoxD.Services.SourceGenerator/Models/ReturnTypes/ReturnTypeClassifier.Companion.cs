@@ -12,7 +12,8 @@ internal static partial class ReturnTypeClassifier
         {
             ct.ThrowIfCancellationRequested();
 
-            if (candidate.DeclaredAccessibility != Accessibility.Public ||
+            if (candidate.HasUnsupportedMetadata ||
+                candidate.DeclaredAccessibility != Accessibility.Public ||
                 !ImplementsService(candidate, serviceType, ct))
             {
                 continue;
