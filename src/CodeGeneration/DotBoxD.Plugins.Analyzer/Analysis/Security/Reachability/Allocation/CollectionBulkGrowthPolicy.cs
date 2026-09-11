@@ -6,10 +6,10 @@ internal static class CollectionBulkGrowthPolicy
 {
     private const string DictionaryInterfaceTypeName =
         "System.Collections.Generic.IDictionary<TKey, TValue>";
+    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
-    private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string SortedDictionaryTypeName =
@@ -37,6 +37,12 @@ internal static class CollectionBulkGrowthPolicy
 
         if (TryGetKnownInstanceMethodDisplayName(method, typeName, out forbidden))
         {
+            return true;
+        }
+
+        if (IsHashSetBulkMutator(method, typeName))
+        {
+            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
             return true;
         }
 
@@ -68,22 +74,9 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
-        if (IsHashSetUnionWith(method, typeName))
-        {
-            forbidden = "System.Collections.Generic.HashSet.UnionWith";
-            return true;
-        }
-
         if (IsListRangeMutator(method, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
-            return true;
-        }
-
-        if (method is { IsStatic: false, Name: "SymmetricExceptWith" } &&
-            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.HashSet.SymmetricExceptWith";
             return true;
         }
 
@@ -103,8 +96,12 @@ internal static class CollectionBulkGrowthPolicy
         => method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsHashSetUnionWith(IMethodSymbol method, string typeName)
-        => method is { IsStatic: false, Name: "UnionWith" } &&
+    private static bool IsHashSetBulkMutator(IMethodSymbol method, string typeName)
+        => method is
+        {
+            IsStatic: false,
+            Name: "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
+        } &&
            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
