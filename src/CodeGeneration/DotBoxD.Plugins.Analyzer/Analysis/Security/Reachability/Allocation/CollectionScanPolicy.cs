@@ -4,6 +4,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class CollectionScanPolicy
 {
+    private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
@@ -19,28 +20,27 @@ internal static class CollectionScanPolicy
             return true;
         }
 
-        if (method is { IsStatic: false, Name: "TrimExcess" } &&
-            string.Equals(typeName, QueueTypeName, StringComparison.Ordinal))
+        return TryGetTrimExcessDisplayName(method, typeName, out forbidden);
+    }
+
+    private static bool TryGetTrimExcessDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
+        if (method is not { IsStatic: false, Name: "TrimExcess" } ||
+            (method.MethodKind != MethodKind.Ordinary &&
+             string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal)))
         {
-            forbidden = "System.Collections.Generic.Queue.TrimExcess";
-            return true;
+            forbidden = null!;
+            return false;
         }
 
-        if (method is { IsStatic: false, MethodKind: MethodKind.Ordinary, Name: "TrimExcess" } &&
-            string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal))
+        forbidden = typeName switch
         {
-            forbidden = "System.Collections.Generic.PriorityQueue.TrimExcess";
-            return true;
-        }
-
-        if (method is { IsStatic: false, Name: "TrimExcess" } &&
-            string.Equals(typeName, SortedListTypeName, StringComparison.Ordinal))
-        {
-            forbidden = "System.Collections.Generic.SortedList.TrimExcess";
-            return true;
-        }
-
-        forbidden = null!;
-        return false;
+            DictionaryTypeName => "System.Collections.Generic.Dictionary.TrimExcess",
+            QueueTypeName => "System.Collections.Generic.Queue.TrimExcess",
+            PriorityQueueTypeName => "System.Collections.Generic.PriorityQueue.TrimExcess",
+            SortedListTypeName => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null!
+        };
+        return forbidden is not null;
     }
 }
