@@ -39,7 +39,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         _kernels = kernels;
         _installer = installer;
         _throwIfDisposed = throwIfDisposed;
-        _resultHooks = new ResultHookSlot<TEvent, TContext>(adapter, onFault, nextResultOrder);
+        _resultHooks = new ResultHookSlot<TEvent, TContext>(adapter, onFault, nextResultOrder, _throwIfDisposed);
     }
     public HookPipeline<TEvent, TContext> Where(
         Func<TEvent, TContext, bool> filter,

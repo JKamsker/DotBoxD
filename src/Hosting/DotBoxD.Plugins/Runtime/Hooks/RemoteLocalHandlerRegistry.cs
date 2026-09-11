@@ -32,8 +32,9 @@ public delegate ValueTask<byte[]> RemoteLocalResultRequest(
 /// </remarks>
 public sealed class RemoteLocalHandlerRegistry
 {
-    private readonly ConcurrentDictionary<string, Handler> _handlers = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, ResultHandler> _resultHandlers = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, RegistrationEntry> _registrations = new(StringComparer.Ordinal);
+
+    internal Action? BeforeRegistrationPublished { get; set; }
 
     /// <summary>
     /// Registers the native terminal delegate for a lowered local chain. <typeparamref name="TProjected"/> is
@@ -129,9 +130,7 @@ public sealed class RemoteLocalHandlerRegistry
             ThrowIfDispatchCanceled(hookContext, cancellationToken);
             return RemoteLocalResultEncoder.Encode(result);
         });
-        _handlers.TryRemove(subscriptionId, out _);
-        _resultHandlers[subscriptionId] = entry;
-        return new ResultRegistration(this, subscriptionId, entry);
+        return RegisterEntry(subscriptionId, new RegistrationEntry(entry));
     }
 
     private IDisposable RegisterKernelHandler(string subscriptionId, Func<KernelRpcValue, HookContext, ValueTask> invoke)
@@ -144,8 +143,13 @@ public sealed class RemoteLocalHandlerRegistry
     private IDisposable RegisterRawHandler(string subscriptionId, Func<ReadOnlyMemory<byte>, HookContext, ValueTask> invoke)
     {
         var entry = new Handler(invoke);
-        _resultHandlers.TryRemove(subscriptionId, out _);
-        _handlers[subscriptionId] = entry;
+        return RegisterEntry(subscriptionId, new RegistrationEntry(entry));
+    }
+
+    private IDisposable RegisterEntry(string subscriptionId, RegistrationEntry entry)
+    {
+        BeforeRegistrationPublished?.Invoke();
+        _registrations[subscriptionId] = entry;
         return new Registration(this, subscriptionId, entry);
     }
 
@@ -170,7 +174,7 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(context);
         ThrowIfDispatchCanceled(context, cancellationToken);
-        if (!_handlers.TryGetValue(subscriptionId, out var handler))
+        if (!_registrations.TryGetValue(subscriptionId, out var entry) || entry.Handler is not { } handler)
         {
             throw new InvalidOperationException(
                 $"No remote local handler is registered for subscription '{subscriptionId}'.");
@@ -190,7 +194,7 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentNullException.ThrowIfNull(context);
         ThrowIfDispatchCanceled(context, cancellationToken);
 
-        if (!_resultHandlers.TryGetValue(subscriptionId, out var handler))
+        if (!_registrations.TryGetValue(subscriptionId, out var entry) || entry.ResultHandler is not { } handler)
         {
             throw new InvalidOperationException(
                 $"No remote local result handler is registered for subscription '{subscriptionId}'.");
@@ -240,18 +244,12 @@ public sealed class RemoteLocalHandlerRegistry
             return false;
         }
 
-        var removedHandler = _handlers.TryRemove(subscriptionId, out _);
-        var removedResult = _resultHandlers.TryRemove(subscriptionId, out _);
-        return removedHandler || removedResult;
+        return _registrations.TryRemove(subscriptionId, out _);
     }
 
-    private bool Unregister(string subscriptionId, Handler handler)
+    private bool Unregister(string subscriptionId, RegistrationEntry entry)
         => !string.IsNullOrEmpty(subscriptionId) &&
-           ((ICollection<KeyValuePair<string, Handler>>)_handlers).Remove(new(subscriptionId, handler));
-
-    private bool Unregister(string subscriptionId, ResultHandler handler)
-        => !string.IsNullOrEmpty(subscriptionId) &&
-           ((ICollection<KeyValuePair<string, ResultHandler>>)_resultHandlers).Remove(new(subscriptionId, handler));
+           ((ICollection<KeyValuePair<string, RegistrationEntry>>)_registrations).Remove(new(subscriptionId, entry));
 
     /// <summary>
     /// Removes all registered handlers. Called when the plugin connection tears down (session disposed / peer
@@ -259,8 +257,7 @@ public sealed class RemoteLocalHandlerRegistry
     /// </summary>
     public void Clear()
     {
-        _handlers.Clear();
-        _resultHandlers.Clear();
+        _registrations.Clear();
     }
 
     private sealed class Handler(Func<ReadOnlyMemory<byte>, HookContext, ValueTask> invoke)
@@ -274,23 +271,24 @@ public sealed class RemoteLocalHandlerRegistry
         public Func<ReadOnlyMemory<byte>, HookContext, CancellationToken, ValueTask<byte[]>> Invoke { get; } = invoke;
     }
 
+    private sealed class RegistrationEntry
+    {
+        public RegistrationEntry(Handler handler) => Handler = handler;
+
+        public RegistrationEntry(ResultHandler resultHandler) => ResultHandler = resultHandler;
+
+        public Handler? Handler { get; }
+
+        public ResultHandler? ResultHandler { get; }
+    }
+
     private sealed class Registration(
         RemoteLocalHandlerRegistry owner,
         string subscriptionId,
-        Handler handler) : IDisposable
+        RegistrationEntry entry) : IDisposable
     {
         private RemoteLocalHandlerRegistry? _owner = owner;
 
-        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
-    }
-
-    private sealed class ResultRegistration(
-        RemoteLocalHandlerRegistry owner,
-        string subscriptionId,
-        ResultHandler handler) : IDisposable
-    {
-        private RemoteLocalHandlerRegistry? _owner = owner;
-
-        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, entry);
     }
 }
