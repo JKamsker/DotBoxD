@@ -18,22 +18,19 @@ internal static class ForbiddenCollectionScanPolicy
 
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (method.Name is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
-            string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
+        if (IsForbiddenListScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
             return true;
         }
 
-        if (method.Name == "Overlaps" &&
-            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal))
+        if (IsHashSetOverlaps(method.Name, typeName))
         {
             forbidden = "System.Collections.Generic.HashSet.Overlaps";
             return true;
         }
 
-        if (method.Name == "TrimExcess" &&
-            string.Equals(typeName, StackTypeName, StringComparison.Ordinal))
+        if (IsStackTrimExcess(method.Name, typeName))
         {
             forbidden = "System.Collections.Generic.Stack.TrimExcess";
             return true;
@@ -42,4 +39,14 @@ internal static class ForbiddenCollectionScanPolicy
         forbidden = null!;
         return false;
     }
+
+    private static bool IsForbiddenListScan(string methodName, string typeName)
+        => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
+           string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
+
+    private static bool IsHashSetOverlaps(string methodName, string typeName)
+        => methodName == "Overlaps" && string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+
+    private static bool IsStackTrimExcess(string methodName, string typeName)
+        => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
 }
