@@ -18,6 +18,7 @@ public sealed class ExperimentalSubServiceCompanionCoverageTests
             assemblyName: "ExperimentalCompanion",
             syntaxTrees: [CSharpSyntaxTree.ParseText($$"""
                 using DotBoxD.Services.Attributes;
+                using DotBoxD.Services.Server;
                 using System.Diagnostics.CodeAnalysis;
                 using System.Threading.Tasks;
 
@@ -52,6 +53,81 @@ public sealed class ExperimentalSubServiceCompanionCoverageTests
         var result = driver.RunGenerators(compilation).GetRunResult();
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXS002");
+    }
+
+    [Fact]
+    public void Experimental_lookalike_does_not_block_manual_companion()
+    {
+        var referenced = CompileReference("""
+            using DotBoxD.Services.Attributes;
+            using DotBoxD.Services.Server;
+            using System.Threading.Tasks;
+
+            namespace System.Diagnostics.CodeAnalysis
+            {
+                public sealed class ExperimentalAttribute : System.Attribute
+                {
+                    public ExperimentalAttribute(string diagnosticId) { }
+                }
+            }
+
+            namespace ReferencedContracts
+            {
+                [RpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                [System.Diagnostics.CodeAnalysis.Experimental("DBXEXP_COMPANION")]
+                public sealed class SubProxy : ISub
+                {
+                    public SubProxy(IRpcInvoker invoker, string instanceId) { }
+
+                    public Task<int> CountAsync() => Task.FromResult(0);
+                }
+            }
+            """);
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "ExperimentalCompanionLookalike",
+            syntaxTrees: [CSharpSyntaxTree.ParseText("""
+                using DotBoxD.Services.Attributes;
+                using System.Threading.Tasks;
+                using ReferencedContracts;
+
+                namespace Consumer
+                {
+                    [RpcService]
+                    public interface IRoot
+                    {
+                        Task<ISub> GetSubAsync();
+                    }
+                }
+                """)],
+            references: TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location))
+                .Append(referenced),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var driver = CSharpGeneratorDriver.Create(new DotBoxDRpcGenerator().AsSourceGenerator());
+        var result = driver.RunGenerators(compilation).GetRunResult();
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXS002");
+    }
+
+    private static MetadataReference CompileReference(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "ExperimentalCompanionReference",
+            syntaxTrees: [CSharpSyntaxTree.ParseText(source)],
+            references: TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location)),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences() =>
