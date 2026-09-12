@@ -68,7 +68,7 @@ internal static class SubscriptionDelivery
             return;
         }
 
-        if (!await FiltersPassAsync(filters, e, rawContext, context, onFault).ConfigureAwait(false))
+        if (!await FiltersPassAsync(filters, e, rawContext, context, onFault, throwIfDisposed).ConfigureAwait(false))
         {
             return;
         }
@@ -91,13 +91,14 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         TContext context,
-        Action<SubscriptionDeliveryFault>? onFault)
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed)
     {
         try
         {
             for (var i = 0; i < filters.Length; i++)
             {
-                if (rawContext.CancellationToken.IsCancellationRequested)
+                if (rawContext.CancellationToken.IsCancellationRequested || IsDisposed(throwIfDisposed))
                 {
                     return false;
                 }
