@@ -199,6 +199,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
                 return PublishAfterFilterAwaitAsync(filter, filters, handlers, e, rawContext, context, i);
             }
 
+            ThrowIfDisposed();
             if (!filter.Result)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -214,6 +215,8 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
             {
                 return PublishAfterHandlerAwaitAsync(handler, handlers, e, rawContext, context, i);
             }
+
+            ThrowIfDisposed();
         }
 
         return ValueTask.CompletedTask;
@@ -225,7 +228,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     private void ThrowIfDisposed()
         => _throwIfDisposed?.Invoke();
 
-    private static async ValueTask PublishAfterFilterAwaitAsync(
+    private async ValueTask PublishAfterFilterAwaitAsync(
         ValueTask<bool> pending,
         Func<TEvent, TContext, ValueTask<bool>>[] filters,
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
@@ -236,6 +239,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     {
         var matched = await pending.ConfigureAwait(false);
         rawContext.CancellationToken.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
         if (!matched)
         {
             return;
@@ -244,7 +248,9 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         for (var i = index + 1; i < filters.Length; i++)
         {
             rawContext.CancellationToken.ThrowIfCancellationRequested();
-            if (!await filters[i](e, context).ConfigureAwait(false))
+            var matches = await filters[i](e, context).ConfigureAwait(false);
+            ThrowIfDisposed();
+            if (!matches)
             {
                 return;
             }
@@ -254,10 +260,11 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         {
             rawContext.CancellationToken.ThrowIfCancellationRequested();
             await handlers[i](e, rawContext, context).ConfigureAwait(false);
+            ThrowIfDisposed();
         }
     }
 
-    private static async ValueTask PublishAfterHandlerAwaitAsync(
+    private async ValueTask PublishAfterHandlerAwaitAsync(
         ValueTask pending,
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
@@ -267,10 +274,12 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     {
         await pending.ConfigureAwait(false);
         rawContext.CancellationToken.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
         for (var i = index + 1; i < handlers.Length; i++)
         {
             rawContext.CancellationToken.ThrowIfCancellationRequested();
             await handlers[i](e, rawContext, context).ConfigureAwait(false);
+            ThrowIfDisposed();
         }
     }
 }
