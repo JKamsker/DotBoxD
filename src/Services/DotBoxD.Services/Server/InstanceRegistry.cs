@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using DotBoxD.Services.Diagnostics;
 
 namespace DotBoxD.Services.Server;
 
@@ -277,54 +276,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
     }
 
-    private void DisposeAndComplete(InstanceRegistryDisposal disposal, bool reportFailure = false)
-    {
-        try
-        {
-            InstanceRegistryDisposer.Dispose(disposal.Instance);
-            disposal.Completion.SetResult(true);
-        }
-        catch (Exception ex)
-        {
-            disposal.Completion.SetException(ex);
-            if (reportFailure)
-            {
-                RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
-            }
-            else
-            {
-                throw;
-            }
-        }
-        finally
-        {
-            CompleteDisposal(disposal.Instance);
-        }
-    }
+    private void DisposeAndComplete(InstanceRegistryDisposal disposal, bool reportFailure = false) =>
+        InstanceRegistryDisposer.DisposeAndComplete(disposal, CompleteDisposal, reportFailure);
 
-    private async Task DisposeAndCompleteAsync(InstanceRegistryDisposal disposal, bool reportFailure = false)
-    {
-        try
-        {
-            await InstanceRegistryDisposer.DisposeAsync(disposal.Instance).ConfigureAwait(false);
-            disposal.Completion.SetResult(true);
-        }
-        catch (Exception ex)
-        {
-            disposal.Completion.SetException(ex);
-            if (reportFailure)
-            {
-                RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
-            }
-            else
-            {
-                throw;
-            }
-        }
-        finally
-        {
-            CompleteDisposal(disposal.Instance);
-        }
-    }
+    private Task DisposeAndCompleteAsync(InstanceRegistryDisposal disposal, bool reportFailure = false) =>
+        InstanceRegistryDisposer.DisposeAndCompleteAsync(disposal, CompleteDisposal, reportFailure);
 
 }
