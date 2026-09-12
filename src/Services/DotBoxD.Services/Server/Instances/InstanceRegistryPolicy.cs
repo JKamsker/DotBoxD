@@ -33,7 +33,7 @@ internal static class InstanceRegistryPolicy
         return false;
     }
 
-    internal static bool ContainsPendingDisposal(
+    internal static bool ContainsDisposal(
         IEnumerable<InstanceRegistryDisposal> disposals,
         object instance)
     {
