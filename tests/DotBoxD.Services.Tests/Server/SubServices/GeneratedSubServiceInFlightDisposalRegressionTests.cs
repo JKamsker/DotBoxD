@@ -44,6 +44,39 @@ public sealed class GeneratedSubServiceInFlightDisposalRegressionTests
         Assert.False(registry.TryGet(descriptor.ServiceName, instanceId, out _));
     }
 
+    [Fact]
+    public async Task GeneratedDispatcher_PreservesReceiverFailureWhenLeaseDisposalAlsoFails()
+    {
+        var primary = new InvalidOperationException("receiver failed");
+        var cleanup = new InvalidOperationException("lease cleanup failed");
+        var service = new ThrowingLifecycleChildService(primary, cleanup);
+        var serializer = new MessagePackRpcSerializer();
+        var registry = new InstanceRegistry();
+        var descriptor = GeneratedServiceRegistry.GetService<ISubServiceLifecycleChild>();
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<ISubServiceLifecycleChild>(service);
+        var ping = Assert.Single(
+            descriptor.Methods,
+            static candidate => candidate.Name == nameof(ISubServiceLifecycleChild.PingAsync));
+        var instanceId = registry.Register(descriptor.ServiceName, service);
+
+        var call = dispatcher.DispatchOnInstanceAsync(
+            instanceId,
+            ping.WireName,
+            ReadOnlyMemory<byte>.Empty,
+            serializer,
+            registry,
+            new ArrayBufferWriter<byte>());
+        await service.PingEntered.Task.WaitAsync(Timeout);
+
+        await registry.ReleaseAsync(descriptor.ServiceName, instanceId);
+        service.AllowPing.SetResult();
+
+        var actual = await Record.ExceptionAsync(() => call.WaitAsync(Timeout));
+
+        Assert.Same(primary, actual);
+        Assert.Equal(1, service.DisposeCount);
+    }
+
     private sealed class BlockingLifecycleChildService : ISubServiceLifecycleChild
     {
         public TaskCompletionSource PingEntered { get; } =
@@ -72,6 +105,30 @@ public sealed class GeneratedSubServiceInFlightDisposalRegressionTests
         {
             Disposed.SetResult();
             return default;
+        }
+    }
+
+    private sealed class ThrowingLifecycleChildService(Exception primary, Exception cleanup) : ISubServiceLifecycleChild
+    {
+        public TaskCompletionSource PingEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowPing { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DisposeCount { get; private set; }
+
+        public async Task<int> PingAsync(CancellationToken ct = default)
+        {
+            PingEntered.SetResult();
+            await AllowPing.Task.ConfigureAwait(false);
+            throw primary;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            throw cleanup;
         }
     }
 }

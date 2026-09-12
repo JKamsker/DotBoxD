@@ -52,13 +52,28 @@ namespace Snap.Inherit
 
         private async global::System.Threading.Tasks.Task DispatchWithLeaseAsync(global::Snap.Inherit.IDerived receiver, global::System.IAsyncDisposable lease, string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
         {
+            var dispatchFailed = true;
             try
             {
                 await DispatchCoreAsync(receiver, instanceId, method, payload, serializer, registry, output, streaming, ct).ConfigureAwait(false);
+                dispatchFailed = false;
             }
             finally
             {
-                await lease.DisposeAsync().ConfigureAwait(false);
+                if (dispatchFailed)
+                {
+                    try
+                    {
+                        await lease.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+                }
+                else
+                {
+                    await lease.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
 
