@@ -110,6 +110,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         {
             var result = await FireEntryAsync(entries[i], e, rawContext, context, options, cancellationToken)
                 .ConfigureAwait(false);
+            _throwIfDisposed?.Invoke();
             if (result is not null)
             {
                 return result;
