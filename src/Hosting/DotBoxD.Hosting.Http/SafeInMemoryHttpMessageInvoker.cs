@@ -32,9 +32,20 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
                 statusCode,
                 Parse(location, nameof(location)),
                 Parse(finalRequestUri, nameof(finalRequestUri)),
-                responseDelay),
+                ValidateResponseDelay(responseDelay)),
             disposeHandler: true)
     {
+    }
+
+    private static TimeSpan? ValidateResponseDelay(TimeSpan? responseDelay)
+    {
+        if (responseDelay is not null &&
+            (responseDelay.Value < TimeSpan.Zero || responseDelay.Value.TotalMilliseconds > int.MaxValue))
+        {
+            throw new ArgumentOutOfRangeException(nameof(responseDelay));
+        }
+
+        return responseDelay;
     }
 
     private static Uri? Parse(string? value, string parameterName)
@@ -65,11 +76,6 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
             TimeSpan? responseDelay)
         {
             ArgumentNullException.ThrowIfNull(responseBytes);
-            if (responseDelay is not null && responseDelay.Value < TimeSpan.Zero)
-            {
-                throw new ArgumentOutOfRangeException(nameof(responseDelay));
-            }
-
             _responseBytes = responseBytes.ToArray();
             _statusCode = statusCode;
             _location = location;
