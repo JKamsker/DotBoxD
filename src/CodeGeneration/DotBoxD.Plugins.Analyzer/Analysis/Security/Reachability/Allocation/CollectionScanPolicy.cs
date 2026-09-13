@@ -22,6 +22,8 @@ internal static class CollectionScanPolicy
         => (typeName, method.Name, method.MethodKind) switch
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
+            (HashSetTypeName, "IsProperSupersetOf", _) =>
+                "System.Collections.Generic.HashSet.IsProperSupersetOf",
             (HashSetTypeName, "SetEquals", _) => "System.Collections.Generic.HashSet.SetEquals",
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
