@@ -52,6 +52,25 @@ public sealed class SafeHttpPublicContractTests
         Assert.Equal("response", ex.ParamName);
     }
 
+    [Fact]
+    public void String_response_invoker_rejects_unschedulable_response_delay_with_public_parameter_name()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SafeInMemoryHttpMessageInvoker("ok", responseDelay: TimeSpan.MaxValue));
+
+        Assert.Equal("responseDelay", ex.ParamName);
+    }
+
+    [Fact]
+    public void String_response_invoker_accepts_zero_and_finite_response_delays()
+    {
+        using var zeroDelay = new SafeInMemoryHttpMessageInvoker("ok", responseDelay: TimeSpan.Zero);
+        using var finiteDelay = new SafeInMemoryHttpMessageInvoker("ok", responseDelay: TimeSpan.FromMilliseconds(1));
+
+        Assert.NotNull(zeroDelay);
+        Assert.NotNull(finiteDelay);
+    }
+
     [Theory]
     [InlineData("location")]
     [InlineData("finalRequestUri")]
