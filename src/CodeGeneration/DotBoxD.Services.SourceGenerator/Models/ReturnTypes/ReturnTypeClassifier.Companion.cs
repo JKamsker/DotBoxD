@@ -45,6 +45,7 @@ internal static partial class ReturnTypeClassifier
            !candidate.IsGenericType &&
            !HasErrorObsoleteAttribute(candidate, ct) &&
            !IsExperimental(candidate, ct) &&
+           !RequiresPreviewFeatures(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
 
     private static bool HasUsableProxyConstructor(
@@ -73,6 +74,7 @@ internal static partial class ReturnTypeClassifier
         => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
            !HasErrorObsoleteAttribute(constructor, ct) &&
            !IsExperimental(constructor, ct) &&
+           !RequiresPreviewFeatures(constructor, ct) &&
            constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
            constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
            SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
@@ -193,6 +195,23 @@ internal static partial class ReturnTypeClassifier
 
             if (attribute.AttributeClass is { } attributeType &&
                 attributeType.ToDisplayString() == "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" &&
+                IsTrustedFrameworkType(attributeType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool RequiresPreviewFeatures(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (attribute.AttributeClass is { } attributeType &&
+                attributeType.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" &&
                 IsTrustedFrameworkType(attributeType))
             {
                 return true;
