@@ -5,6 +5,8 @@ namespace DotBoxD.Hosting.Http;
 
 public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
 {
+    private static readonly TimeSpan MaxResponseDelay = TimeSpan.FromMilliseconds(int.MaxValue);
+
     public SafeInMemoryHttpMessageInvoker(
         string response,
         HttpStatusCode statusCode = HttpStatusCode.OK,
@@ -32,7 +34,7 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
                 statusCode,
                 Parse(location, nameof(location)),
                 Parse(finalRequestUri, nameof(finalRequestUri)),
-                responseDelay),
+                ValidateResponseDelay(responseDelay)),
             disposeHandler: true)
     {
     }
@@ -49,6 +51,17 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
             : throw new ArgumentException("URI must be absolute.", parameterName);
     }
 
+    private static TimeSpan ValidateResponseDelay(TimeSpan? responseDelay)
+    {
+        var delay = responseDelay ?? TimeSpan.Zero;
+        if (delay < TimeSpan.Zero || delay > MaxResponseDelay)
+        {
+            throw new ArgumentOutOfRangeException(nameof(responseDelay));
+        }
+
+        return delay;
+    }
+
     private sealed class InMemoryHandler : HttpMessageHandler
     {
         private readonly byte[] _responseBytes;
@@ -62,19 +75,15 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
             HttpStatusCode statusCode,
             Uri? location,
             Uri? finalRequestUri,
-            TimeSpan? responseDelay)
+            TimeSpan responseDelay)
         {
             ArgumentNullException.ThrowIfNull(responseBytes);
-            if (responseDelay is not null && responseDelay.Value < TimeSpan.Zero)
-            {
-                throw new ArgumentOutOfRangeException(nameof(responseDelay));
-            }
 
             _responseBytes = responseBytes.ToArray();
             _statusCode = statusCode;
             _location = location;
             _finalRequestUri = finalRequestUri;
-            _responseDelay = responseDelay ?? TimeSpan.Zero;
+            _responseDelay = responseDelay;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(
