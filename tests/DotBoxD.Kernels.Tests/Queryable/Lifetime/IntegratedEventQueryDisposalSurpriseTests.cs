@@ -14,6 +14,7 @@ public sealed class IntegratedEventQueryDisposalSurpriseTests
 
         var projectionDisposedServer = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handlerInvoked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeline = server.Subscriptions.On<DisposingProjectionEvent>();
         var handle = await server.Subscriptions.Query<DisposingProjectionEvent>()
             .Select(@event => @event.ProjectedValue)
             .SubscribeAsync((_, _) =>
@@ -25,9 +26,10 @@ public sealed class IntegratedEventQueryDisposalSurpriseTests
         server.Subscriptions.Publish(new DisposingProjectionEvent(server, projectionDisposedServer));
 
         await projectionDisposedServer.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var completed = await Task.WhenAny(handlerInvoked.Task, Task.Delay(TimeSpan.FromMilliseconds(200)));
+        var delivery = Assert.IsAssignableFrom<Task>(pipeline.LastQueuedDelivery);
+        await delivery.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.NotSame(handlerInvoked.Task, completed);
+        Assert.False(handlerInvoked.Task.IsCompleted);
         Assert.Equal(0, handle.Dispatches);
     }
 
