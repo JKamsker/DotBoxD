@@ -22,6 +22,7 @@ public sealed class SubscriptionRegistry
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
     private readonly Action? _throwIfDisposed;
+    private readonly Func<bool>? _isDisposed;
 
     internal SubscriptionRegistry(
         IPluginMessageSink messages,
@@ -29,7 +30,8 @@ public sealed class SubscriptionRegistry
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
         Action<SubscriptionDeliveryFault>? onFault = null,
-        Action? throwIfDisposed = null)
+        Action? throwIfDisposed = null,
+        Func<bool>? isDisposed = null)
     {
         _messages = messages;
         _events = events;
@@ -37,6 +39,7 @@ public sealed class SubscriptionRegistry
         _installer = installer;
         _onFault = onFault;
         _throwIfDisposed = throwIfDisposed;
+        _isDisposed = isDisposed;
     }
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
@@ -233,6 +236,8 @@ public sealed class SubscriptionRegistry
         Publish(e, cancellationToken);
         return ValueTask.CompletedTask;
     }
+
+    internal bool IsDisposed => _isDisposed?.Invoke() == true;
 
     private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
