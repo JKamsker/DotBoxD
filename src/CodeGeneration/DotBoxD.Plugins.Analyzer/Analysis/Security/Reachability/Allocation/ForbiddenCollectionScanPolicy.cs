@@ -6,6 +6,7 @@ internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
@@ -24,9 +25,9 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsHashSetOverlaps(method.Name, typeName))
+        if (IsSetOverlaps(method.Name, typeName))
         {
-            forbidden = "System.Collections.Generic.HashSet.Overlaps";
+            forbidden = $"System.Collections.Generic.{OverlapsCollectionType(typeName)}.Overlaps";
             return true;
         }
 
@@ -44,8 +45,13 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsHashSetOverlaps(string methodName, string typeName)
-        => methodName == "Overlaps" && string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+    private static bool IsSetOverlaps(string methodName, string typeName)
+        => methodName == "Overlaps" &&
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+
+    private static string OverlapsCollectionType(string typeName)
+        => string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ? "ISet" : "HashSet";
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
