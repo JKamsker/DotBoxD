@@ -75,7 +75,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
         HookContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (entry.Handle.IsDisposed || isDisposed?.Invoke() == true)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -86,7 +86,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
             return;
         }
 
-        if (entry.Handle.IsDisposed || isDisposed?.Invoke() == true)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -97,7 +97,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
             return;
         }
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (entry.Handle.IsDisposed || isDisposed?.Invoke() == true)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -159,6 +159,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
             return false;
         }
     }
+
+    private bool IsDisposed(EventQuerySubscriptionEntry<TEvent> entry)
+        => entry.Handle.IsDisposed || isDisposed?.Invoke() == true;
 
     private void Remove(EventQuerySubscriptionEntry<TEvent> entry)
     {
