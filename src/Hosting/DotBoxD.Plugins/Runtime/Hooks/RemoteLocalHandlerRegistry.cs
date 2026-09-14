@@ -225,6 +225,7 @@ public sealed class RemoteLocalHandlerRegistry
                 throw ProjectedPayloadDecoderFailed(subscriptionId, typeof(TProjected), ex);
             }
 
+            context.CancellationToken.ThrowIfCancellationRequested();
             return handler(projected, context);
         };
 
