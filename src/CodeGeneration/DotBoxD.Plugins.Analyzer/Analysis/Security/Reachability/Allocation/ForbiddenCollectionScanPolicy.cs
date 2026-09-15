@@ -6,6 +6,7 @@ internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
@@ -30,6 +31,12 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
+        if (IsSetOverlaps(method.Name, typeName))
+        {
+            forbidden = $"System.Collections.Generic.{OverlapsCollectionType(typeName)}.Overlaps";
+            return true;
+        }
+
         if (IsStackTrimExcess(method.Name, typeName))
         {
             forbidden = "System.Collections.Generic.Stack.TrimExcess";
@@ -45,8 +52,16 @@ internal static class ForbiddenCollectionScanPolicy
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenHashSetScan(string methodName, string typeName)
-        => methodName is "IsSubsetOf" or "IsProperSupersetOf" or "Overlaps" &&
+        => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+
+    private static bool IsSetOverlaps(string methodName, string typeName)
+        => methodName == "Overlaps" &&
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+
+    private static string OverlapsCollectionType(string typeName)
+        => string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ? "ISet" : "HashSet";
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
