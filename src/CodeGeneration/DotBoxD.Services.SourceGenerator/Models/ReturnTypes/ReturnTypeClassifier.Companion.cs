@@ -78,9 +78,24 @@ internal static partial class ReturnTypeClassifier
            !RequiresPreviewFeatures(constructor, ct) &&
            constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
            constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
+           !HasRequiredCustomModifiers(invoker) &&
+           !HasRequiredCustomModifiers(instanceId) &&
            SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
            instanceId.Type.SpecialType == SpecialType.System_String &&
            CanConstructProxy(candidate, constructor, ct);
+
+    private static bool HasRequiredCustomModifiers(IParameterSymbol parameter)
+    {
+        foreach (var modifier in parameter.CustomModifiers)
+        {
+            if (!modifier.IsOptional)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static INamedTypeSymbol? GetRpcInvokerType(INamedTypeSymbol serviceType, CancellationToken ct)
     {
