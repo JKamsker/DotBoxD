@@ -51,6 +51,7 @@ public enum QueryValueKind.String = 4
 public enum QueryValueKind.Timestamp = 8
 public enum QueryValueKind.UnsignedInteger = 7
 public EventQuery<TEvent> Query<TEvent>() => new(this)
+public EventQueryHost()
 public EventQuery<TEvent> Where(Expression<Func<TEvent, bool>> predicate)
 public EventQueryDocument Document { get; }
 public EventQueryPlan Plan { get; }

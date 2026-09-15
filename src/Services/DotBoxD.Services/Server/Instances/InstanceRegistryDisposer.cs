@@ -44,6 +44,62 @@ internal static class InstanceRegistryDisposer
         }
     }
 
+    internal static void DisposeAndComplete(
+        InstanceRegistryDisposal disposal,
+        Action<object> onCompleted,
+        bool reportFailure)
+    {
+        try
+        {
+            Dispose(disposal.Instance);
+            disposal.Completion.SetResult(true);
+        }
+        catch (Exception ex)
+        {
+            disposal.Completion.SetException(ex);
+            if (reportFailure)
+            {
+                RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            }
+            else
+            {
+                throw;
+            }
+        }
+        finally
+        {
+            onCompleted(disposal.Instance);
+        }
+    }
+
+    internal static async Task DisposeAndCompleteAsync(
+        InstanceRegistryDisposal disposal,
+        Action<object> onCompleted,
+        bool reportFailure)
+    {
+        try
+        {
+            await DisposeAsync(disposal.Instance).ConfigureAwait(false);
+            disposal.Completion.SetResult(true);
+        }
+        catch (Exception ex)
+        {
+            disposal.Completion.SetException(ex);
+            if (reportFailure)
+            {
+                RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            }
+            else
+            {
+                throw;
+            }
+        }
+        finally
+        {
+            onCompleted(disposal.Instance);
+        }
+    }
+
     internal static async Task DisposeAsyncBestEffort(object instance)
     {
         try

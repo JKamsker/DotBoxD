@@ -7,6 +7,7 @@ internal static class CollectionBulkGrowthPolicy
     private const string DictionaryInterfaceTypeName =
         "System.Collections.Generic.IDictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
@@ -40,9 +41,9 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
-        if (IsHashSetBulkMutator(method, typeName))
+        if (IsSetBulkMutator(method, typeName))
         {
-            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
+            forbidden = $"{typeName.Substring(0, typeName.IndexOf('<'))}.{method.Name}";
             return true;
         }
 
@@ -96,13 +97,14 @@ internal static class CollectionBulkGrowthPolicy
         => method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsHashSetBulkMutator(IMethodSymbol method, string typeName)
+    private static bool IsSetBulkMutator(IMethodSymbol method, string typeName)
         => method is
         {
             IsStatic: false,
             Name: "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
         } &&
-           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
         IMethodSymbol method,

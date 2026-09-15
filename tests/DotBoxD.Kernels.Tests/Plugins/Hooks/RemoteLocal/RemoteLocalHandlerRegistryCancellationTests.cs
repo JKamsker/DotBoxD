@@ -150,6 +150,34 @@ public sealed class RemoteLocalHandlerRegistryCancellationTests
         Assert.Equal((typeof(OperationCanceledException), 1), (exception?.GetType(), invocations));
     }
 
+    [Fact]
+    public async Task DispatchAsync_does_not_invoke_handler_after_raw_decoder_cancels_context()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        using var contextCancellation = new CancellationTokenSource();
+        var invocations = 0;
+        registry.Register(
+            "sub-decoder-context-cancel",
+            (string _, HookContext _) =>
+            {
+                invocations++;
+                return ValueTask.CompletedTask;
+            },
+            (ReadOnlyMemory<byte> _) =>
+            {
+                contextCancellation.Cancel();
+                return "payload";
+            });
+
+        var exception = await Record.ExceptionAsync(
+            async () => await registry.DispatchAsync(
+                "sub-decoder-context-cancel",
+                EncodeProjected("payload"),
+                new HookContext(new InMemoryPluginMessageSink(), contextCancellation.Token)));
+
+        Assert.Equal((typeof(OperationCanceledException), 0), (exception?.GetType(), invocations));
+    }
+
     private static byte[] EncodeProjected<T>(T value)
     {
         var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(T));

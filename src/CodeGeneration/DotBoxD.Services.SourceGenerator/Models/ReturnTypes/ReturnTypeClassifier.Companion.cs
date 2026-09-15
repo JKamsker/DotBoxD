@@ -43,8 +43,11 @@ internal static partial class ReturnTypeClassifier
            candidate.DeclaredAccessibility == Accessibility.Public &&
            !candidate.IsAbstract &&
            !candidate.IsGenericType &&
+           !candidate.IsRefLikeType &&
            !HasErrorObsoleteAttribute(candidate, ct) &&
            !IsExperimental(candidate, ct) &&
+           !RequiresPreviewFeatures(candidate, ct) &&
+           !IsPlatformRestricted(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
 
     private static bool HasUsableProxyConstructor(
@@ -70,14 +73,34 @@ internal static partial class ReturnTypeClassifier
         IMethodSymbol constructor,
         INamedTypeSymbol rpcInvokerType,
         CancellationToken ct)
-        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
-           !HasErrorObsoleteAttribute(constructor, ct) &&
-           !IsExperimental(constructor, ct) &&
+        => HasSupportedProxyConstructorShape(constructor, ct) &&
            constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
            constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
+           !HasRequiredCustomModifiers(invoker) &&
+           !HasRequiredCustomModifiers(instanceId) &&
            SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
            instanceId.Type.SpecialType == SpecialType.System_String &&
            CanConstructProxy(candidate, constructor, ct);
+
+    private static bool HasSupportedProxyConstructorShape(IMethodSymbol constructor, CancellationToken ct)
+        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
+           !HasErrorObsoleteAttribute(constructor, ct) &&
+           !IsExperimental(constructor, ct) &&
+           !RequiresPreviewFeatures(constructor, ct) &&
+           !IsPlatformRestricted(constructor, ct);
+
+    private static bool HasRequiredCustomModifiers(IParameterSymbol parameter)
+    {
+        foreach (var modifier in parameter.CustomModifiers)
+        {
+            if (!modifier.IsOptional)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static INamedTypeSymbol? GetRpcInvokerType(INamedTypeSymbol serviceType, CancellationToken ct)
     {
@@ -196,6 +219,44 @@ internal static partial class ReturnTypeClassifier
                 IsTrustedFrameworkType(attributeType))
             {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool RequiresPreviewFeatures(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (attribute.AttributeClass is { } attributeType &&
+                attributeType.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" &&
+                IsTrustedFrameworkType(attributeType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPlatformRestricted(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            for (var type = attribute.AttributeClass; type is not null; type = type.BaseType)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (type.ToDisplayString() == "System.Runtime.Versioning.OSPlatformAttribute" &&
+                    IsTrustedFrameworkType(type))
+                {
+                    return true;
+                }
             }
         }
 

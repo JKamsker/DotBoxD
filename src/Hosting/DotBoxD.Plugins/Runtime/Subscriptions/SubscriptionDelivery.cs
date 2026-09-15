@@ -7,7 +7,7 @@ internal static class SubscriptionDelivery
 {
     // Keep the capture in this post-validation helper. If the Task.Run lambda lives in SubscriptionPipeline.Publish,
     // C# creates its display class before that method's cancellation and empty-pipeline returns.
-    internal static void Queue<TEvent, TContext>(
+    internal static Task Queue<TEvent, TContext>(
         Func<TEvent, TContext, ValueTask<bool>>[] filters,
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
@@ -16,11 +16,11 @@ internal static class SubscriptionDelivery
         Action<SubscriptionDeliveryFault>? onFault,
         Action? throwIfDisposed = null)
     {
-        _ = Task.Run(() => PublishSafelyAsync(
+        return Task.Run(() => PublishSafelyAsync(
             filters, handlers, e, rawContext, createContext, onFault, throwIfDisposed).AsTask());
     }
 
-    internal static void Queue<TEvent, TContext>(
+    internal static Task Queue<TEvent, TContext>(
         Func<TEvent, TContext, ValueTask<bool>>[] filters,
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
@@ -68,7 +68,7 @@ internal static class SubscriptionDelivery
             return;
         }
 
-        if (!await FiltersPassAsync(filters, e, rawContext, context, onFault).ConfigureAwait(false))
+        if (!await FiltersPassAsync(filters, e, rawContext, context, onFault, throwIfDisposed).ConfigureAwait(false))
         {
             return;
         }
@@ -91,13 +91,14 @@ internal static class SubscriptionDelivery
         TEvent e,
         HookContext rawContext,
         TContext context,
-        Action<SubscriptionDeliveryFault>? onFault)
+        Action<SubscriptionDeliveryFault>? onFault,
+        Action? throwIfDisposed)
     {
         try
         {
             for (var i = 0; i < filters.Length; i++)
             {
-                if (rawContext.CancellationToken.IsCancellationRequested)
+                if (rawContext.CancellationToken.IsCancellationRequested || IsDisposed(throwIfDisposed))
                 {
                     return false;
                 }
