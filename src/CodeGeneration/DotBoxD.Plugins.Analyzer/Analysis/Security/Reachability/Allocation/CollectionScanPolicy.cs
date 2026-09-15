@@ -23,6 +23,7 @@ internal static class CollectionScanPolicy
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
             (HashSetTypeName, "IsProperSubsetOf", _) => "System.Collections.Generic.HashSet.IsProperSubsetOf",
+            (HashSetTypeName, "IsSupersetOf", _) => "System.Collections.Generic.HashSet.IsSupersetOf",
             (HashSetTypeName, "SetEquals", _) => "System.Collections.Generic.HashSet.SetEquals",
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
