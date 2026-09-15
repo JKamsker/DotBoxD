@@ -72,6 +72,41 @@ public sealed class SafeHttpPublicContractTests
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Response_invoker_rejects_unsupported_status_codes_at_construction(bool useStringResponse)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+        {
+            if (useStringResponse)
+            {
+                _ = new SafeInMemoryHttpMessageInvoker("ok", (HttpStatusCode)1000);
+            }
+            else
+            {
+                _ = new SafeInMemoryHttpMessageInvoker([1], (HttpStatusCode)1000);
+            }
+        });
+
+        Assert.Equal("statusCode", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Response_invoker_accepts_supported_status_codes(bool useStringResponse)
+    {
+        if (useStringResponse)
+        {
+            using var invoker = new SafeInMemoryHttpMessageInvoker("ok", HttpStatusCode.OK);
+        }
+        else
+        {
+            using var invoker = new SafeInMemoryHttpMessageInvoker([1], HttpStatusCode.OK);
+        }
+    }
+
+    [Theory]
     [InlineData("location")]
     [InlineData("finalRequestUri")]
     public void String_response_invoker_rejects_invalid_uri_strings_with_public_parameter_name(string parameterName)

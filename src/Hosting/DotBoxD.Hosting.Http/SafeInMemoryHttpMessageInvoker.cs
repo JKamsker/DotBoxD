@@ -76,6 +76,14 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
             TimeSpan? responseDelay)
         {
             ArgumentNullException.ThrowIfNull(responseBytes);
+            if ((int)statusCode is < 0 or > 999)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(statusCode),
+                    statusCode,
+                    "HTTP status codes must be between 0 and 999.");
+            }
+
             _responseBytes = responseBytes.ToArray();
             _statusCode = statusCode;
             _location = location;
