@@ -43,6 +43,7 @@ internal static partial class ReturnTypeClassifier
            candidate.DeclaredAccessibility == Accessibility.Public &&
            !candidate.IsAbstract &&
            !candidate.IsGenericType &&
+           !candidate.IsRefLikeType &&
            !HasErrorObsoleteAttribute(candidate, ct) &&
            !IsExperimental(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
