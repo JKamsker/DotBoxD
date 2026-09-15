@@ -22,16 +22,22 @@ internal static class CollectionScanPolicy
         => (typeName, method.Name, method.MethodKind) switch
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
-            (HashSetTypeName, "IsProperSubsetOf", _) => "System.Collections.Generic.HashSet.IsProperSubsetOf",
-            (HashSetTypeName, "IsSupersetOf", _) => "System.Collections.Generic.HashSet.IsSupersetOf",
-            (HashSetTypeName, "IsProperSupersetOf", _) =>
-                "System.Collections.Generic.HashSet.IsProperSupersetOf",
-            (HashSetTypeName, "SetEquals", _) => "System.Collections.Generic.HashSet.SetEquals",
+            (HashSetTypeName, _, _) => GetHashSetDisplayName(method.Name),
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
             (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null
+        };
+
+    private static string? GetHashSetDisplayName(string methodName)
+        => methodName switch
+        {
+            "IsProperSubsetOf" => "System.Collections.Generic.HashSet.IsProperSubsetOf",
+            "IsSupersetOf" => "System.Collections.Generic.HashSet.IsSupersetOf",
+            "IsProperSupersetOf" => "System.Collections.Generic.HashSet.IsProperSupersetOf",
+            "SetEquals" => "System.Collections.Generic.HashSet.SetEquals",
             _ => null
         };
 }

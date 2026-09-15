@@ -73,11 +73,7 @@ internal static partial class ReturnTypeClassifier
         IMethodSymbol constructor,
         INamedTypeSymbol rpcInvokerType,
         CancellationToken ct)
-        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
-           !HasErrorObsoleteAttribute(constructor, ct) &&
-           !IsExperimental(constructor, ct) &&
-           !RequiresPreviewFeatures(constructor, ct) &&
-           !IsPlatformRestricted(constructor, ct) &&
+        => HasSupportedProxyConstructorShape(constructor, ct) &&
            constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
            constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
            !HasRequiredCustomModifiers(invoker) &&
@@ -85,6 +81,13 @@ internal static partial class ReturnTypeClassifier
            SubServiceReturnTypeReader.IsRpcInvokerType(invoker.Type, rpcInvokerType) &&
            instanceId.Type.SpecialType == SpecialType.System_String &&
            CanConstructProxy(candidate, constructor, ct);
+
+    private static bool HasSupportedProxyConstructorShape(IMethodSymbol constructor, CancellationToken ct)
+        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
+           !HasErrorObsoleteAttribute(constructor, ct) &&
+           !IsExperimental(constructor, ct) &&
+           !RequiresPreviewFeatures(constructor, ct) &&
+           !IsPlatformRestricted(constructor, ct);
 
     private static bool HasRequiredCustomModifiers(IParameterSymbol parameter)
     {
