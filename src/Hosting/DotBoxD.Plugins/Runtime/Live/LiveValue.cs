@@ -28,8 +28,10 @@ public sealed class LiveValue<T> : ICoercibleLiveSetting
     public LiveValue(string name, T value)
     {
         ArgumentNullException.ThrowIfNull(name);
-        Definition = new LiveSettingDefinition(name, LiveSettingTypeConverter.FromClrType(typeof(T)), value);
-        _value = value;
+        var type = LiveSettingTypeConverter.FromClrType(typeof(T));
+        var coercedValue = LiveSettingTypeConverter.CoerceClr(typeof(T), value);
+        Definition = new LiveSettingDefinition(name, type, coercedValue);
+        _value = (T)coercedValue!;
     }
 
     internal LiveValue(LiveSettingDefinition definition, T value)
@@ -52,9 +54,10 @@ public sealed class LiveValue<T> : ICoercibleLiveSetting
         }
         set
         {
+            var coercedValue = (T)Coerce(value)!;
             lock (_gate)
             {
-                _value = value;
+                _value = coercedValue;
             }
         }
     }
