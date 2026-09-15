@@ -45,7 +45,7 @@ internal static class ForbiddenCollectionScanPolicy
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenHashSetScan(string methodName, string typeName)
-        => methodName is "IsSubsetOf" or "Overlaps" &&
+        => methodName is "IsSubsetOf" or "IsProperSupersetOf" or "Overlaps" &&
            string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
