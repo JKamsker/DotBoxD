@@ -47,6 +47,7 @@ internal static partial class ReturnTypeClassifier
            !HasErrorObsoleteAttribute(candidate, ct) &&
            !IsExperimental(candidate, ct) &&
            !RequiresPreviewFeatures(candidate, ct) &&
+           !IsPlatformRestricted(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
 
     private static bool HasUsableProxyConstructor(
@@ -76,6 +77,7 @@ internal static partial class ReturnTypeClassifier
            !HasErrorObsoleteAttribute(constructor, ct) &&
            !IsExperimental(constructor, ct) &&
            !RequiresPreviewFeatures(constructor, ct) &&
+           !IsPlatformRestricted(constructor, ct) &&
            constructor.Parameters[0] is { RefKind: RefKind.None } invoker &&
            constructor.Parameters[1] is { RefKind: RefKind.None } instanceId &&
            !HasRequiredCustomModifiers(invoker) &&
@@ -231,6 +233,27 @@ internal static partial class ReturnTypeClassifier
                 IsTrustedFrameworkType(attributeType))
             {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPlatformRestricted(ISymbol symbol, CancellationToken ct)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            for (var type = attribute.AttributeClass; type is not null; type = type.BaseType)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (type.ToDisplayString() == "System.Runtime.Versioning.OSPlatformAttribute" &&
+                    IsTrustedFrameworkType(type))
+                {
+                    return true;
+                }
             }
         }
 
