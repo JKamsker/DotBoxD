@@ -72,7 +72,7 @@ internal static partial class ReturnTypeClassifier
         IMethodSymbol constructor,
         INamedTypeSymbol rpcInvokerType,
         CancellationToken ct)
-        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
+        => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
            !HasErrorObsoleteAttribute(constructor, ct) &&
            !IsExperimental(constructor, ct) &&
            !RequiresPreviewFeatures(constructor, ct) &&
