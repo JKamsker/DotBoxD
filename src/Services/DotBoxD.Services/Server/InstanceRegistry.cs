@@ -51,7 +51,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
             }
 
             if (InstanceRegistryPolicy.ContainsReference(_disposing, instance) ||
-                InstanceRegistryPolicy.ContainsPendingDisposal(_pendingDisposals, instance))
+                InstanceRegistryPolicy.ContainsDisposal(_pendingDisposals, instance))
             {
                 throw new InvalidOperationException("Cannot register an instance while it is being disposed.");
             }
@@ -143,9 +143,12 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public void ReleaseAll()
     {
-        foreach (var instance in DrainAll())
+        foreach (var disposal in DrainAll())
         {
-            InstanceRegistryDisposer.DisposeBestEffort(instance);
+            if (disposal.IsReady)
+            {
+                DisposeAndComplete(disposal, reportFailure: true);
+            }
         }
     }
 
@@ -157,29 +160,45 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// </summary>
     internal async Task ReleaseAllAsync()
     {
-        foreach (var instance in DrainAll())
+        foreach (var disposal in DrainAll())
         {
-            await InstanceRegistryDisposer.DisposeAsyncBestEffort(instance).ConfigureAwait(false);
+            if (disposal.IsReady)
+            {
+                await DisposeAndCompleteAsync(disposal, reportFailure: true).ConfigureAwait(false);
+            }
         }
     }
 
-    private List<object> DrainAll()
+    private List<InstanceRegistryDisposal> DrainAll()
     {
         lock (_gate)
         {
             _closed = true;
-            var instances = new List<object>(_entries.Count);
+            var disposals = new List<InstanceRegistryDisposal>(_entries.Count);
             foreach (var instance in _entries.Values)
             {
-                if (!InstanceRegistryPolicy.ContainsReference(instances, instance))
+                if (InstanceRegistryPolicy.ContainsDisposal(disposals, instance))
                 {
-                    instances.Add(instance);
+                    continue;
                 }
+
+                var disposal = new InstanceRegistryDisposal(instance);
+                if (InstanceRegistryPolicy.ContainsReference(_activeInstances, instance))
+                {
+                    _pendingDisposals.Add(disposal);
+                }
+                else
+                {
+                    _disposing.Add(instance);
+                    disposal.MarkReady();
+                }
+
+                disposals.Add(disposal);
             }
 
             _entries.Clear();
             _count = 0;
-            return instances;
+            return disposals;
         }
     }
 
@@ -257,40 +276,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
     }
 
-    private void DisposeAndComplete(InstanceRegistryDisposal disposal)
-    {
-        try
-        {
-            InstanceRegistryDisposer.Dispose(disposal.Instance);
-            disposal.Completion.SetResult(true);
-        }
-        catch (Exception ex)
-        {
-            disposal.Completion.SetException(ex);
-            throw;
-        }
-        finally
-        {
-            CompleteDisposal(disposal.Instance);
-        }
-    }
+    private void DisposeAndComplete(InstanceRegistryDisposal disposal, bool reportFailure = false) =>
+        InstanceRegistryDisposer.DisposeAndComplete(disposal, CompleteDisposal, reportFailure);
 
-    private async Task DisposeAndCompleteAsync(InstanceRegistryDisposal disposal)
-    {
-        try
-        {
-            await InstanceRegistryDisposer.DisposeAsync(disposal.Instance).ConfigureAwait(false);
-            disposal.Completion.SetResult(true);
-        }
-        catch (Exception ex)
-        {
-            disposal.Completion.SetException(ex);
-            throw;
-        }
-        finally
-        {
-            CompleteDisposal(disposal.Instance);
-        }
-    }
+    private Task DisposeAndCompleteAsync(InstanceRegistryDisposal disposal, bool reportFailure = false) =>
+        InstanceRegistryDisposer.DisposeAndCompleteAsync(disposal, CompleteDisposal, reportFailure);
 
 }
