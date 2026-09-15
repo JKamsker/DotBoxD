@@ -38,7 +38,8 @@ public sealed partial class PluginServer : IDisposable
             Kernels,
             InstallChainPackage,
             onSubscriptionFault,
-            ThrowIfDisposed);
+            ThrowIfDisposed,
+            () => Volatile.Read(ref _disposed) != 0);
     }
 
     // Synchronous installer the hook pipelines use to wire analyzer-generated chain packages at

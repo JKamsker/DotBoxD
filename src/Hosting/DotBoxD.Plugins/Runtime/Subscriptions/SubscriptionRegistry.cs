@@ -22,6 +22,7 @@ public sealed class SubscriptionRegistry
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
     private readonly Action? _throwIfDisposed;
+    private readonly Func<bool>? _isDisposed;
 
     internal SubscriptionRegistry(
         IPluginMessageSink messages,
@@ -29,7 +30,8 @@ public sealed class SubscriptionRegistry
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
         Action<SubscriptionDeliveryFault>? onFault = null,
-        Action? throwIfDisposed = null)
+        Action? throwIfDisposed = null,
+        Func<bool>? isDisposed = null)
     {
         _messages = messages;
         _events = events;
@@ -37,6 +39,7 @@ public sealed class SubscriptionRegistry
         _installer = installer;
         _onFault = onFault;
         _throwIfDisposed = throwIfDisposed;
+        _isDisposed = isDisposed;
     }
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
@@ -57,31 +60,7 @@ public sealed class SubscriptionRegistry
     {
         ArgumentNullException.ThrowIfNull(adapter);
         ThrowIfDisposed();
-        lock (_gate)
-        {
-            EnsureCanRegisterLocked(adapter);
-            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (_pipelines.TryGetValue(key, out var existing))
-            {
-                created = false;
-                var pipeline = (SubscriptionPipeline<TEvent, HookContext>)existing;
-                EnsureContextFactoryMatches(pipeline.UsesContextFactory, ServerContextFactory<HookContext>.Identity, "subscription");
-                return pipeline;
-            }
-
-            created = true;
-            var createdPipeline = new SubscriptionPipeline<TEvent, HookContext>(
-                adapter,
-                _messages,
-                new ServerContextFactory<HookContext>(ServerContextFactory<HookContext>.Identity),
-                _kernels,
-                _installer,
-                _onFault,
-                _throwIfDisposed);
-            _pipelines[key] = createdPipeline;
-            PublishEventFanoutLocked(typeof(TEvent));
-            return createdPipeline;
-        }
+        return GetOrAddPipeline(adapter, ServerContextFactory<HookContext>.Identity, out created);
     }
 
     internal void RemoveWirePipeline<TEvent>(
@@ -124,18 +103,35 @@ public sealed class SubscriptionRegistry
                 (Func<HookContext, HookContext>)(object)createContext);
         }
 
+        return GetOrAddPipeline(adapter, createContext, out _);
+    }
+
+    private SubscriptionPipeline<TEvent, HookContext> OnHookContext<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, HookContext> createContext)
+    {
+        return GetOrAddPipeline(adapter, createContext, out _);
+    }
+
+    private SubscriptionPipeline<TEvent, TContext> GetOrAddPipeline<TEvent, TContext>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, TContext> createContext,
+        out bool created)
+    {
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
             var key = new PipelineKey(typeof(TEvent), typeof(TContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
+                created = false;
                 var pipeline = (SubscriptionPipeline<TEvent, TContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
                 return pipeline;
             }
 
-            var created = new SubscriptionPipeline<TEvent, TContext>(
+            created = true;
+            var createdPipeline = new SubscriptionPipeline<TEvent, TContext>(
                 adapter,
                 _messages,
                 new ServerContextFactory<TContext>(createContext),
@@ -143,38 +139,9 @@ public sealed class SubscriptionRegistry
                 _installer,
                 _onFault,
                 _throwIfDisposed);
-            _pipelines[key] = created;
+            _pipelines[key] = createdPipeline;
             PublishEventFanoutLocked(typeof(TEvent));
-            return created;
-        }
-    }
-
-    private SubscriptionPipeline<TEvent, HookContext> OnHookContext<TEvent>(
-        IPluginEventAdapter<TEvent> adapter,
-        Func<HookContext, HookContext> createContext)
-    {
-        lock (_gate)
-        {
-            EnsureCanRegisterLocked(adapter);
-            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (_pipelines.TryGetValue(key, out var existing))
-            {
-                var pipeline = (SubscriptionPipeline<TEvent, HookContext>)existing;
-                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
-                return pipeline;
-            }
-
-            var created = new SubscriptionPipeline<TEvent, HookContext>(
-                adapter,
-                _messages,
-                new ServerContextFactory<HookContext>(createContext),
-                _kernels,
-                _installer,
-                _onFault,
-                _throwIfDisposed);
-            _pipelines[key] = created;
-            PublishEventFanoutLocked(typeof(TEvent));
-            return created;
+            return createdPipeline;
         }
     }
 
@@ -233,6 +200,8 @@ public sealed class SubscriptionRegistry
         Publish(e, cancellationToken);
         return ValueTask.CompletedTask;
     }
+
+    internal bool IsDisposed => _isDisposed?.Invoke() == true;
 
     private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {

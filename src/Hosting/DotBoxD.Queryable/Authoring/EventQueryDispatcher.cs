@@ -11,7 +11,7 @@ namespace DotBoxD.Queryable.Authoring;
 /// to compiled when hot) and, on a match, the projection is materialized and dispatched. Subscriptions with
 /// no equality predicate are evaluated against every event (an explicit broad fallback).
 /// </summary>
-internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
+internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Func<bool>? isDisposed)
 {
     private readonly object _gate = new();
     private long _eventsObserved;
@@ -75,7 +75,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         HookContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (entry.Handle.IsDisposed)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -86,7 +86,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return;
         }
 
-        if (entry.Handle.IsDisposed)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -97,7 +97,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return;
         }
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (entry.Handle.IsDisposed)
+        if (IsDisposed(entry))
         {
             return;
         }
@@ -159,6 +159,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return false;
         }
     }
+
+    private bool IsDisposed(EventQuerySubscriptionEntry<TEvent> entry)
+        => entry.Handle.IsDisposed || isDisposed?.Invoke() == true;
 
     private void Remove(EventQuerySubscriptionEntry<TEvent> entry)
     {

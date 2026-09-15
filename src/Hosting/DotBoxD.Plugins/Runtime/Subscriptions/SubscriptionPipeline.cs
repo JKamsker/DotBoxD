@@ -18,6 +18,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
     private readonly Action? _throwIfDisposed;
     private readonly KernelHandlerSet<TEvent, TContext> _handlerSet = new();
+    private Task? _lastQueuedDelivery;
 
     internal SubscriptionPipeline(
         IPluginEventAdapter<TEvent> adapter,
@@ -259,6 +260,9 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     internal bool UsesContextFactory(Func<HookContext, TContext> createContext)
         => _contextFactory.Uses(createContext);
 
+    // Allows integration tests to await the latest fire-and-forget delivery deterministically.
+    internal Task? LastQueuedDelivery => Volatile.Read(ref _lastQueuedDelivery);
+
     bool ISubscriptionPipeline<TEvent>.UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => UsesAdapter(adapter);
 
@@ -286,7 +290,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
             ? new HookContext(_messages, cancellationToken)
             : _defaultRawContext;
         var onFault = _onFault;
-        SubscriptionDelivery.Queue(filters, handlers, e, rawContext, _contextFactory.Create, onFault, _throwIfDisposed);
+        Volatile.Write(ref _lastQueuedDelivery, SubscriptionDelivery.Queue(filters, handlers, e, rawContext, _contextFactory.Create, onFault, _throwIfDisposed));
     }
 
     void ISubscriptionPipeline<TEvent>.Publish(TEvent e, CancellationToken cancellationToken)

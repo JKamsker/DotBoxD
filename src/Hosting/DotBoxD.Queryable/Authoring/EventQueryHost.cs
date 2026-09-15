@@ -18,9 +18,21 @@ public sealed class EventQueryHost : IEventQuerySource
 {
     private readonly MemberValueReader _reader = new();
     private readonly object _gate = new();
+    private readonly Func<bool>? _isDisposed;
     // Read lock-free on the hot PublishAsync/HasSubscriptions path; the dispatcher set only mutates on
     // Register, which still serializes through _gate so each event type creates exactly one dispatcher.
     private readonly ConcurrentDictionary<Type, object> _dispatchers = new();
+
+    /// <summary>Creates an independent in-process event-query host.</summary>
+    public EventQueryHost()
+        : this(isDisposed: null)
+    {
+    }
+
+    internal EventQueryHost(Func<bool>? isDisposed)
+    {
+        _isDisposed = isDisposed;
+    }
 
     /// <inheritdoc />
     public EventQuery<TEvent> Query<TEvent>() => new(this);
@@ -96,7 +108,7 @@ public sealed class EventQueryHost : IEventQuerySource
         {
             if (!_dispatchers.TryGetValue(typeof(TEvent), out var existing))
             {
-                existing = new EventQueryDispatcher<TEvent>(_reader);
+                existing = new EventQueryDispatcher<TEvent>(_reader, _isDisposed);
                 _dispatchers[typeof(TEvent)] = existing;
             }
 
