@@ -39,17 +39,23 @@ internal static partial class ReturnTypeClassifier
         INamedTypeSymbol candidate,
         INamedTypeSymbol serviceType,
         CancellationToken ct)
+        => HasSupportedProxyCandidateShape(candidate) &&
+           !HasUnsupportedProxyMetadata(candidate, ct) &&
+           ImplementsService(candidate, serviceType, ct);
+
+    private static bool HasSupportedProxyCandidateShape(INamedTypeSymbol candidate)
         => !candidate.HasUnsupportedMetadata &&
            candidate.DeclaredAccessibility == Accessibility.Public &&
            !candidate.IsAbstract &&
            !candidate.IsGenericType &&
-           !candidate.IsRefLikeType &&
-           !HasErrorObsoleteAttribute(candidate, ct) &&
-           !IsExperimental(candidate, ct) &&
-           !HasCodeRequirement(candidate, ct) &&
-           !RequiresPreviewFeatures(candidate, ct) &&
-           !IsPlatformRestricted(candidate, ct) &&
-           ImplementsService(candidate, serviceType, ct);
+           !candidate.IsRefLikeType;
+
+    private static bool HasUnsupportedProxyMetadata(INamedTypeSymbol candidate, CancellationToken ct)
+        => HasErrorObsoleteAttribute(candidate, ct) ||
+           IsExperimental(candidate, ct) ||
+           HasCodeRequirement(candidate, ct) ||
+           RequiresPreviewFeatures(candidate, ct) ||
+           IsPlatformRestricted(candidate, ct);
 
     private static bool HasUsableProxyConstructor(
         INamedTypeSymbol candidate,
