@@ -44,10 +44,10 @@ internal static partial class ReturnTypeClassifier
            !candidate.IsAbstract &&
            !candidate.IsGenericType &&
            !candidate.IsRefLikeType &&
-           !HasErrorObsoleteAttribute(candidate, ct) &&
-           !IsExperimental(candidate, ct) &&
-           !RequiresPreviewFeatures(candidate, ct) &&
-           !IsPlatformRestricted(candidate, ct) &&
+           !ProxyCompanionAvailability.HasErrorObsoleteAttribute(candidate, ct) &&
+           !ProxyCompanionAvailability.IsExperimental(candidate, ct) &&
+           !ProxyCompanionAvailability.RequiresPreviewFeatures(candidate, ct) &&
+           !ProxyCompanionAvailability.IsPlatformRestricted(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
 
     private static bool HasUsableProxyConstructor(
@@ -84,10 +84,11 @@ internal static partial class ReturnTypeClassifier
 
     private static bool HasSupportedProxyConstructorShape(IMethodSymbol constructor, CancellationToken ct)
         => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
-           !HasErrorObsoleteAttribute(constructor, ct) &&
-           !IsExperimental(constructor, ct) &&
-           !RequiresPreviewFeatures(constructor, ct) &&
-           !IsPlatformRestricted(constructor, ct);
+           !ProxyCompanionAvailability.HasErrorObsoleteAttribute(constructor, ct) &&
+           !ProxyCompanionAvailability.IsExperimental(constructor, ct) &&
+           !ProxyCompanionAvailability.RequiresAssemblyFiles(constructor, ct) &&
+           !ProxyCompanionAvailability.RequiresPreviewFeatures(constructor, ct) &&
+           !ProxyCompanionAvailability.IsPlatformRestricted(constructor, ct);
 
     private static bool HasRequiredCustomModifiers(IParameterSymbol parameter)
     {
@@ -175,88 +176,6 @@ internal static partial class ReturnTypeClassifier
             if (location.IsInMetadata)
             {
                 return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool HasErrorObsoleteAttribute(ISymbol symbol, CancellationToken ct)
-    {
-        foreach (var attribute in symbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass?.ToDisplayString() != "System.ObsoleteAttribute" ||
-                !IsFrameworkAssembly(attributeClass.ContainingAssembly.Name))
-            {
-                continue;
-            }
-
-            if (attribute.ConstructorArguments.Length > 1 &&
-                attribute.ConstructorArguments[1].Value is bool isError &&
-                isError)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsFrameworkAssembly(string assemblyName) =>
-        assemblyName is "mscorlib" or "netstandard" or "System.Private.CoreLib" or "System.Runtime";
-
-    private static bool IsExperimental(ISymbol symbol, CancellationToken ct)
-    {
-        foreach (var attribute in symbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (attribute.AttributeClass is { } attributeType &&
-                attributeType.ToDisplayString() == "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" &&
-                IsTrustedFrameworkType(attributeType))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool RequiresPreviewFeatures(ISymbol symbol, CancellationToken ct)
-    {
-        foreach (var attribute in symbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (attribute.AttributeClass is { } attributeType &&
-                attributeType.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" &&
-                IsTrustedFrameworkType(attributeType))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsPlatformRestricted(ISymbol symbol, CancellationToken ct)
-    {
-        foreach (var attribute in symbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            for (var type = attribute.AttributeClass; type is not null; type = type.BaseType)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (type.ToDisplayString() == "System.Runtime.Versioning.OSPlatformAttribute" &&
-                    IsTrustedFrameworkType(type))
-                {
-                    return true;
-                }
             }
         }
 
