@@ -46,6 +46,7 @@ internal static partial class ReturnTypeClassifier
            !candidate.IsRefLikeType &&
            !HasErrorObsoleteAttribute(candidate, ct) &&
            !IsExperimental(candidate, ct) &&
+           !HasCodeRequirement(candidate, ct) &&
            !RequiresPreviewFeatures(candidate, ct) &&
            !IsPlatformRestricted(candidate, ct) &&
            ImplementsService(candidate, serviceType, ct);
@@ -86,6 +87,7 @@ internal static partial class ReturnTypeClassifier
         => constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2, IsVararg: false } &&
            !HasErrorObsoleteAttribute(constructor, ct) &&
            !IsExperimental(constructor, ct) &&
+           !HasCodeRequirement(constructor, ct) &&
            !RequiresPreviewFeatures(constructor, ct) &&
            !IsPlatformRestricted(constructor, ct);
 
