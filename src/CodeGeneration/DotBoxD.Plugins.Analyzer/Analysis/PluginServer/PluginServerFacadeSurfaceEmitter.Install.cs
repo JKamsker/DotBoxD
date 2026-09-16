@@ -32,6 +32,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        ThrowIfDisposed();");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(irInvocation);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        var __request = irInvocation.EncodeArguments(lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(__request);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
@@ -61,6 +62,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(captures);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(irInvocation);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        var __request = irInvocation.EncodeArguments(captures, lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(__request);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
