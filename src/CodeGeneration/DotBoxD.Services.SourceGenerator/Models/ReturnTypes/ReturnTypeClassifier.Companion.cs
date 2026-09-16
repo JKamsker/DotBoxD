@@ -227,25 +227,6 @@ internal static partial class ReturnTypeClassifier
         return false;
     }
 
-    private static bool HasCodeRequirement(ISymbol symbol, CancellationToken ct)
-    {
-        foreach (var attribute in symbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (attribute.AttributeClass is { } attributeType &&
-                attributeType.ToDisplayString() is
-                    "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute" or
-                    "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute" &&
-                IsTrustedFrameworkType(attributeType))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static bool RequiresPreviewFeatures(ISymbol symbol, CancellationToken ct)
     {
         foreach (var attribute in symbol.GetAttributes())
