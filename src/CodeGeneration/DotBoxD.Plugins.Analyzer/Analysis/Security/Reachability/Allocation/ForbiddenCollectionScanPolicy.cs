@@ -25,15 +25,15 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsForbiddenHashSetScan(method.Name, typeName))
+        if (IsForbiddenSetScan(method.Name, typeName))
         {
-            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.{method.Name}";
             return true;
         }
 
         if (IsSetOverlaps(method.Name, typeName))
         {
-            forbidden = $"System.Collections.Generic.{OverlapsCollectionType(typeName)}.Overlaps";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.Overlaps";
             return true;
         }
 
@@ -51,16 +51,17 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsForbiddenHashSetScan(string methodName, string typeName)
+    private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
-           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
     private static bool IsSetOverlaps(string methodName, string typeName)
         => methodName == "Overlaps" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
-    private static string OverlapsCollectionType(string typeName)
+    private static string SetCollectionType(string typeName)
         => string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ? "ISet" : "HashSet";
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
