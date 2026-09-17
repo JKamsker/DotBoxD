@@ -37,6 +37,12 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
+        if (IsSetProperSubsetOf(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Generic.ISet.IsProperSubsetOf";
+            return true;
+        }
+
         if (IsStackTrimExcess(method.Name, typeName))
         {
             forbidden = "System.Collections.Generic.Stack.TrimExcess";
@@ -62,6 +68,10 @@ internal static class ForbiddenCollectionScanPolicy
 
     private static string OverlapsCollectionType(string typeName)
         => string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ? "ISet" : "HashSet";
+
+    private static bool IsSetProperSubsetOf(string methodName, string typeName)
+        => methodName == "IsProperSubsetOf" &&
+           string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal);
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
