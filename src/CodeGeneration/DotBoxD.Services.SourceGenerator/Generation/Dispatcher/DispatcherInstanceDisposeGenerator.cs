@@ -64,7 +64,7 @@ internal static class DispatcherInstanceDisposeGenerator
     {
         sb.AppendLine($"                    if ({instanceId} is not null)");
         sb.AppendLine("                    {");
-        sb.AppendLine($"                        await registry.{ServicesGeneratorMemberNames.InstanceRegistry.ReleaseAsync}(\"{service.ServiceName}\", {instanceId}).ConfigureAwait(false);");
+        sb.AppendLine($"                        registry.{ServicesGeneratorMemberNames.InstanceRegistry.Release}(\"{service.ServiceName}\", {instanceId});");
         sb.AppendLine("                        return;");
         sb.AppendLine("                    }");
         sb.AppendLine();

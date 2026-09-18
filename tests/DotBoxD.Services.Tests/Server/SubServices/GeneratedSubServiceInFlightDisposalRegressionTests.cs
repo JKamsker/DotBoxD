@@ -68,12 +68,14 @@ public sealed class GeneratedSubServiceInFlightDisposalRegressionTests
             new ArrayBufferWriter<byte>());
         await service.PingEntered.Task.WaitAsync(Timeout);
 
-        await registry.ReleaseAsync(descriptor.ServiceName, instanceId);
+        var release = registry.ReleaseAsync(descriptor.ServiceName, instanceId).AsTask();
         service.AllowPing.SetResult();
 
         var actual = await Record.ExceptionAsync(() => call.WaitAsync(Timeout));
+        var releaseFailure = await Record.ExceptionAsync(() => release.WaitAsync(Timeout));
 
         Assert.Same(primary, actual);
+        Assert.Same(cleanup, releaseFailure);
         Assert.Equal(1, service.DisposeCount);
     }
 
