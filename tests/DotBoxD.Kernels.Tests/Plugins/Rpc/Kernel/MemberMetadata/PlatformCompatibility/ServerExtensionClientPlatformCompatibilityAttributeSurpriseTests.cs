@@ -30,7 +30,7 @@ public sealed class ServerExtensionClientPlatformCompatibilityAttributeSurpriseT
             generatedSources,
             "EchoKernelServerExtensionClientExtensions",
             "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(\"windows\")]" +
-            "\n    public static int WindowsEchoValue(");
+            "\n        public global::System.Threading.Tasks.ValueTask<int> @WindowsEchoValue(");
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public sealed class ServerExtensionClientPlatformCompatibilityAttributeSurpriseT
             generatedSources,
             "EchoKernelDirectServerExtensionClientExtensions",
             "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(\"windows\")]" +
-            "\n    public static int WindowsEcho(");
+            "\n    public static int @WindowsEcho(");
     }
 
     private static void AssertGeneratedSourceContains(
