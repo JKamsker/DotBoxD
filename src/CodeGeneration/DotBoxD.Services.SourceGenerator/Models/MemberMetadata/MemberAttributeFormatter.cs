@@ -17,6 +17,10 @@ internal static class MemberAttributeFormatter
             {
                 AppendObsoleteAttribute(attributes, attr);
             }
+            else if (IsSupportedOSPlatformAttribute(attr))
+            {
+                AppendSupportedOSPlatformAttribute(attributes, attr);
+            }
         }
 
         return attributes.ToString();
@@ -62,6 +66,19 @@ internal static class MemberAttributeFormatter
         }
 
         return hasArguments;
+    }
+
+    private static bool IsSupportedOSPlatformAttribute(AttributeData attr) =>
+        attr.AttributeClass is { } attributeType &&
+        attributeType.ToDisplayString() == "System.Runtime.Versioning.SupportedOSPlatformAttribute" &&
+        attr.ConstructorArguments.Length == 1 &&
+        ReturnTypeClassifier.IsTrustedFrameworkType(attributeType);
+
+    private static void AppendSupportedOSPlatformAttribute(StringBuilder sb, AttributeData attr)
+    {
+        sb.Append("[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(");
+        AppendStringArgument(sb, attr.ConstructorArguments[0]);
+        sb.AppendLine(")]");
     }
 
     private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
