@@ -26,7 +26,12 @@ internal sealed class InstanceRegistryDisposal(object instance)
     internal TaskCompletionSource<bool> Completion { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    internal bool IsReady { get; private set; }
+    private int _isReady;
+    private int _disposalStarted;
 
-    internal void MarkReady() => IsReady = true;
+    internal void MarkReady() => Volatile.Write(ref _isReady, 1);
+
+    internal bool TryStartDisposal() =>
+        Volatile.Read(ref _isReady) != 0 &&
+        Interlocked.CompareExchange(ref _disposalStarted, 1, 0) == 0;
 }
