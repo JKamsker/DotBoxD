@@ -23,6 +23,7 @@ internal static class RegistrationAccumulatorMetadataAttributeSource
     {
         var lines = new List<string>();
         lines.AddRange(RegistrationObsoleteAttributeSource.Attributes(symbol, compilation));
+        lines.AddRange(RegistrationPlatformAttributeSource.Attributes(symbol, compilation));
 
         var experimentalAttribute = compilation.GetTypeByMetadataName(
             "System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
