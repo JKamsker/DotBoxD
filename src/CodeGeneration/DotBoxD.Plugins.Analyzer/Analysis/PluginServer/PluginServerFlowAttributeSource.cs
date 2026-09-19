@@ -123,6 +123,13 @@ internal static class PluginServerFlowAttributeSource
 
     private static string? AttributeLine(AttributeData attribute, bool targetReturn, bool includeExperimental)
     {
+        var platformCompatibilityAttribute =
+            PluginServerPlatformCompatibilityAttributeFormatter.Format(attribute);
+        if (platformCompatibilityAttribute is not null)
+        {
+            return MemberOnlyAttribute(targetReturn, platformCompatibilityAttribute);
+        }
+
         switch (GetFrameworkAttributeName(attribute))
         {
             case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
@@ -151,11 +158,6 @@ internal static class PluginServerFlowAttributeSource
                 }
 
                 return MemberOnlyAttribute(targetReturn, PluginServerExperimentalAttributeFormatter.Format(attribute));
-
-            case "System.Runtime.Versioning.SupportedOSPlatformAttribute":
-            case "System.Runtime.Versioning.UnsupportedOSPlatformAttribute":
-            case "System.Runtime.Versioning.ObsoletedOSPlatformAttribute":
-                return MemberOnlyAttribute(targetReturn, PluginServerPlatformCompatibilityAttributeFormatter.Format(attribute));
 
             default:
                 return null;
