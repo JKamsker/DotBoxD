@@ -152,6 +152,11 @@ internal static class PluginServerFlowAttributeSource
 
                 return MemberOnlyAttribute(targetReturn, PluginServerExperimentalAttributeFormatter.Format(attribute));
 
+            case "System.Runtime.Versioning.SupportedOSPlatformAttribute":
+            case "System.Runtime.Versioning.UnsupportedOSPlatformAttribute":
+            case "System.Runtime.Versioning.ObsoletedOSPlatformAttribute":
+                return MemberOnlyAttribute(targetReturn, PluginServerPlatformCompatibilityAttributeFormatter.Format(attribute));
+
             default:
                 return null;
         }
