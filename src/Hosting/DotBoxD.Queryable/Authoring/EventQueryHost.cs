@@ -58,6 +58,7 @@ public sealed class EventQueryHost : IEventQuerySource
     {
         ArgumentNullException.ThrowIfNull(predicates);
         ArgumentNullException.ThrowIfNull(handler);
+        ObjectDisposedException.ThrowIf(_isDisposed?.Invoke() == true, this);
 
         var filter = BuildFilter(predicates);
         QuerySatisfiability.EnsureSatisfiable(filter);
