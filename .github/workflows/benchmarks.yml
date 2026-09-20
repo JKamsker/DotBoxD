@@ -105,7 +105,7 @@ jobs:
 
       - name: Track / alert on Services benchmarks
         if: env.IS_TRACKING_RUN != 'true'
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
           name: DotBoxD.Services Benchmarks
           tool: 'benchmarkdotnet'
@@ -121,7 +121,7 @@ jobs:
 
       - name: Track / alert on Kernels benchmarks
         if: env.IS_TRACKING_RUN != 'true'
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
           name: DotBoxD.Kernels Benchmarks
           tool: 'benchmarkdotnet'
@@ -158,7 +158,7 @@ jobs:
           path: artifacts/benchmarks
 
       - name: Track / alert on Services benchmarks
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
           name: DotBoxD.Services Benchmarks
           tool: 'benchmarkdotnet'
@@ -172,7 +172,7 @@ jobs:
           auto-push: true
 
       - name: Track / alert on Kernels benchmarks
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
           name: DotBoxD.Kernels Benchmarks
           tool: 'benchmarkdotnet'
