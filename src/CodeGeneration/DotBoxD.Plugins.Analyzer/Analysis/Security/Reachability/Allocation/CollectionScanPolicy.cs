@@ -6,6 +6,7 @@ internal static class CollectionScanPolicy
 {
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string IReadOnlySetTypeName = "System.Collections.Generic.IReadOnlySet<T>";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
@@ -22,7 +23,8 @@ internal static class CollectionScanPolicy
         => (typeName, method.Name, method.MethodKind) switch
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
-            (HashSetTypeName, _, _) => GetHashSetDisplayName(method.Name),
+            (HashSetTypeName, _, _) => GetSetDisplayName("HashSet", method.Name),
+            (IReadOnlySetTypeName, _, _) => GetSetDisplayName("IReadOnlySet", method.Name),
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
@@ -31,13 +33,11 @@ internal static class CollectionScanPolicy
             _ => null
         };
 
-    private static string? GetHashSetDisplayName(string methodName)
+    private static string? GetSetDisplayName(string setTypeName, string methodName)
         => methodName switch
         {
-            "IsProperSubsetOf" => "System.Collections.Generic.HashSet.IsProperSubsetOf",
-            "IsSupersetOf" => "System.Collections.Generic.HashSet.IsSupersetOf",
-            "IsProperSupersetOf" => "System.Collections.Generic.HashSet.IsProperSupersetOf",
-            "SetEquals" => "System.Collections.Generic.HashSet.SetEquals",
+            "IsProperSubsetOf" or "IsSupersetOf" or "IsProperSupersetOf" or "SetEquals" =>
+                $"System.Collections.Generic.{setTypeName}.{methodName}",
             _ => null
         };
 }
