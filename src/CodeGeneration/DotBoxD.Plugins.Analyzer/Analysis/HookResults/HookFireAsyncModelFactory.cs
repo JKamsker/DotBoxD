@@ -228,12 +228,18 @@ internal static class HookFireAsyncModelFactory
         Compilation compilation)
     {
         var experimentalAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.ExperimentalAttribute);
+        var supportedOsPlatformAttribute = compilation.GetTypeByMetadataName(
+            "System.Runtime.Versioning.SupportedOSPlatformAttribute");
         var attributes = new List<string>();
         foreach (var attribute in contextType.GetAttributes())
         {
             if (ExperimentalAttribute(attribute, experimentalAttribute) is { } experimentalAttributeSource)
             {
                 attributes.Add(experimentalAttributeSource);
+            }
+            else if (SupportedOsPlatformAttribute(attribute, supportedOsPlatformAttribute) is { } supportedOsPlatformAttributeSource)
+            {
+                attributes.Add(supportedOsPlatformAttributeSource);
             }
         }
 
@@ -267,5 +273,20 @@ internal static class HookFireAsyncModelFactory
 
         return "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(" +
             string.Join(", ", arguments) + ")]";
+    }
+
+    private static string? SupportedOsPlatformAttribute(
+        AttributeData attribute,
+        INamedTypeSymbol? supportedOsPlatformAttribute)
+    {
+        if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, supportedOsPlatformAttribute) ||
+            attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string platformName)
+        {
+            return null;
+        }
+
+        return "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(" +
+            LiteralReader.StringLiteral(platformName) + ")]";
     }
 }
