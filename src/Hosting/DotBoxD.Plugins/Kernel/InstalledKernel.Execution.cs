@@ -28,10 +28,11 @@ public sealed partial class InstalledKernel
                 reusableNoAuditState)
             .ConfigureAwait(false);
         var isRevoked = IsRevoked;
-        var terminalResult = isRevoked ? WithRevokedError(result) : result;
+        var cancellationCallbackFailed = Volatile.Read(ref _revocationCancellationCallbackFailed) != 0;
+        var terminalResult = isRevoked && !cancellationCallbackFailed ? WithRevokedError(result) : result;
         RememberSuccessfulAutoCompiledRun(entrypoint, terminalResult);
         _executionObserver.Record(entrypoint, _executionMode, terminalResult);
-        if (isRevoked)
+        if (isRevoked && !cancellationCallbackFailed)
         {
             PluginKernelRevocation.ThrowIfRevoked(true);
         }
@@ -39,9 +40,10 @@ public sealed partial class InstalledKernel
         if (!terminalResult.Succeeded)
         {
             if (terminalResult.Error?.Code == SandboxErrorCode.Cancelled &&
-                cancellationToken.IsCancellationRequested)
+                (cancellationToken.IsCancellationRequested || cancellationCallbackFailed))
             {
-                throw new OperationCanceledException(cancellationToken);
+                throw new OperationCanceledException(
+                    cancellationToken.IsCancellationRequested ? cancellationToken : _revocation.Token);
             }
 
             throw new SandboxRuntimeException(
