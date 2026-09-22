@@ -228,7 +228,7 @@ internal static class HookFireAsyncModelFactory
         Compilation compilation)
     {
         var experimentalAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.ExperimentalAttribute);
-        var codeRequirementAttributes = CodeRequirementAttributes(compilation);
+        var codeRequirementAttributes = CodeRequirementAttributeSourceFactory.CreateMap(compilation);
         var attributes = new List<string>();
         foreach (var attribute in contextType.GetAttributes())
         {
@@ -236,7 +236,7 @@ internal static class HookFireAsyncModelFactory
             {
                 attributes.Add(experimentalAttributeSource);
             }
-            else if (CodeRequirementAttribute(attribute, codeRequirementAttributes) is { } codeRequirementAttributeSource)
+            else if (CodeRequirementAttributeSourceFactory.Create(attribute, codeRequirementAttributes) is { } codeRequirementAttributeSource)
             {
                 attributes.Add(codeRequirementAttributeSource);
             }
@@ -244,59 +244,6 @@ internal static class HookFireAsyncModelFactory
 
         attributes.Sort(StringComparer.Ordinal);
         return new EquatableArray<string>(attributes);
-    }
-
-    private static Dictionary<INamedTypeSymbol, string> CodeRequirementAttributes(Compilation compilation)
-    {
-        var attributes = new Dictionary<INamedTypeSymbol, string>(SymbolEqualityComparer.Default);
-        AddCodeRequirementAttribute(
-            attributes,
-            compilation,
-            "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute");
-        AddCodeRequirementAttribute(
-            attributes,
-            compilation,
-            "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute");
-        AddCodeRequirementAttribute(
-            attributes,
-            compilation,
-            "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute");
-        return attributes;
-    }
-
-    private static void AddCodeRequirementAttribute(
-        Dictionary<INamedTypeSymbol, string> attributes,
-        Compilation compilation,
-        string metadataName)
-    {
-        if (compilation.GetTypeByMetadataName(metadataName) is { } attribute)
-        {
-            attributes.Add(attribute, "global::" + metadataName);
-        }
-    }
-
-    private static string? CodeRequirementAttribute(
-        AttributeData attribute,
-        Dictionary<INamedTypeSymbol, string> codeRequirementAttributes)
-    {
-        if (attribute.AttributeClass is not { } attributeClass ||
-            !codeRequirementAttributes.TryGetValue(attributeClass, out var attributeName) ||
-            attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string message)
-        {
-            return null;
-        }
-
-        var arguments = new List<string> { LiteralReader.StringLiteral(message) };
-        foreach (var argument in attribute.NamedArguments)
-        {
-            if (argument is { Key: "Url", Value.Value: string url })
-            {
-                arguments.Add("Url = " + LiteralReader.StringLiteral(url));
-            }
-        }
-
-        return "[" + attributeName + "(" + string.Join(", ", arguments) + ")]";
     }
 
     private static string? ExperimentalAttribute(

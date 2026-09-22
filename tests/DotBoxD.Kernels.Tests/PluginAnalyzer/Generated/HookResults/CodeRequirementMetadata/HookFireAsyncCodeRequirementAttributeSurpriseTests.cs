@@ -31,6 +31,12 @@ public sealed class HookFireAsyncCodeRequirementAttributeSurpriseTests
             "FireAsync(",
             fireAsyncSource,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"Reads assembly files.\", Url = \"https://example.test/assembly-files\")]\n" +
+            "    public static global::System.Threading.Tasks.ValueTask<global::Regression.Game.AssemblyFileDamageResult?> " +
+            "FireAsync(",
+            fireAsyncSource,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             "[global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute(\"Uses reflection.\")]\n" +
             "    public static global::System.Threading.Tasks.ValueTask<global::Regression.Game.PortableDamageResult?> " +
@@ -64,6 +70,13 @@ public sealed class HookFireAsyncCodeRequirementAttributeSurpriseTests
 
         [HookResult]
         public readonly partial record struct DynamicDamageResult(bool Success, string? Reason, int Amount);
+
+        [RequiresAssemblyFiles("Reads assembly files.", Url = "https://example.test/assembly-files")]
+        [Hook("combat.assembly-files", typeof(AssemblyFileDamageResult))]
+        public sealed record AssemblyFileDamageContext(int Amount);
+
+        [HookResult]
+        public readonly partial record struct AssemblyFileDamageResult(bool Success, string? Reason, int Amount);
 
         [Hook("combat.portable", typeof(PortableDamageResult))]
         public sealed record PortableDamageContext(int Amount);
