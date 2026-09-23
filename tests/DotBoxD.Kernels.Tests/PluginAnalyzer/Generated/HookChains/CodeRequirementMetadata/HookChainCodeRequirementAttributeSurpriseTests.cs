@@ -51,6 +51,42 @@ public sealed class HookChainCodeRequirementAttributeSurpriseTests
         Assert.Equal(2, CountOccurrences(generated, emittedAttribute));
     }
 
+    [Fact]
+    public void Remote_RunLocal_deduplicates_code_requirement_attributes_with_different_messages()
+    {
+        var result = CompileWithGenerator("""
+            using System.Diagnostics.CodeAnalysis;
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Regression.Game;
+
+            [RequiresDynamicCode("The event requires dynamic code.")]
+            public sealed record DamageEvent(string TargetId, int Damage);
+
+            [RequiresDynamicCode("The projected payload requires dynamic code.")]
+            public sealed record DamagePayload(string TargetId, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                    => hooks.On<DamageEvent>()
+                        .Select(e => new DamagePayload(e.TargetId, e.Damage))
+                        .RunLocal((payload, ctx) => { _ = payload.TargetId; });
+            }
+            """);
+
+        Assert.DoesNotContain(result.AllDiagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var generated = string.Join(Environment.NewLine, result.GeneratedSources);
+        var eventAttribute =
+            "[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"The event requires dynamic code.\")]";
+        var payloadAttribute =
+            "[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"The projected payload requires dynamic code.\")]";
+
+        Assert.Equal(4, CountOccurrences(generated, eventAttribute));
+        Assert.DoesNotContain(payloadAttribute, generated, StringComparison.Ordinal);
+    }
+
     private static GeneratedCompilation CompileWithGenerator(string source)
     {
         var compilation = CSharpCompilation.Create(

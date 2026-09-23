@@ -13,7 +13,7 @@ internal static class ExperimentalAttributeSource
     public static string FromTypes(params ITypeSymbol?[] types)
     {
         var diagnosticIds = new SortedSet<string>(StringComparer.Ordinal);
-        var codeRequirementAttributes = new SortedSet<string>(StringComparer.Ordinal);
+        var codeRequirementAttributes = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var type in types)
         {
             Collect(type, diagnosticIds, codeRequirementAttributes);
@@ -27,13 +27,13 @@ internal static class ExperimentalAttributeSource
                      ")]\n";
         }
 
-        return source + string.Concat(codeRequirementAttributes);
+        return source + string.Concat(codeRequirementAttributes.Values);
     }
 
     private static void Collect(
         ITypeSymbol? type,
         ISet<string> diagnosticIds,
-        ISet<string> codeRequirementAttributes)
+        IDictionary<string, string> codeRequirementAttributes)
     {
         switch (type)
         {
@@ -51,7 +51,7 @@ internal static class ExperimentalAttributeSource
     private static void CollectNamed(
         INamedTypeSymbol named,
         ISet<string> diagnosticIds,
-        ISet<string> codeRequirementAttributes)
+        IDictionary<string, string> codeRequirementAttributes)
     {
         foreach (var attribute in named.GetAttributes())
         {
@@ -73,7 +73,7 @@ internal static class ExperimentalAttributeSource
 
     private static void CollectCodeRequirementAttribute(
         AttributeData attribute,
-        ISet<string> codeRequirementAttributes)
+        IDictionary<string, string> codeRequirementAttributes)
     {
         var attributeClass = attribute.AttributeClass;
         var name = attributeClass?.ToDisplayString();
@@ -88,8 +88,12 @@ internal static class ExperimentalAttributeSource
         var urlAssignment = url is null
             ? string.Empty
             : ", Url = " + LiteralReader.StringLiteral(url);
-        codeRequirementAttributes.Add(
-            "[global::System.Diagnostics.CodeAnalysis." + attributeClass!.Name + "(" +
-            LiteralReader.StringLiteral(message) + urlAssignment + ")]\n");
+        if (!codeRequirementAttributes.ContainsKey(attributeClass!.Name))
+        {
+            codeRequirementAttributes.Add(
+                attributeClass.Name,
+                "[global::System.Diagnostics.CodeAnalysis." + attributeClass.Name + "(" +
+                LiteralReader.StringLiteral(message) + urlAssignment + ")]\n");
+        }
     }
 }
