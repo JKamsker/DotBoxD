@@ -93,8 +93,13 @@ internal sealed class PendingLiveUpdateQueue
 
         lock (_gate)
         {
-            _pending.RemoveAll(task => task.IsCompleted);
-            _lastError = null;
+            foreach (var task in pending)
+            {
+                if (task.IsCompleted)
+                {
+                    _pending.Remove(task);
+                }
+            }
         }
     }
 }
