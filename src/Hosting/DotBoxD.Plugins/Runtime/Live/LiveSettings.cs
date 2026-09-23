@@ -7,6 +7,7 @@ public sealed class LiveSettingStore
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, ILiveSetting> _settings;
+    private LiveSettingUpdateTransaction? _activeUpdate;
 
     public LiveSettingStore(IEnumerable<ILiveSetting> settings)
     {
@@ -73,7 +74,9 @@ public sealed class LiveSettingStore
             // The slot is the single coercion/validation site; hand it the raw caller value
             // so conversion and range checks run exactly once instead of once here and again
             // inside the slot.
-            Resolve(name).SetObject(value);
+            var setting = Resolve(name);
+            _activeUpdate?.Record(setting);
+            setting.SetObject(value);
         }
     }
 
@@ -82,72 +85,72 @@ public sealed class LiveSettingStore
         ArgumentNullException.ThrowIfNull(values);
         lock (_gate)
         {
-            // Resolve every slot first so an unknown setting fails before any value is applied,
-            // preserving the all-or-nothing batch contract.
-            var resolved = new (ILiveSetting Setting, object? Value)[values.Count];
-            var index = 0;
-            foreach (var item in values)
-            {
-                resolved[index++] = (Resolve(item.Key), item.Value);
-            }
+            var ownsUpdate = _activeUpdate is null;
+            var update = _activeUpdate ?? new LiveSettingUpdateTransaction();
+            _activeUpdate ??= update;
 
-            // Coerce and range-validate built-in slots before anything is applied. Foreign slots
-            // keep their own single coercion site via SetObject, so they are applied before the
-            // built-in commit phase and rolled back best-effort if a later foreign slot fails.
-            for (var i = 0; i < resolved.Length; i++)
+            try
             {
-                if (resolved[i].Setting is ICoercibleLiveSetting coercible)
+                // Resolve every slot first so an unknown setting fails before any value is applied,
+                // preserving the all-or-nothing batch contract.
+                var resolved = new (ILiveSetting Setting, object? Value)[values.Count];
+                var index = 0;
+                foreach (var item in values)
                 {
-                    resolved[i] = (coercible, coercible.Coerce(resolved[i].Value));
+                    resolved[index++] = (Resolve(item.Key), item.Value);
+                }
+
+                // Coerce and range-validate built-in slots before anything is applied. Foreign slots
+                // keep their own single coercion site via SetObject, so they are applied before the
+                // built-in commit phase and rolled back best-effort if a later foreign slot fails.
+                for (var i = 0; i < resolved.Length; i++)
+                {
+                    if (resolved[i].Setting is ICoercibleLiveSetting coercible)
+                    {
+                        resolved[i] = (coercible, coercible.Coerce(resolved[i].Value));
+                    }
+                }
+
+                ApplyForeignSettings(resolved, update);
+                foreach (var (setting, value) in resolved)
+                {
+                    if (setting is ICoercibleLiveSetting coercible)
+                    {
+                        update.Apply(coercible, value);
+                    }
                 }
             }
-
-            ApplyForeignSettings(resolved);
-            foreach (var (setting, value) in resolved)
+            catch
             {
-                if (setting is ICoercibleLiveSetting coercible)
+                if (ownsUpdate)
                 {
-                    coercible.ApplyCoerced(value);
+                    update.RollBack();
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (ownsUpdate)
+                {
+                    _activeUpdate = null;
                 }
             }
         }
     }
 
-    private static void ApplyForeignSettings((ILiveSetting Setting, object? Value)[] resolved)
+    private static void ApplyForeignSettings(
+        (ILiveSetting Setting, object? Value)[] resolved,
+        LiveSettingUpdateTransaction update)
     {
-        List<(ILiveSetting Setting, object? Previous)>? applied = null;
-        try
+        foreach (var (setting, value) in resolved)
         {
-            foreach (var (setting, value) in resolved)
+            if (setting is ICoercibleLiveSetting)
             {
-                if (setting is ICoercibleLiveSetting)
-                {
-                    continue;
-                }
-
-                applied ??= [];
-                applied.Add((setting, setting.CurrentValue));
-                setting.SetObject(value);
-            }
-        }
-        catch
-        {
-            if (applied is not null)
-            {
-                for (var i = applied.Count - 1; i >= 0; i--)
-                {
-                    try
-                    {
-                        applied[i].Setting.SetObject(applied[i].Previous);
-                    }
-                    catch
-                    {
-                        // A foreign slot can reject rollback too; preserve the original failure.
-                    }
-                }
+                continue;
             }
 
-            throw;
+            update.Apply(setting, value);
         }
     }
 
