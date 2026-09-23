@@ -85,9 +85,9 @@ public sealed class LiveSettingStore
         ArgumentNullException.ThrowIfNull(values);
         lock (_gate)
         {
-            var ownsUpdate = _activeUpdate is null;
-            var update = _activeUpdate ?? new LiveSettingUpdateTransaction();
-            _activeUpdate ??= update;
+            var parent = _activeUpdate;
+            var update = new LiveSettingUpdateTransaction(parent);
+            _activeUpdate = update;
 
             try
             {
@@ -122,19 +122,12 @@ public sealed class LiveSettingStore
             }
             catch
             {
-                if (ownsUpdate)
-                {
-                    update.RollBack();
-                }
-
+                update.RollBack();
                 throw;
             }
             finally
             {
-                if (ownsUpdate)
-                {
-                    _activeUpdate = null;
-                }
+                _activeUpdate = parent;
             }
         }
     }

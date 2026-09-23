@@ -1,6 +1,6 @@
 namespace DotBoxD.Plugins.Runtime;
 
-internal sealed class LiveSettingUpdateTransaction
+internal sealed class LiveSettingUpdateTransaction(LiveSettingUpdateTransaction? parent = null)
 {
     private readonly Dictionary<ILiveSetting, object?> _previousValues =
         new(ReferenceEqualityComparer.Instance);
@@ -20,6 +20,7 @@ internal sealed class LiveSettingUpdateTransaction
 
     public void Record(ILiveSetting setting)
     {
+        parent?.Record(setting);
         if (_previousValues.TryAdd(setting, setting.CurrentValue))
         {
             _updatedSettings.Add(setting);

@@ -34,6 +34,33 @@ public sealed class LiveSettingStoreReentrantRollbackSurpriseTests
         Assert.Equal(2, store.Get<int>("Second"));
     }
 
+    [Fact]
+    public void Caught_nested_batch_failure_rolls_back_only_the_nested_batch()
+    {
+        var nestedFirst = new LiveValue<int>("NestedFirst", 1);
+        var nestedSecond = new ThrowingLiveSetting("NestedSecond", 2, 20);
+        LiveSettingStore? store = null;
+        var outer = new CallbackLiveSetting("Outer", 1, value =>
+        {
+            if (value is 10)
+            {
+                Assert.Throws<InvalidOperationException>(() => store!.SetMany(
+                    new Dictionary<string, object?>
+                    {
+                        ["NestedFirst"] = 10,
+                        ["NestedSecond"] = 20
+                    }));
+            }
+        });
+        store = new LiveSettingStore([nestedFirst, nestedSecond, outer]);
+
+        store.SetMany(new Dictionary<string, object?> { ["Outer"] = 10 });
+
+        Assert.Equal(10, store.Get<int>("Outer"));
+        Assert.Equal(1, store.Get<int>("NestedFirst"));
+        Assert.Equal(2, store.Get<int>("NestedSecond"));
+    }
+
     private sealed class CallbackLiveSetting(string name, int initialValue, Action<object?> callback) : ILiveSetting
     {
         private int _value = initialValue;
