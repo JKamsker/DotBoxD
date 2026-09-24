@@ -1,4 +1,6 @@
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
@@ -18,18 +20,22 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelServerExtensionClient",
+            "RestrictedServiceEchoAsync",
             RequiresUnreferencedCode);
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelServerExtensionClient",
+            "RestrictedServiceEchoAsync",
             RequiresDynamicCode);
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelServerExtensionClientExtensions",
+            "RestrictedServiceEcho",
             RequiresUnreferencedCode);
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelServerExtensionClientExtensions",
+            "RestrictedServiceEcho",
             RequiresDynamicCode);
     }
 
@@ -41,10 +47,12 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelDirectServerExtensionClientExtensions",
+            "RestrictedDirectEcho",
             RequiresUnreferencedCode);
         AssertGeneratedTypeContains(
             generatedSources,
             "EchoKernelDirectServerExtensionClientExtensions",
+            "RestrictedDirectEcho",
             RequiresDynamicCode);
     }
 
@@ -66,11 +74,21 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
     private static void AssertGeneratedTypeContains(
         IReadOnlyList<string> generatedSources,
         string generatedTypeName,
+        string generatedMethodName,
         string expectedAttribute)
-        => Assert.Contains(
-            generatedSources,
-            source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
-                      source.Contains(expectedAttribute, StringComparison.Ordinal));
+    {
+        var generatedType = generatedSources
+            .Select(static source => CSharpSyntaxTree.ParseText(source))
+            .SelectMany(tree => tree.GetRoot().DescendantNodes().OfType<TypeDeclarationSyntax>())
+            .Single(type => string.Equals(type.Identifier.ValueText, generatedTypeName, StringComparison.Ordinal));
+        var generatedMethod = generatedType.Members
+            .OfType<MethodDeclarationSyntax>()
+            .Single(method => string.Equals(method.Identifier.ValueText, generatedMethodName, StringComparison.Ordinal));
+
+        Assert.Contains(
+            generatedMethod.AttributeLists,
+            attribute => attribute.ToFullString().Contains(expectedAttribute, StringComparison.Ordinal));
+    }
 
     private static void AssertGeneratedMethodDoesNotContain(
         IReadOnlyList<string> generatedSources,
