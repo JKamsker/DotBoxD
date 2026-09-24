@@ -129,11 +129,11 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
 
     private static string PortableServiceSource => Source
         .Replace(
-            "            [RequiresUnreferencedCode(\"Trimming contract\", Url = \"https://example.invalid/trimming\")]" + Environment.NewLine,
+            "[RequiresUnreferencedCode(\"Trimming contract\", Url = \"https://example.invalid/trimming\")]",
             string.Empty,
             StringComparison.Ordinal)
         .Replace(
-            "            [RequiresDynamicCode(\"Dynamic-code contract\", Url = \"https://example.invalid/dynamic-code\")]" + Environment.NewLine,
+            "[RequiresDynamicCode(\"Dynamic-code contract\", Url = \"https://example.invalid/dynamic-code\")]",
             string.Empty,
             StringComparison.Ordinal)
         .Replace("RestrictedServiceEcho", "PortableServiceEcho", StringComparison.Ordinal);
