@@ -31,6 +31,12 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
+        if (IsISetIsSupersetOf(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Generic.ISet.IsSupersetOf";
+            return true;
+        }
+
         if (IsSetOverlaps(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.Overlaps";
@@ -61,6 +67,9 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+
+    private static bool IsISetIsSupersetOf(string methodName, string typeName)
+        => methodName == "IsSupersetOf" && string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal);
 
     private static bool IsSetOverlaps(string methodName, string typeName)
         => methodName == "Overlaps" &&
