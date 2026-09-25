@@ -6,6 +6,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class GeneratedPackageAttributeSource
 {
     private const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
+    private const string RequiresDynamicCodeAttribute = "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
+    private const string RequiresUnreferencedCodeAttribute = "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
     private const string SupportedOSPlatformAttribute = "System.Runtime.Versioning.SupportedOSPlatformAttribute";
 
     public static EquatableArray<string> FromKernel(INamedTypeSymbol kernelType, Compilation compilation)
@@ -18,8 +20,14 @@ internal static class GeneratedPackageAttributeSource
             {
                 attributes.Add(source);
             }
-            else if (IsFrameworkAttribute(attribute, compilation, SupportedOSPlatformAttribute) &&
-                     TrySupportedOSPlatformAttribute(attribute) is { } platformSource)
+
+            if (TryCodeRequirementAttribute(attribute, compilation) is { } codeRequirementSource)
+            {
+                attributes.Add(codeRequirementSource);
+            }
+
+            if (IsFrameworkAttribute(attribute, compilation, SupportedOSPlatformAttribute) &&
+                TrySupportedOSPlatformAttribute(attribute) is { } platformSource)
             {
                 attributes.Add(platformSource);
             }
@@ -78,6 +86,27 @@ internal static class GeneratedPackageAttributeSource
                LiteralReader.StringLiteral(platformName) + ")]";
     }
 
+    private static string? TryCodeRequirementAttribute(AttributeData attribute, Compilation compilation)
+    {
+        var attributeMetadataName = attribute.AttributeClass?.ToDisplayString();
+        if (attributeMetadataName is not (RequiresDynamicCodeAttribute or RequiresUnreferencedCodeAttribute) ||
+            !IsFrameworkAttribute(attribute, compilation, attributeMetadataName) ||
+            attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string message)
+        {
+            return null;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("[global::")
+            .Append(attributeMetadataName)
+            .Append("(")
+            .Append(LiteralReader.StringLiteral(message));
+        AppendUrl(builder, attribute);
+        builder.Append(")]");
+        return builder.ToString();
+    }
+
     private static void AppendUrlFormat(StringBuilder builder, AttributeData attribute)
     {
         foreach (var argument in attribute.NamedArguments)
@@ -85,6 +114,17 @@ internal static class GeneratedPackageAttributeSource
             if (argument.Key == "UrlFormat" && argument.Value.Value is string urlFormat)
             {
                 builder.Append(", UrlFormat = ").Append(LiteralReader.StringLiteral(urlFormat));
+            }
+        }
+    }
+
+    private static void AppendUrl(StringBuilder builder, AttributeData attribute)
+    {
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (argument.Key == "Url" && argument.Value.Value is string url)
+            {
+                builder.Append(", Url = ").Append(LiteralReader.StringLiteral(url));
             }
         }
     }
