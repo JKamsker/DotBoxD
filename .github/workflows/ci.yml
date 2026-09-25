@@ -515,6 +515,7 @@ jobs:
               "QuerySatisfiabilityTests",
               "QueryTextTests",
               "QueryComparerHardeningTests",
+              "QueryCustomStringComparerTests",
               "QueryNumericComparisonAllocationTests",
               "MemberValueReaderContractTests",
               "EventQueryNumericRoutingTests",

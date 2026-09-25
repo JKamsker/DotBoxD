@@ -8,25 +8,13 @@ internal static class CollectionComparerSupport
     public static bool HasUnsupportedComparer(object collection)
     {
         var comparer = GetComparer(collection, depth: 0);
-        if (comparer is null)
+        if (comparer is null || ReferenceEquals(comparer, StringComparer.Ordinal))
         {
             return false;
         }
 
-        // Behavioral probes rather than identity checks against public singletons: an ordinal/default string
-        // comparer treats these pairs as distinct. Case-insensitive comparers match "a"/"A"; culture-sensitive
-        // case-sensitive comparers can match "a\0"/"a" because some cultures ignore embedded nulls.
-        // SortedSet<T> exposes ordering comparers, so compare equality must be checked there too.
-        if (comparer is IEqualityComparer<string> equalityComparer)
-        {
-            return equalityComparer.Equals("a", "A") || equalityComparer.Equals("a\0", "a");
-        }
-
-        if (comparer is IComparer<string> orderingComparer)
-        {
-            return orderingComparer.Compare("a", "A") == 0 || orderingComparer.Compare("a\0", "a") == 0;
-        }
-
+        // Sample comparisons cannot establish that an arbitrary comparer has portable equality semantics.
+        // Recognize the framework defaults by identity without invoking user comparer code.
         return HasCustomGenericComparer(comparer);
     }
 
@@ -41,11 +29,6 @@ internal static class CollectionComparerSupport
 
             var interfaceDefinition = interfaceType.GetGenericTypeDefinition();
             var elementType = interfaceType.GetGenericArguments()[0];
-            if (elementType == typeof(string))
-            {
-                continue;
-            }
-
             if (interfaceDefinition == typeof(IEqualityComparer<>))
             {
                 return !IsDefaultComparer(comparer, typeof(EqualityComparer<>), elementType);
@@ -53,7 +36,9 @@ internal static class CollectionComparerSupport
 
             if (interfaceDefinition == typeof(IComparer<>))
             {
-                return !IsDefaultComparer(comparer, typeof(Comparer<>), elementType);
+                // Default string ordering is culture-sensitive; only StringComparer.Ordinal is portable.
+                return elementType == typeof(string) ||
+                       !IsDefaultComparer(comparer, typeof(Comparer<>), elementType);
             }
         }
 

@@ -211,8 +211,7 @@ public sealed class QueryReviewHardeningTests
     [Fact]
     public void Contains_over_a_factory_created_culture_comparer_is_rejected()
     {
-        // Not a public StringComparer singleton, so an identity check would miss it; the behavioral probe
-        // catches it because it reports "a" == "A".
+        // Factory-created culture comparers also differ from portable ordinal equality.
         var watched = new HashSet<string>(StringComparer.Create(CultureInfo.InvariantCulture, ignoreCase: true)) { "a" };
         Assert.Throws<QueryTranslationException>(() =>
             ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId)));
