@@ -57,6 +57,9 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
         AssertMemberDoesNotHaveCodeRequirementAttribute(
             proxy,
             "public global::System.Threading.Tasks.Task ControlAsync()");
+        AssertMemberDoesNotHaveCodeRequirementAttribute(
+            proxy,
+            "public global::System.Threading.Tasks.Task ControlAsync(global::System.Threading.CancellationToken ct = default)");
 
         AssertMemberHasAttribute(
             asyncSibling,
@@ -85,10 +88,23 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
         var declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
         declarationIndex.Should().BeGreaterThanOrEqualTo(0);
 
-        var previousLineEnd = source.LastIndexOf('\n', declarationIndex - 1);
-        var previousLineStart = source.LastIndexOf('\n', previousLineEnd - 1) + 1;
-        var previousLine = source.Substring(previousLineStart, previousLineEnd - previousLineStart).Trim();
-        previousLine.Should().NotContain("RequiresUnreferencedCodeAttribute")
+        var declarationLineStart = source.LastIndexOf('\n', declarationIndex - 1) + 1;
+        var attributeBlockStart = declarationLineStart;
+        while (attributeBlockStart > 0)
+        {
+            var previousLineEnd = attributeBlockStart - 1;
+            var previousLineStart = source.LastIndexOf('\n', previousLineEnd - 1) + 1;
+            var previousLine = source.Substring(previousLineStart, previousLineEnd - previousLineStart).Trim();
+            if (!previousLine.StartsWith("[", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            attributeBlockStart = previousLineStart;
+        }
+
+        var attributeBlock = source.Substring(attributeBlockStart, declarationLineStart - attributeBlockStart);
+        attributeBlock.Should().NotContain("RequiresUnreferencedCodeAttribute")
             .And.NotContain("RequiresDynamicCodeAttribute")
             .And.NotContain("RequiresAssemblyFilesAttribute");
     }
