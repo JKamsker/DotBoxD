@@ -6,6 +6,7 @@ internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -25,9 +26,9 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsForbiddenHashSetScan(method.Name, typeName))
+        if (IsForbiddenSetScan(method.Name, typeName))
         {
-            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.{method.Name}";
             return true;
         }
 
@@ -51,9 +52,13 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsForbiddenHashSetScan(string methodName, string typeName)
+    private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
-           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal));
+
+    private static string SetCollectionType(string typeName)
+        => string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ? "SortedSet" : "HashSet";
 
     private static bool IsSetOverlaps(string methodName, string typeName)
         => methodName == "Overlaps" &&
