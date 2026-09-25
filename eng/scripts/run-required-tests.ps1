@@ -252,6 +252,7 @@ $defaultMinimums = @{
     EventQueryNumericRoutingAllocationTests = 1
     EventIndexNumericComparisonTests = 18
     EventIndexNumericAllocationTests = 1
+    EventIndexMatcherAllocationTests = 4
     DifferentialFuzzTests = 1
 }
 

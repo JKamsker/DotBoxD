@@ -79,9 +79,9 @@ public sealed class EventIndexMatcher<TEvent>
     /// </summary>
     public bool CouldMatch(TEvent value)
     {
-        foreach (var check in _checks)
+        for (var i = 0; i < _checks.Count; i++)
         {
-            if (!check.Evaluate(value))
+            if (!_checks[i].Evaluate(value))
             {
                 return false;
             }
