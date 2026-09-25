@@ -128,6 +128,7 @@ internal static class LocalCallbackProjection
         EnsureWholeEventSupported(adapter);
         using var writer = PooledRpcBufferWriter.Rent();
         KernelRpcBinaryCodec.EncodeValue(BuildEventRecord(adapter, e), writer);
+        cancellationToken.ThrowIfCancellationRequested();
         return await request(subscriptionId, writer.WrittenMemory, cancellationToken).ConfigureAwait(false);
     }
 
