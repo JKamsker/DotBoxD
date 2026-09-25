@@ -67,6 +67,7 @@ internal static class ForbiddenCollectionScanPolicy
     private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
     private static bool IsISetIsSupersetOf(string methodName, string typeName)
