@@ -22,22 +22,36 @@ internal static class CollectionScanPolicy
     }
 
     private static string? GetDisplayName(IMethodSymbol method, string typeName)
-        => (typeName, method.Name, method.MethodKind) switch
+    {
+        var setDisplayName = GetSetDisplayName(method.Name, typeName);
+        if (setDisplayName is not null)
+        {
+            return setDisplayName;
+        }
+
+        return (typeName, method.Name, method.MethodKind) switch
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
-            (HashSetTypeName, _, _) => GetSetDisplayName("HashSet", method.Name),
-            (IReadOnlySetTypeName, _, _) => GetSetDisplayName("IReadOnlySet", method.Name),
-            (SetInterfaceTypeName, "SetEquals", _) => "System.Collections.Generic.ISet.SetEquals",
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
             (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
-            (SortedSetTypeName, "SetEquals", _) => "System.Collections.Generic.SortedSet.SetEquals",
+            _ => null
+        };
+    }
+
+    private static string? GetSetDisplayName(string methodName, string typeName)
+        => typeName switch
+        {
+            HashSetTypeName => GetSetMethodDisplayName("HashSet", methodName),
+            IReadOnlySetTypeName => GetSetMethodDisplayName("IReadOnlySet", methodName),
+            SetInterfaceTypeName when methodName == "SetEquals" => "System.Collections.Generic.ISet.SetEquals",
+            SortedSetTypeName when methodName == "SetEquals" => "System.Collections.Generic.SortedSet.SetEquals",
             _ => null
         };
 
-    private static string? GetSetDisplayName(string setTypeName, string methodName)
+    private static string? GetSetMethodDisplayName(string setTypeName, string methodName)
         => methodName switch
         {
             "IsProperSubsetOf" or "IsSupersetOf" or "IsProperSupersetOf" or "SetEquals" =>
