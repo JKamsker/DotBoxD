@@ -347,6 +347,7 @@ jobs:
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",
               "PersistentCacheRootCreationTests",
+              "SandboxHostCompiledNoAuditStateColdHostAllocationTests",
               "CompiledCacheTests",
               "BranchMergeScopeTests",
               "CacheKeyIdentityTests",

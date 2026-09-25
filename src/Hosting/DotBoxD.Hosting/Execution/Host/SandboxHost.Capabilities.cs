@@ -6,14 +6,15 @@ namespace DotBoxD.Hosting.Execution;
 
 public sealed partial class SandboxHost
 {
-    private readonly ConcurrentDictionary<string, RevokedCapability> _revokedCapabilities =
-        new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, RevokedCapability>? _revokedCapabilities;
 
     public void RevokeCapability(string capabilityId, string reason = "")
     {
         ThrowIfDisposed();
         ValidateCapabilityId(capabilityId);
-        _revokedCapabilities[capabilityId] = new RevokedCapability(
+        var revokedCapabilities = LazyInitializer.EnsureInitialized(
+            ref _revokedCapabilities, static () => new(StringComparer.Ordinal));
+        revokedCapabilities[capabilityId] = new RevokedCapability(
             capabilityId,
             SanitizeReason(reason),
             DateTimeOffset.UtcNow);
@@ -24,7 +25,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         out RevokedCapability revoked)
     {
-        if (_revokedCapabilities.IsEmpty)
+        var revokedCapabilities = Volatile.Read(ref _revokedCapabilities);
+        if (revokedCapabilities is null || revokedCapabilities.IsEmpty)
         {
             revoked = null!;
             return false;
@@ -33,13 +35,13 @@ public sealed partial class SandboxHost
         var requiredCapabilities = plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities;
         foreach (var capabilityId in requiredCapabilities)
         {
-            if (_revokedCapabilities.TryGetValue(capabilityId, out revoked!))
+            if (revokedCapabilities.TryGetValue(capabilityId, out revoked!))
             {
                 return true;
             }
         }
 
-        foreach (var revokedCapability in _revokedCapabilities.Values)
+        foreach (var revokedCapability in revokedCapabilities.Values)
         {
             if (!CapabilityPattern.IsWildcard(revokedCapability.Id))
             {

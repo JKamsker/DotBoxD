@@ -44,6 +44,7 @@ $defaultMinimums = @{
     CompiledCacheMetadataTests = 3
     CompiledCacheRootGuardTests = 6
     PersistentCacheRootCreationTests = 4
+    SandboxHostCompiledNoAuditStateColdHostAllocationTests = 1
     CompiledCacheTests = 10
     BranchMergeScopeTests = 2
     CacheKeyIdentityTests = 5

@@ -30,7 +30,7 @@ public sealed class SandboxHostCompiledNoAuditStateColdHostAllocationTests
         }
 
         Console.WriteLine(
-            $"cold host construction: default={defaultAllocated / (double)MeasuredIterations:N3} B/host, " +
+            $"cold host construction ({Environment.ProcessorCount} processors): default={defaultAllocated / (double)MeasuredIterations:N3} B/host, " +
             $"interpreter={interpreterAllocated / (double)MeasuredIterations:N3} B/host.");
         var defaultBytesPerHost = defaultAllocated / MeasuredIterations;
         var interpreterBytesPerHost = interpreterAllocated / MeasuredIterations;
