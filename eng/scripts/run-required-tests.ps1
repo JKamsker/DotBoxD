@@ -43,6 +43,7 @@ $defaultMinimums = @{
     CompiledCacheEntrypointTests = 1
     CompiledCacheMetadataTests = 3
     CompiledCacheRootGuardTests = 6
+    PersistentCacheRootCreationTests = 4
     CompiledCacheTests = 10
     BranchMergeScopeTests = 2
     CacheKeyIdentityTests = 5

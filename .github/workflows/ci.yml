@@ -346,6 +346,7 @@ jobs:
               "CompiledCacheEntrypointTests",
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",
+              "PersistentCacheRootCreationTests",
               "CompiledCacheTests",
               "BranchMergeScopeTests",
               "CacheKeyIdentityTests",
