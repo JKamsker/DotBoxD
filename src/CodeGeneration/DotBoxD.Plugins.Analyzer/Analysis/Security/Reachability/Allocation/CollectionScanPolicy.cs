@@ -13,6 +13,7 @@ internal static class CollectionScanPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
@@ -32,6 +33,7 @@ internal static class CollectionScanPolicy
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
             (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
+            (SortedSetTypeName, "SetEquals", _) => "System.Collections.Generic.SortedSet.SetEquals",
             _ => null
         };
 
