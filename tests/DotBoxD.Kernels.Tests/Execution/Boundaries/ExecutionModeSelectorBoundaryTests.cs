@@ -83,6 +83,28 @@ public sealed class ExecutionModeSelectorBoundaryTests
         Assert.Equal(2, selector.HotnessSnapshots[1].CompletedRunCount);
     }
 
+    [Fact]
+    public async Task Auto_mode_selector_fault_after_cancelling_caller_token_is_classified_as_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var selector = new CancelThenFaultSelector(cancellation);
+        var compiler = new CountingCompiler();
+        var scenario = await SelectorScenario.CreateAsync(selector, compiler);
+
+        var warmup = await scenario.ExecuteAsync();
+        var cancelled = await scenario.ExecuteAsync(cancellation.Token);
+
+        Assert.True(warmup.Succeeded, warmup.Error?.SafeMessage);
+        Assert.False(cancelled.Succeeded);
+        Assert.Equal(SandboxErrorCode.Cancelled, cancelled.Error!.Code);
+        Assert.Equal(ExecutionMode.Auto, cancelled.ActualMode);
+        Assert.False(cancelled.ExecutionDispatched);
+        Assert.Equal(0, compiler.Calls);
+        Assert.Contains(cancelled.AuditEvents, e =>
+            e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.Cancelled);
+        Assert.DoesNotContain(cancelled.AuditEvents, e => e.Kind == "ExecutionModeSelectionFailed");
+    }
+
     private static void AssertSelectorFailure(SandboxExecutionResult result)
     {
         Assert.False(result.Succeeded);
@@ -152,6 +174,22 @@ public sealed class ExecutionModeSelectorBoundaryTests
             }
 
             return ExecutionModeDecision.Interpreted;
+        }
+    }
+
+    private sealed class CancelThenFaultSelector(CancellationTokenSource cancellation) : IExecutionModeSelector
+    {
+        public List<ModuleHotnessStats> HotnessSnapshots { get; } = [];
+
+        public ExecutionModeDecision Choose(
+            ExecutionPlan plan,
+            SandboxExecutionOptions options,
+            ModuleHotnessStats hotness,
+            CompiledCacheStatus cacheStatus)
+        {
+            HotnessSnapshots.Add(hotness);
+            cancellation.Cancel();
+            throw new InvalidOperationException(SelectorSecret);
         }
     }
 
