@@ -250,6 +250,8 @@ $defaultMinimums = @{
     MemberValueReaderContractTests = 10
     EventQueryNumericRoutingTests = 11
     EventQueryNumericRoutingAllocationTests = 1
+    EventIndexNumericComparisonTests = 18
+    EventIndexNumericAllocationTests = 1
     DifferentialFuzzTests = 1
 }
 

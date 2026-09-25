@@ -515,6 +515,8 @@ jobs:
               "MemberValueReaderContractTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
+              "EventIndexNumericComparisonTests",
+              "EventIndexNumericAllocationTests",
               "QueryReviewHardeningTests",
               "DifferentialFuzzTests"
             )
