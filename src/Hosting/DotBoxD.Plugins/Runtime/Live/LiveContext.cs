@@ -25,11 +25,21 @@ internal class LiveContextProxy<T> : DispatchProxy where T : class
 
     public static T Create(LiveSettingStore settings, Func<bool>? isRevoked = null)
     {
+        RejectIndexers();
         var proxy = Create<T, LiveContextProxy<T>>();
         var context = (LiveContextProxy<T>)(object)proxy;
         context._settings = settings;
         context._isRevoked = isRevoked;
         return proxy;
+    }
+
+    private static void RejectIndexers()
+    {
+        if (typeof(T).GetProperties().Any(static property => property.GetIndexParameters().Length > 0))
+        {
+            throw LiveSettingTypeConverter.Diagnostic(
+                $"Live context binding '{typeof(T).Name}' cannot declare indexer properties.");
+        }
     }
 
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)

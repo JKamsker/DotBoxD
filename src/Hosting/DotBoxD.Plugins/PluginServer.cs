@@ -39,7 +39,8 @@ public sealed partial class PluginServer : IDisposable
             InstallChainPackage,
             onSubscriptionFault,
             ThrowIfDisposed,
-            () => Volatile.Read(ref _disposed) != 0);
+            () => Volatile.Read(ref _disposed) != 0,
+            _lifecycleGate);
     }
 
     // Synchronous installer the hook pipelines use to wire analyzer-generated chain packages at
@@ -255,7 +256,7 @@ public sealed partial class PluginServer : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        if (TryBeginDispose())
         {
             // Revoke running kernels before tearing down the host so an in-flight publish cannot call
             // into a disposed SandboxHost; revocation cancels each kernel's execution token first.

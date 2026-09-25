@@ -99,6 +99,38 @@ public sealed class RemoteLocalHandlerRegistryCancellationTests
     }
 
     [Fact]
+    public async Task DispatchResultAsync_does_not_invoke_result_handler_after_context_constructor_cancels()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        var invocations = 0;
+        registry.RegisterResult<CancelingDamageContext, DamageResult>(
+            "sub-result-decode-cancel",
+            (context, _) =>
+            {
+                invocations++;
+                return new DamageResult(true, "ok", context.Damage);
+            });
+        using var cancellation = new CancellationTokenSource();
+        var payload = EncodeProjected(new CancelingDamageContext(11));
+        CancelingDamageContext.Cancellation = cancellation;
+
+        try
+        {
+            var exception = await Record.ExceptionAsync(
+                async () => await registry.DispatchResultAsync(
+                    "sub-result-decode-cancel",
+                    payload,
+                    new HookContext(new InMemoryPluginMessageSink(), cancellation.Token)));
+
+            Assert.Equal((typeof(OperationCanceledException), 0), (exception?.GetType(), invocations));
+        }
+        finally
+        {
+            CancelingDamageContext.Cancellation = null;
+        }
+    }
+
+    [Fact]
     public async Task DispatchAsync_observes_caller_cancellation_after_raw_decoder_handler_returns()
     {
         var registry = new RemoteLocalHandlerRegistry();
@@ -185,6 +217,19 @@ public sealed class RemoteLocalHandlerRegistryCancellationTests
     }
 
     private sealed record DamageContext(int Damage);
+
+    private sealed class CancelingDamageContext
+    {
+        public CancelingDamageContext(int damage)
+        {
+            Damage = damage;
+            Cancellation?.Cancel();
+        }
+
+        public static CancellationTokenSource? Cancellation { get; set; }
+
+        public int Damage { get; }
+    }
 
     private readonly record struct DamageResult(bool Success, string? Reason, int Damage) : IHookResult;
 }

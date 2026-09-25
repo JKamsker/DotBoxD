@@ -23,6 +23,7 @@ public sealed class SubscriptionRegistry
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
     private readonly Action? _throwIfDisposed;
     private readonly Func<bool>? _isDisposed;
+    private readonly object _lifecycleGate;
 
     internal SubscriptionRegistry(
         IPluginMessageSink messages,
@@ -31,7 +32,8 @@ public sealed class SubscriptionRegistry
         Func<PluginPackage, InstalledKernel>? installer = null,
         Action<SubscriptionDeliveryFault>? onFault = null,
         Action? throwIfDisposed = null,
-        Func<bool>? isDisposed = null)
+        Func<bool>? isDisposed = null,
+        object? lifecycleGate = null)
     {
         _messages = messages;
         _events = events;
@@ -40,6 +42,7 @@ public sealed class SubscriptionRegistry
         _onFault = onFault;
         _throwIfDisposed = throwIfDisposed;
         _isDisposed = isDisposed;
+        _lifecycleGate = lifecycleGate ?? new object();
     }
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
@@ -202,6 +205,8 @@ public sealed class SubscriptionRegistry
     }
 
     internal bool IsDisposed => _isDisposed?.Invoke() == true;
+
+    internal object LifecycleGate => _lifecycleGate;
 
     private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {

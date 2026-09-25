@@ -24,6 +24,7 @@ public sealed partial class InstalledKernel
     private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
     private readonly CancellationTokenSource _revocation = new();
+    private readonly TaskCompletionSource _revocationCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object? _ownerId;
     private readonly SandboxExecutionOptions _executionOptions;
     private readonly SandboxFunction? _rpcEntrypointFunction;
@@ -63,6 +64,7 @@ public sealed partial class InstalledKernel
     public PluginExecutionObservation? LastExecution => _executionObserver.Last;
     public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot();
     public bool IsRevoked => Volatile.Read(ref _revoked) != 0;
+    internal CancellationToken RevocationToken => _revocation.Token;
 
     public TypedInstalledKernel<TSettings> As<TSettings>() where TSettings : class => new(this);
 
@@ -72,21 +74,6 @@ public sealed partial class InstalledKernel
     /// cross-owner id reuse so one plugin cannot replace another plugin's kernel.
     /// </summary>
     public object? OwnerId => _ownerId;
-
-    public void Revoke()
-    {
-        Action<InstalledKernel>[] callbacks = [];
-        lock (_lifecycleGate)
-        {
-            if (Interlocked.Exchange(ref _revoked, 1) == 0)
-            {
-                _revocation.Cancel();
-                callbacks = DrainRevocationCallbacks();
-            }
-        }
-
-        InvokeRevocationCallbacks(callbacks);
-    }
 
     internal void RegisterStateSynchronizer(Type stateType, Action synchronize)
         => _liveStateSync.Register(stateType, synchronize);

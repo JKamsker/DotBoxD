@@ -138,6 +138,12 @@ public sealed partial class SandboxHost
             result = PreDispatchCancelledResult(plan, options);
             return false;
         }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            selectedMode = default;
+            result = PreDispatchCancelledResult(plan, options);
+            return false;
+        }
         catch (Exception)
         {
             selectedMode = default;

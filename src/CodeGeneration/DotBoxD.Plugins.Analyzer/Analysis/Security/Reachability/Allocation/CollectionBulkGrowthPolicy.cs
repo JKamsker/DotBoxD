@@ -15,6 +15,7 @@ internal static class CollectionBulkGrowthPolicy
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string SortedDictionaryTypeName =
         "System.Collections.Generic.SortedDictionary<TKey, TValue>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
@@ -104,7 +105,8 @@ internal static class CollectionBulkGrowthPolicy
             Name: "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
         } &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
-            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal));
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
         IMethodSymbol method,
