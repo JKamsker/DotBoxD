@@ -247,6 +247,7 @@ $defaultMinimums = @{
     QueryReviewHardeningTests = 25
     QueryComparerHardeningTests = 4
     QueryNumericComparisonAllocationTests = 12
+    MemberValueReaderContractTests = 10
     DifferentialFuzzTests = 1
 }
 

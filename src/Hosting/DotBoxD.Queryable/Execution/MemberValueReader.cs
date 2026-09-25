@@ -73,9 +73,24 @@ public sealed class MemberValueReader
 
     private static MemberInfo ResolveMember(Type type, string name, string path)
     {
-        MemberInfo? member = type.GetProperty(name, MemberFlags);
-        member ??= type.GetField(name, MemberFlags);
-        return member ?? throw new InvalidOperationException(
-            $"Event type '{type.FullName}' has no public instance member '{name}' for query path '{path}'.");
+        try
+        {
+            MemberInfo? member = type.GetProperty(name, MemberFlags);
+            if (member is PropertyInfo property &&
+                (property.GetMethod is not { IsPublic: true } || property.GetIndexParameters().Length != 0))
+            {
+                throw new InvalidOperationException(
+                    $"Event property '{type.FullName}.{name}' must have a public parameterless getter for query path '{path}'.");
+            }
+
+            member ??= type.GetField(name, MemberFlags);
+            return member ?? throw new InvalidOperationException(
+                $"Event type '{type.FullName}' has no public instance member '{name}' for query path '{path}'.");
+        }
+        catch (AmbiguousMatchException ex)
+        {
+            throw new InvalidOperationException(
+                $"Event type '{type.FullName}' has an ambiguous member '{name}' for query path '{path}'.", ex);
+        }
     }
 }
