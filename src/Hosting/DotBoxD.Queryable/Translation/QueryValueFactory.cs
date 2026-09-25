@@ -76,8 +76,8 @@ internal static class QueryValueFactory
             "Only bool, integral and floating types, string, and enums are supported.");
     }
 
-    /// <summary>Evaluates a parameter-free collection operand into a list of <see cref="QueryValue"/>s.</summary>
-    public static IReadOnlyList<QueryValue> ToValues(Expression expression, ParameterExpression parameter)
+    /// <summary>Captures a collection once so comparer validation and enumeration inspect the same instance.</summary>
+    public static IEnumerable EvaluateCollection(Expression expression, ParameterExpression parameter)
     {
         if (!TryEvaluateObject(expression, parameter, out var raw) || raw is not IEnumerable enumerable || raw is string)
         {
@@ -85,6 +85,12 @@ internal static class QueryValueFactory
                 expression, "the 'in'/Contains operand must be a constant array or collection.");
         }
 
+        return enumerable;
+    }
+
+    /// <summary>Converts a captured collection into a list of <see cref="QueryValue"/>s.</summary>
+    public static IReadOnlyList<QueryValue> ToValues(IEnumerable enumerable, Expression expression)
+    {
         var values = new List<QueryValue>();
         try
         {

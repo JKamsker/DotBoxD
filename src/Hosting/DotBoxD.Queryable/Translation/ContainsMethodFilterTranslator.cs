@@ -48,8 +48,9 @@ internal static class ContainsMethodFilterTranslator
 
         ValidateSupportedContainsMethod(call);
         var unwrapped = UnwrapSpan(collection);
-        RejectUnsupportedContainsComparer(call, unwrapped, parameter);
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
+        var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
+        RejectUnsupportedContainsComparer(call, capturedCollection);
+        filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedCollection, unwrapped));
         return true;
     }
 
@@ -125,14 +126,11 @@ internal static class ContainsMethodFilterTranslator
 
     private static void RejectUnsupportedContainsComparer(
         MethodCallExpression call,
-        Expression collection,
-        ParameterExpression parameter)
+        object collection)
     {
         // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
         // semantics even when written as static Enumerable.Contains(source, item).
-        if (QueryValueFactory.TryEvaluateObject(collection, parameter, out var collectionObject) &&
-            collectionObject is not null &&
-            HasUnsupportedComparer(call, collectionObject))
+        if (HasUnsupportedComparer(call, collection))
         {
             throw QueryTranslationException.Unsupported(
                 call,
