@@ -1,7 +1,9 @@
+using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Lifecycle;
 
@@ -76,6 +78,38 @@ public sealed class PluginLiveUpdateRecoveryTests
     }
 
     [Fact]
+    public async Task AsyncSet_flush_preserves_failure_enqueued_after_its_snapshot()
+    {
+        var server = PluginAddendumTestPolicies.CreateServer();
+        await server.InstallAsync(FireDamagePluginPackage.Create());
+        var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
+        var queue = PendingQueue(kernel.Kernel);
+        var firstUpdateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var laterFailure = new InvalidOperationException("Later live update failed.");
+
+        kernel.UpdateMode = LiveUpdateMode.AsyncSet;
+        queue.Enqueue(() =>
+        {
+            firstUpdateStarted.SetResult();
+            releaseFirstUpdate.Task.GetAwaiter().GetResult();
+        });
+        await firstUpdateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var firstFlush = kernel.FlushUpdatesAsync().AsTask();
+        queue.Enqueue(() => throw laterFailure);
+        await WaitForAsyncUpdateErrorAsync(kernel);
+
+        releaseFirstUpdate.SetResult();
+        await firstFlush.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Same(laterFailure, kernel.LastAsyncUpdateError);
+        var secondFlush = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await kernel.FlushUpdatesAsync().AsTask());
+        Assert.Same(laterFailure, secondFlush.InnerException);
+    }
+
+    [Fact]
     public async Task AsyncSet_flush_rejects_revoked_kernel_without_applying_typed_value()
     {
         var server = PluginAddendumTestPolicies.CreateServer();
@@ -147,6 +181,18 @@ public sealed class PluginLiveUpdateRecoveryTests
         }
 
         throw new TimeoutException("Async live update did not settle after revocation.");
+    }
+
+    // This test needs to enqueue after FlushUpdatesAsync takes its queue snapshot. The public
+    // live-setting surface has no hook at that exact boundary, so it follows ordering coverage
+    // and reaches the queue through the installed kernel.
+    private static PendingLiveUpdateQueue PendingQueue(InstalledKernel kernel)
+    {
+        var field = typeof(InstalledKernel).GetField(
+            "_pendingLiveUpdates",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return (PendingLiveUpdateQueue)field.GetValue(kernel)!;
     }
 
     private sealed class BlockingReadFireDamageSettings
