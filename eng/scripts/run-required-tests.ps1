@@ -196,6 +196,7 @@ $defaultMinimums = @{
     RequestEnvelopeMessageIdMismatch_ReturnsProtocolError = 1
     InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException = 1
     InstanceRegistryTests = 8
+    InstanceRegistryLeaseRegressionTests = 4
     UnknownStreamComplete_ReportsProtocolError = 1
     UnknownStreamError_ReportsProtocolError = 1
     ForwardedRemoteStreamError_PreservesOriginalRemoteType = 1

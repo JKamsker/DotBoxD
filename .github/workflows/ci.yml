@@ -524,6 +524,7 @@ jobs:
               "RequestEnvelopeMessageIdMismatch_ReturnsProtocolError",
               "InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException",
               "InstanceRegistryTests",
+              "InstanceRegistryLeaseRegressionTests",
               "UnknownStreamComplete_ReportsProtocolError",
               "UnknownStreamError_ReportsProtocolError",
               "ForwardedRemoteStreamError_PreservesOriginalRemoteType",
