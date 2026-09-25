@@ -511,6 +511,7 @@ jobs:
               "QuerySatisfiabilityTests",
               "QueryTextTests",
               "QueryComparerHardeningTests",
+              "QueryNumericComparisonAllocationTests",
               "QueryReviewHardeningTests",
               "DifferentialFuzzTests"
             )

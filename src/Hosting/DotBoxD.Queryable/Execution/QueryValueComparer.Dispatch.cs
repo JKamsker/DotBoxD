@@ -36,11 +36,11 @@ public static partial class QueryValueComparer
     private static readonly Dictionary<QueryValueKind, OrderEvaluator> OrderEvaluators = new()
     {
         [QueryValueKind.Integer] = static (actual, expected, _) =>
-            OrderedNumeric(actual, (decimal)expected.Integer, () => (double)expected.Integer),
+            OrderedNumeric(actual, (decimal)expected.Integer, (double)expected.Integer),
         [QueryValueKind.UnsignedInteger] = static (actual, expected, _) =>
-            OrderedNumeric(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger),
+            OrderedNumeric(actual, (decimal)expected.UnsignedInteger, (double)expected.UnsignedInteger),
         [QueryValueKind.Decimal] = static (actual, expected, _) =>
-            OrderedNumeric(actual, expected.Decimal, () => (double)expected.Decimal),
+            OrderedNumeric(actual, expected.Decimal, (double)expected.Decimal),
         [QueryValueKind.Number] = OrderNumber,
         [QueryValueKind.Timestamp] = OrderTimestamp,
         [QueryValueKind.String] = OrderString,
@@ -105,13 +105,13 @@ public static partial class QueryValueComparer
     }
 
     private static bool EqualInteger(object actual, QueryValue expected, bool ignoreCase, out bool equal)
-        => TryAreNumericEqual(actual, (decimal)expected.Integer, () => (double)expected.Integer, out equal);
+        => TryAreNumericEqual(actual, (decimal)expected.Integer, (double)expected.Integer, out equal);
 
     private static bool EqualUnsignedInteger(object actual, QueryValue expected, bool ignoreCase, out bool equal)
-        => TryAreNumericEqual(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger, out equal);
+        => TryAreNumericEqual(actual, (decimal)expected.UnsignedInteger, (double)expected.UnsignedInteger, out equal);
 
     private static bool EqualDecimal(object actual, QueryValue expected, bool ignoreCase, out bool equal)
-        => TryAreNumericEqual(actual, expected.Decimal, () => (double)expected.Decimal, out equal);
+        => TryAreNumericEqual(actual, expected.Decimal, (double)expected.Decimal, out equal);
 
     private static bool EqualNumber(object actual, QueryValue expected, bool ignoreCase, out bool equal)
     {
