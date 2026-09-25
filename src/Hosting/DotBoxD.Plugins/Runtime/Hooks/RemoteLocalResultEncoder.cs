@@ -8,27 +8,42 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 
 internal static class RemoteLocalResultEncoder
 {
-    public static byte[] Encode<TResult>(TResult result)
+    public static byte[] Encode<TResult>(
+        TResult result,
+        CancellationToken contextCancellationToken,
+        CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
         var members = Shape<TResult>.Members;
         using var writer = PooledRpcBufferWriter.Rent();
         if (members.Length == 0)
         {
+            ThrowIfCanceled(contextCancellationToken, cancellationToken);
             KernelRpcBinaryCodec.EncodeValue(
                 KernelRpcMarshaller.ToSandboxValue(result, typeof(TResult)),
                 writer);
+            ThrowIfCanceled(contextCancellationToken, cancellationToken);
         }
         else
         {
             KernelRpcBinaryCodec.BeginRecord(members.Length, writer);
             for (var i = 0; i < members.Length; i++)
             {
+                ThrowIfCanceled(contextCancellationToken, cancellationToken);
                 members[i].WriteValue(result, writer);
+                ThrowIfCanceled(contextCancellationToken, cancellationToken);
             }
         }
 
         return writer.WrittenMemory.ToArray();
+    }
+
+    private static void ThrowIfCanceled(
+        CancellationToken contextCancellationToken,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        contextCancellationToken.ThrowIfCancellationRequested();
     }
 
     private static SandboxValue EncodeMember(object? value, Type type, string name)
