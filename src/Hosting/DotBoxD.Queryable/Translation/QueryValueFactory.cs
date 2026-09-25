@@ -26,8 +26,8 @@ internal static class QueryValueFactory
             return false;
         }
 
-        var stripped = MemberPathReader.StripConvert(expression);
-        if (stripped is ConstantExpression constant)
+        // Conversions around a literal still need evaluation: they can round, truncate, throw, or call user code.
+        if (expression is ConstantExpression constant)
         {
             result = constant.Value;
             return true;

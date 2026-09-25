@@ -255,6 +255,7 @@ $defaultMinimums = @{
     QueryComparerHardeningTests = 4
     QueryCustomStringComparerTests = 13
     QueryCollectionCaptureTests = 4
+    QueryConstantConversionTests = 12
     QueryNumericComparisonAllocationTests = 12
     MemberValueReaderContractTests = 10
     EventQueryNumericRoutingTests = 11
