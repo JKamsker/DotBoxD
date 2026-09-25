@@ -42,7 +42,7 @@ public sealed class RegistrationAccumulatorPlatformCompatibilitySurpriseTests
             }
             """);
 
-        var windowsSource = GeneratedSource(result, "WindowsRegistrationAccumulator");
+        var windowsSource = NormalizeLineEndings(GeneratedSource(result, "WindowsRegistrationAccumulator"));
         Assert.Contains(
             SupportedWindowsAttribute + "\ninternal sealed class WindowsRegistrationAccumulator",
             windowsSource,
@@ -91,6 +91,9 @@ public sealed class RegistrationAccumulatorPlatformCompatibilitySurpriseTests
             .Single(tree => tree.FilePath.Contains(hintNameFragment, StringComparison.Ordinal))
             .GetText()
             .ToString();
+
+    private static string NormalizeLineEndings(string source)
+        => source.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

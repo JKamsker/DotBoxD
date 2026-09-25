@@ -52,7 +52,10 @@ public sealed class ServerExtensionClientPlatformCompatibilityAttributeSurpriseT
         => Assert.Contains(
             generatedSources,
             source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
-                      source.Contains(expectedSource, StringComparison.Ordinal));
+                      NormalizeLineEndings(source).Contains(expectedSource, StringComparison.Ordinal));
+
+    private static string NormalizeLineEndings(string source)
+        => source.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private const string ServiceBackedSource = """
         #nullable enable
