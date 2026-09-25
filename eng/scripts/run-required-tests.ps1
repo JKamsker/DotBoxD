@@ -198,6 +198,7 @@ $defaultMinimums = @{
     InstanceRegistryTests = 8
     InstanceRegistryLeaseRegressionTests = 4
     RpcStreamHandleEnvelopeValidationTests = 13
+    RpcStreamCancellationCallbackTests = 3
     UnknownStreamComplete_ReportsProtocolError = 1
     UnknownStreamError_ReportsProtocolError = 1
     ForwardedRemoteStreamError_PreservesOriginalRemoteType = 1

@@ -534,6 +534,7 @@ jobs:
               "InstanceRegistryTests",
               "InstanceRegistryLeaseRegressionTests",
               "RpcStreamHandleEnvelopeValidationTests",
+              "RpcStreamCancellationCallbackTests",
               "UnknownStreamComplete_ReportsProtocolError",
               "UnknownStreamError_ReportsProtocolError",
               "ForwardedRemoteStreamError_PreservesOriginalRemoteType",
