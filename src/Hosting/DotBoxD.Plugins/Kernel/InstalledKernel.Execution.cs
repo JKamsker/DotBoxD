@@ -28,7 +28,7 @@ public sealed partial class InstalledKernel
                 reusableNoAuditState)
             .ConfigureAwait(false);
         var isRevoked = IsRevoked;
-        var cancellationCallbackFailed = Volatile.Read(ref _revocationCancellationCallbackFailed) != 0;
+        var cancellationCallbackFailed = await RevocationCancellationCallbackFailedAsync(isRevoked).ConfigureAwait(false);
         var terminalResult = isRevoked && !cancellationCallbackFailed ? WithRevokedError(result) : result;
         RememberSuccessfulAutoCompiledRun(entrypoint, terminalResult);
         _executionObserver.Record(entrypoint, _executionMode, terminalResult);
@@ -51,6 +51,17 @@ public sealed partial class InstalledKernel
         }
 
         return terminalResult.Value ?? SandboxValue.Unit;
+    }
+
+    private ValueTask<bool> RevocationCancellationCallbackFailedAsync(bool isRevoked)
+        => isRevoked
+            ? AwaitRevocationCompletionAsync()
+            : ValueTask.FromResult(false);
+
+    private async ValueTask<bool> AwaitRevocationCompletionAsync()
+    {
+        await _revocationCompleted.Task.ConfigureAwait(false);
+        return Volatile.Read(ref _revocationCancellationCallbackFailed) != 0;
     }
 
     private static PreparedExecutionResult WithRevokedError(PreparedExecutionResult result)

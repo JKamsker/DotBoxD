@@ -19,10 +19,24 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
             configureHost: builder => builder.AddBinding(binding.Descriptor()),
             defaultPolicy: CreatePolicy());
         var incumbent = await server.InstallAsync(CreatePackage());
+        using var allowRevocationToFinish = new ManualResetEventSlim(initialState: false);
+        var revocationCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var revocationBarrier = incumbent.RevocationToken.Register(
+            () =>
+            {
+                revocationCallbackStarted.TrySetResult();
+                allowRevocationToFinish.Wait(TimeSpan.FromSeconds(5));
+            });
+        using var throwingRevocationCallback = incumbent.RevocationToken.Register(
+            static () => throw new InvalidOperationException("The revocation callback failed."));
         var execution = incumbent.ShouldHandleAsync(EventAdapter.Instance, new ReplacementEvent()).AsTask();
         await binding.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var replacement = await server.InstallAsync(CreatePackage());
+        var replacementTask = Task.Run(async () => await server.InstallAsync(CreatePackage()));
+        await revocationCallbackStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await binding.ExecutionObservedCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        allowRevocationToFinish.Set();
+        var replacement = await replacementTask;
 
         Assert.True(incumbent.IsRevoked);
         Assert.Same(replacement, server.Kernels.Get("replacement-cancellation-callback"));
@@ -100,7 +114,7 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
     private sealed class ThrowingCancellationCallbackBinding
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
+        public TaskCompletionSource ExecutionObservedCancellation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public BindingDescriptor Descriptor() => KernelReplacementCancellationCallbackSurpriseTests.Descriptor(this);
 
         public async ValueTask<SandboxValue> InvokeAsync(CancellationToken cancellationToken)
@@ -108,8 +122,15 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
             using var registration = cancellationToken.Register(
                 static () => throw new InvalidOperationException("The execution callback failed."));
             Started.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
-            return SandboxValue.FromBool(true);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+                return SandboxValue.FromBool(true);
+            }
+            finally
+            {
+                ExecutionObservedCancellation.TrySetResult();
+            }
         }
     }
 

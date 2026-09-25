@@ -33,6 +33,23 @@ public sealed class RetainedEventQueryBuilderDisposalSurpriseTests
     }
 
     [Fact]
+    public async Task Subscription_racing_server_disposal_is_rejected()
+    {
+        using var server = CreateServer();
+        var translation = new BlockingQueryValue();
+        var query = server.Subscriptions.Query<RetainedQueryEvent>()
+            .Where(@event => @event.Value == translation.Value);
+        var subscription = Task.Run(async () =>
+            await query.SubscribeAsync((_, _) => ValueTask.CompletedTask));
+        await translation.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        server.Dispose();
+        translation.AllowCompletion.Set();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await subscription);
+    }
+
+    [Fact]
     public async Task Standalone_host_allows_identity_and_projected_subscriptions()
     {
         var host = new EventQueryHost();
@@ -54,6 +71,23 @@ public sealed class RetainedEventQueryBuilderDisposalSurpriseTests
     }
 
     private sealed record RetainedQueryEvent(int Value);
+
+    private sealed class BlockingQueryValue
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ManualResetEventSlim AllowCompletion { get; } = new(initialState: false);
+
+        public int Value
+        {
+            get
+            {
+                Started.TrySetResult();
+                AllowCompletion.Wait(TimeSpan.FromSeconds(5));
+                return 0;
+            }
+        }
+    }
 
     private sealed class RetainedQueryEventAdapter : IPluginEventAdapter<RetainedQueryEvent>
     {

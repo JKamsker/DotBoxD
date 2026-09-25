@@ -7,6 +7,7 @@ public sealed class LiveSettingStore
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, ILiveSetting> _settings;
+    private readonly LiveSettingRollbackGuard _rollback = new();
     private LiveSettingUpdateTransaction? _activeUpdate;
 
     public LiveSettingStore(IEnumerable<ILiveSetting> settings)
@@ -71,6 +72,7 @@ public sealed class LiveSettingStore
     {
         lock (_gate)
         {
+            _rollback.ThrowIfActive();
             // The slot is the single coercion/validation site; hand it the raw caller value
             // so conversion and range checks run exactly once instead of once here and again
             // inside the slot.
@@ -85,6 +87,7 @@ public sealed class LiveSettingStore
         ArgumentNullException.ThrowIfNull(values);
         lock (_gate)
         {
+            _rollback.ThrowIfActive();
             var parent = _activeUpdate;
             var update = new LiveSettingUpdateTransaction(parent);
             _activeUpdate = update;
@@ -120,9 +123,9 @@ public sealed class LiveSettingStore
                     }
                 }
             }
-            catch
+            catch (Exception updateFailure)
             {
-                update.RollBack();
+                _rollback.Execute(update.RollBack, updateFailure);
                 throw;
             }
             finally

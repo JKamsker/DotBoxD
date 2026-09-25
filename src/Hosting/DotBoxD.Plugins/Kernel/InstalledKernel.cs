@@ -24,6 +24,7 @@ public sealed partial class InstalledKernel
     private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
     private readonly CancellationTokenSource _revocation = new();
+    private readonly TaskCompletionSource _revocationCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object? _ownerId;
     private readonly SandboxExecutionOptions _executionOptions;
     private readonly SandboxFunction? _rpcEntrypointFunction;
@@ -63,6 +64,7 @@ public sealed partial class InstalledKernel
     public PluginExecutionObservation? LastExecution => _executionObserver.Last;
     public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot();
     public bool IsRevoked => Volatile.Read(ref _revoked) != 0;
+    internal CancellationToken RevocationToken => _revocation.Token;
 
     public TypedInstalledKernel<TSettings> As<TSettings>() where TSettings : class => new(this);
 

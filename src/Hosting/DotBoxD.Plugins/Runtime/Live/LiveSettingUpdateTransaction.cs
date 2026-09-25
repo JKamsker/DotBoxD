@@ -29,6 +29,7 @@ internal sealed class LiveSettingUpdateTransaction(LiveSettingUpdateTransaction?
 
     public void RollBack()
     {
+        List<Exception>? failures = null;
         for (var i = _updatedSettings.Count - 1; i >= 0; i--)
         {
             var setting = _updatedSettings[i];
@@ -36,10 +37,16 @@ internal sealed class LiveSettingUpdateTransaction(LiveSettingUpdateTransaction?
             {
                 setting.SetObject(_previousValues[setting]);
             }
-            catch
+            catch (Exception exception)
             {
-                // A slot can reject rollback too; preserve the original failure.
+                failures ??= [];
+                failures.Add(exception);
             }
+        }
+
+        if (failures is not null)
+        {
+            throw new AggregateException("One or more live settings could not be restored.", failures);
         }
     }
 }

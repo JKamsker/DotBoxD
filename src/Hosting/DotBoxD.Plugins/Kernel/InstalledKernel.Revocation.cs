@@ -21,6 +21,10 @@ public sealed partial class InstalledKernel
                     // The token has already transitioned; callback failures cannot roll back revocation.
                     Volatile.Write(ref _revocationCancellationCallbackFailed, 1);
                 }
+                finally
+                {
+                    _revocationCompleted.TrySetResult();
+                }
 
                 callbacks = DrainRevocationCallbacks();
             }
