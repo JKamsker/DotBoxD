@@ -27,6 +27,8 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             "[global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute(\"Trimming can remove contract types\", Url = \"https://example.test/trimming\")]";
         const string dynamicCodeAttribute =
             "[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"Dynamic code is required for this call\", Url = \"https://example.test/dynamic-code\")]";
+        const string assemblyFilesAttribute =
+            "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"Files adjacent to the assembly are required\", Url = \"https://example.test/assembly-files\")]";
 
         AssertMemberHasAttribute(
             proxy,
@@ -44,6 +46,14 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             proxy,
             dynamicCodeAttribute,
             "public global::System.Threading.Tasks.Task DynamicCodeAsync(global::System.Threading.CancellationToken ct = default)");
+        AssertMemberHasAttribute(
+            proxy,
+            assemblyFilesAttribute,
+            "public global::System.Threading.Tasks.Task AssemblyFilesAsync()");
+        AssertMemberHasAttribute(
+            proxy,
+            assemblyFilesAttribute,
+            "public global::System.Threading.Tasks.Task AssemblyFilesAsync(global::System.Threading.CancellationToken ct = default)");
         AssertMemberDoesNotHaveCodeRequirementAttribute(
             proxy,
             "public global::System.Threading.Tasks.Task ControlAsync()");
@@ -56,6 +66,10 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             asyncSibling,
             dynamicCodeAttribute,
             "global::System.Threading.Tasks.Task DynamicCodeAsync(global::System.Threading.CancellationToken ct = default);");
+        AssertMemberHasAttribute(
+            asyncSibling,
+            assemblyFilesAttribute,
+            "global::System.Threading.Tasks.Task AssemblyFilesAsync(global::System.Threading.CancellationToken ct = default);");
         AssertMemberDoesNotHaveCodeRequirementAttribute(
             asyncSibling,
             "global::System.Threading.Tasks.Task ControlAsync(global::System.Threading.CancellationToken ct = default);");
@@ -75,7 +89,8 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
         var previousLineStart = source.LastIndexOf('\n', previousLineEnd - 1) + 1;
         var previousLine = source.Substring(previousLineStart, previousLineEnd - previousLineStart).Trim();
         previousLine.Should().NotContain("RequiresUnreferencedCodeAttribute")
-            .And.NotContain("RequiresDynamicCodeAttribute");
+            .And.NotContain("RequiresDynamicCodeAttribute")
+            .And.NotContain("RequiresAssemblyFilesAttribute");
     }
 
     private const string ServiceSource = """
@@ -93,6 +108,9 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
 
                 [RequiresDynamicCode("Dynamic code is required for this call", Url = "https://example.test/dynamic-code")]
                 Task DynamicCodeAsync();
+
+                [RequiresAssemblyFiles("Files adjacent to the assembly are required", Url = "https://example.test/assembly-files")]
+                Task AssemblyFilesAsync();
 
                 Task ControlAsync();
             }

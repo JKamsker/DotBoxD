@@ -7,15 +7,29 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static class MemberAttributeFormatter
 {
+    private const string RequiresAssemblyFilesAttribute =
+        "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute";
+    private const string RequiresDynamicCodeAttribute =
+        "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
+    private const string RequiresUnreferencedCodeAttribute =
+        "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
+
     public static string BuildPrefix(ISymbol symbol, CancellationToken ct)
     {
         var attributes = new StringBuilder();
         foreach (var attr in symbol.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-            if (attr.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            var attributeType = attr.AttributeClass?.ToDisplayString();
+            if (attributeType == "System.ObsoleteAttribute")
             {
                 AppendObsoleteAttribute(attributes, attr);
+            }
+            else if (attributeType is RequiresAssemblyFilesAttribute or
+                RequiresDynamicCodeAttribute or
+                RequiresUnreferencedCodeAttribute)
+            {
+                AppendCodeRequirementAttribute(attributes, attr, attributeType);
             }
         }
 
@@ -62,6 +76,32 @@ internal static class MemberAttributeFormatter
         }
 
         return hasArguments;
+    }
+
+    private static void AppendCodeRequirementAttribute(
+        StringBuilder sb,
+        AttributeData attr,
+        string attributeType)
+    {
+        if (attr.ConstructorArguments.Length != 1)
+        {
+            return;
+        }
+
+        sb.Append("[global::").Append(attributeType).Append("(");
+        AppendStringArgument(sb, attr.ConstructorArguments[0]);
+        foreach (var namedArgument in attr.NamedArguments)
+        {
+            if (namedArgument.Key != "Url")
+            {
+                continue;
+            }
+
+            sb.Append(", Url = ");
+            AppendStringArgument(sb, namedArgument.Value);
+        }
+
+        sb.AppendLine(")]");
     }
 
     private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
