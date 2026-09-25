@@ -212,6 +212,7 @@ $defaultMinimums = @{
     SingleConnectionTransportCoverageTests = 8
     SingleConnectionServerTransportLifecycleRegressionTests = 5
     NamedPipeServerTransportCancellationRegressionTests = 2
+    NamedPipeServerLifecycleRaceTests = 2
     UnsupportedShapeCoverageTests = 8
     UnsupportedDtoConstructibilityTests = 1
     UnsupportedDtoPayloadShapeTests = 5

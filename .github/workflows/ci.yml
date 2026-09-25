@@ -551,6 +551,7 @@ jobs:
               "SingleConnectionTransportCoverageTests",
               "SingleConnectionServerTransportLifecycleRegressionTests",
               "NamedPipeServerTransportCancellationRegressionTests",
+              "NamedPipeServerLifecycleRaceTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
