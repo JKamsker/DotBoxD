@@ -380,6 +380,7 @@ jobs:
               "PluginTypedLiveSettingViewTests",
               "EventIndexTrustBoundaryTests",
               "CapabilityPolicySplitTests",
+              "CapabilityPatternAllocationTests",
               "PluginLiveUpdateModeTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
