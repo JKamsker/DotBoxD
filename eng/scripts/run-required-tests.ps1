@@ -78,6 +78,7 @@ $defaultMinimums = @{
     EventIndexTrustBoundaryTests = 7
     CapabilityPolicySplitTests = 7
     CapabilityPatternAllocationTests = 6
+    CapabilityRevocationAllocationTests = 2
     PluginLiveUpdateModeTests = 2
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11

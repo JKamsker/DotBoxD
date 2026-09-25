@@ -33,24 +33,25 @@ public sealed partial class SandboxHost
         }
 
         var requiredCapabilities = plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities;
-        foreach (var capabilityId in requiredCapabilities)
+        for (var i = 0; i < requiredCapabilities.Count; i++)
         {
-            if (revokedCapabilities.TryGetValue(capabilityId, out revoked!))
+            if (revokedCapabilities.TryGetValue(requiredCapabilities[i], out revoked!))
             {
                 return true;
             }
         }
 
-        foreach (var revokedCapability in revokedCapabilities.Values)
+        foreach (var entry in revokedCapabilities)
         {
+            var revokedCapability = entry.Value;
             if (!CapabilityPattern.IsWildcard(revokedCapability.Id))
             {
                 continue;
             }
 
-            foreach (var capabilityId in requiredCapabilities)
+            for (var i = 0; i < requiredCapabilities.Count; i++)
             {
-                if (CapabilityPattern.Matches(revokedCapability.Id, capabilityId))
+                if (CapabilityPattern.Matches(revokedCapability.Id, requiredCapabilities[i]))
                 {
                     revoked = revokedCapability;
                     return true;
@@ -74,8 +75,10 @@ public sealed partial class SandboxHost
         }
 
         var now = plan.Policy.GrantClock;
-        foreach (var capabilityId in plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities)
+        var requiredCapabilities = plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities;
+        for (var i = 0; i < requiredCapabilities.Count; i++)
         {
+            var capabilityId = requiredCapabilities[i];
             if (!plan.Policy.GrantsCapability(capabilityId, now))
             {
                 denial = new UnavailableCapabilityDenial(new UnavailableCapability(capabilityId, now));

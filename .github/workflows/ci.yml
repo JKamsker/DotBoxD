@@ -381,6 +381,7 @@ jobs:
               "EventIndexTrustBoundaryTests",
               "CapabilityPolicySplitTests",
               "CapabilityPatternAllocationTests",
+              "CapabilityRevocationAllocationTests",
               "PluginLiveUpdateModeTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
