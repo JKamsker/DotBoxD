@@ -228,6 +228,7 @@ internal static class HookFireAsyncModelFactory
         Compilation compilation)
     {
         var experimentalAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.ExperimentalAttribute);
+        var codeRequirementAttributes = CodeRequirementAttributeSourceFactory.CreateMap(compilation);
         var supportedOsPlatformAttribute = compilation.GetTypeByMetadataName(
             "System.Runtime.Versioning.SupportedOSPlatformAttribute");
         var attributes = new List<string>();
@@ -236,6 +237,10 @@ internal static class HookFireAsyncModelFactory
             if (ExperimentalAttribute(attribute, experimentalAttribute) is { } experimentalAttributeSource)
             {
                 attributes.Add(experimentalAttributeSource);
+            }
+            else if (CodeRequirementAttributeSourceFactory.Create(attribute, codeRequirementAttributes) is { } codeRequirementAttributeSource)
+            {
+                attributes.Add(codeRequirementAttributeSource);
             }
             else if (SupportedOsPlatformAttribute(attribute, supportedOsPlatformAttribute) is { } supportedOsPlatformAttributeSource)
             {
