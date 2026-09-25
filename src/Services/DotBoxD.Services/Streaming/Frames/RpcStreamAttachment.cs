@@ -34,6 +34,10 @@ public abstract class RpcStreamAttachment
         return new StreamAttachment(handle, stream, leaveOpen);
     }
 
+    /// <summary>
+    /// Streams from a pipe. When <paramref name="completeReader"/> is false, canceling a pending
+    /// read leaves the reader open and its buffered bytes available to the caller.
+    /// </summary>
     public static RpcStreamAttachment FromPipe(
         RpcStreamHandle handle,
         Pipe pipe,
@@ -221,7 +225,8 @@ public abstract class RpcStreamAttachment
                     }
                     finally
                     {
-                        _pipe.Reader.AdvanceTo(buffer.End);
+                        // A canceled read has not handed any of its buffered bytes to the sender.
+                        _pipe.Reader.AdvanceTo(result.IsCanceled ? buffer.Start : buffer.End);
                     }
 
                     if (result.IsCompleted)
