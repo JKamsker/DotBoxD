@@ -29,6 +29,8 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             "[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"Dynamic code is required for this call\", Url = \"https://example.test/dynamic-code\")]";
         const string assemblyFilesAttribute =
             "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"Files adjacent to the assembly are required\", Url = \"https://example.test/assembly-files\")]";
+        const string parameterlessAssemblyFilesAttribute =
+            "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute]";
 
         AssertMemberHasAttribute(
             proxy,
@@ -54,6 +56,14 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             proxy,
             assemblyFilesAttribute,
             "public global::System.Threading.Tasks.Task AssemblyFilesAsync(global::System.Threading.CancellationToken ct = default)");
+        AssertMemberHasAttribute(
+            proxy,
+            parameterlessAssemblyFilesAttribute,
+            "public global::System.Threading.Tasks.Task ParameterlessAssemblyFilesAsync()");
+        AssertMemberHasAttribute(
+            proxy,
+            parameterlessAssemblyFilesAttribute,
+            "public global::System.Threading.Tasks.Task ParameterlessAssemblyFilesAsync(global::System.Threading.CancellationToken ct = default)");
         AssertMemberDoesNotHaveCodeRequirementAttribute(
             proxy,
             "public global::System.Threading.Tasks.Task ControlAsync()");
@@ -73,6 +83,10 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
             asyncSibling,
             assemblyFilesAttribute,
             "global::System.Threading.Tasks.Task AssemblyFilesAsync(global::System.Threading.CancellationToken ct = default);");
+        AssertMemberHasAttribute(
+            asyncSibling,
+            parameterlessAssemblyFilesAttribute,
+            "global::System.Threading.Tasks.Task ParameterlessAssemblyFilesAsync(global::System.Threading.CancellationToken ct = default);");
         AssertMemberDoesNotHaveCodeRequirementAttribute(
             asyncSibling,
             "global::System.Threading.Tasks.Task ControlAsync(global::System.Threading.CancellationToken ct = default);");
@@ -127,6 +141,9 @@ public sealed class ServiceMemberCodeRequirementAttributeTests
 
                 [RequiresAssemblyFiles("Files adjacent to the assembly are required", Url = "https://example.test/assembly-files")]
                 Task AssemblyFilesAsync();
+
+                [RequiresAssemblyFiles]
+                Task ParameterlessAssemblyFilesAsync();
 
                 Task ControlAsync();
             }

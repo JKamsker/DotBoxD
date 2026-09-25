@@ -83,13 +83,21 @@ internal static class MemberAttributeFormatter
         AttributeData attr,
         string attributeType)
     {
-        if (attr.ConstructorArguments.Length != 1)
+        var hasMessage = attr.ConstructorArguments.Length == 1;
+        if (!hasMessage &&
+            (attributeType != RequiresAssemblyFilesAttribute || attr.ConstructorArguments.Length != 0))
         {
             return;
         }
 
-        sb.Append("[global::").Append(attributeType).Append("(");
-        AppendStringArgument(sb, attr.ConstructorArguments[0]);
+        sb.Append("[global::").Append(attributeType);
+        if (hasMessage)
+        {
+            sb.Append("(");
+            AppendStringArgument(sb, attr.ConstructorArguments[0]);
+        }
+
+        var hasNamedArguments = false;
         foreach (var namedArgument in attr.NamedArguments)
         {
             if (namedArgument.Key != "Url")
@@ -97,11 +105,17 @@ internal static class MemberAttributeFormatter
                 continue;
             }
 
-            sb.Append(", Url = ");
+            sb.Append(hasMessage ? ", Url = " : "(Url = ");
             AppendStringArgument(sb, namedArgument.Value);
+            hasNamedArguments = true;
         }
 
-        sb.AppendLine(")]");
+        if (hasMessage || hasNamedArguments)
+        {
+            sb.Append(")");
+        }
+
+        sb.AppendLine("]");
     }
 
     private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
