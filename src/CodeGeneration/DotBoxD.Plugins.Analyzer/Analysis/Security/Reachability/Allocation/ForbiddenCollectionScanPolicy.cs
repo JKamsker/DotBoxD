@@ -7,6 +7,7 @@ internal static class ForbiddenCollectionScanPolicy
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -77,6 +78,7 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName == "Overlaps" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
     private static string SetCollectionType(string typeName)
@@ -84,6 +86,7 @@ internal static class ForbiddenCollectionScanPolicy
         {
             ReadOnlySetInterfaceTypeName => "IReadOnlySet",
             SetInterfaceTypeName => "ISet",
+            SortedSetTypeName => "SortedSet",
             _ => "HashSet",
         };
 
