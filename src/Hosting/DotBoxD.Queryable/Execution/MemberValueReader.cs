@@ -71,6 +71,14 @@ public sealed class MemberValueReader
         return chain;
     }
 
+    internal static Type ResolvePathType(Type rootType, string path) =>
+        ResolveChain(rootType, path)[^1] switch
+        {
+            PropertyInfo property => property.PropertyType,
+            FieldInfo field => field.FieldType,
+            _ => throw new InvalidOperationException($"Query path '{path}' is not a property or field."),
+        };
+
     private static MemberInfo ResolveMember(Type type, string name, string path)
     {
         try

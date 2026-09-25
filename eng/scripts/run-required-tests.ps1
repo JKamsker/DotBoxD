@@ -248,6 +248,8 @@ $defaultMinimums = @{
     QueryComparerHardeningTests = 4
     QueryNumericComparisonAllocationTests = 12
     MemberValueReaderContractTests = 10
+    EventQueryNumericRoutingTests = 11
+    EventQueryNumericRoutingAllocationTests = 1
     DifferentialFuzzTests = 1
 }
 

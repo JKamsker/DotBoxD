@@ -1,11 +1,11 @@
 namespace DotBoxD.Queryable.Authoring;
 
-internal sealed class EventQueryRoutingGroup<TEvent>(string[] paths)
+internal sealed class EventQueryRoutingGroup<TEvent>(EventQueryRoutingPath[] paths)
 {
     private readonly Dictionary<string, List<EventQuerySubscriptionEntry<TEvent>>> _byValue =
         new(StringComparer.Ordinal);
 
-    public string[] Paths { get; } = paths;
+    public EventQueryRoutingPath[] Paths { get; } = paths;
 
     public void Add(string compositeKey, EventQuerySubscriptionEntry<TEvent> entry)
     {

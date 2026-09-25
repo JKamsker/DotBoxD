@@ -27,12 +27,11 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
             }
 
             var paths = entry.RoutingKeys
-                .Select(k => k.Path)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(p => p, StringComparer.Ordinal)
+                .Select(k => new EventQueryRoutingPath(k.Path, k.NumericRouting))
+                .OrderBy(p => p.Path, StringComparer.Ordinal)
                 .ToArray();
 
-            var groupKey = string.Join(Separator, paths);
+            var groupKey = string.Join(Separator, paths.Select(p => $"{p.NumericRouting}:{p.Path}"));
             if (!builders.TryGetValue(groupKey, out var group))
             {
                 group = new EventQueryRoutingGroup<TEvent>(paths);
@@ -58,12 +57,12 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
     [ThreadStatic] private static StringBuilder? _eventKeyBuilder;
     [ThreadStatic] private static bool _eventKeyBuilderInUse;
 
-    private static string CompositeKey(EventQuerySubscriptionEntry<TEvent> entry, string[] sortedPaths)
+    private static string CompositeKey(EventQuerySubscriptionEntry<TEvent> entry, EventQueryRoutingPath[] sortedPaths)
     {
         var builder = new StringBuilder();
         foreach (var path in sortedPaths)
         {
-            var key = entry.RoutingKeys.First(k => k.Path == path);
+            var key = entry.RoutingKeys.First(k => k.Path == path.Path);
             key.AppendValueToken(builder);
             builder.Append(Separator);
         }
@@ -72,7 +71,7 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
     }
 
     public static bool TryEventKey(
-        string[] sortedPaths,
+        EventQueryRoutingPath[] sortedPaths,
         TEvent e,
         MemberValueReader reader,
         CancellationToken cancellationToken,
@@ -90,9 +89,9 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
             builder.Clear();
             foreach (var path in sortedPaths)
             {
-                var value = reader.Read(e!, path);
+                var value = reader.Read(e!, path.Path);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!EventQueryRoutingKey.TryFromRuntime(path, value, out var runtimeKey))
+                if (!EventQueryRoutingKey.TryFromRuntime(path.Path, value, path.NumericRouting, out var runtimeKey))
                 {
                     key = string.Empty;
                     return false;

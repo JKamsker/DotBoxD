@@ -184,7 +184,12 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
         {
             if (seenPaths.Add(predicate.Path))
             {
-                keys.Add(EventQueryRoutingKey.FromValue(predicate.Path, predicate.Value));
+                var numericRouting = EventQueryNumericRoutingResolver.Resolve(
+                    typeof(TEvent), predicate.Path, predicate.Value.Kind);
+                if (numericRouting != EventQueryNumericRouting.Unresolved)
+                {
+                    keys.Add(EventQueryRoutingKey.FromValue(predicate.Path, predicate.Value, numericRouting));
+                }
             }
         }
 

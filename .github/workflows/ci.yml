@@ -513,6 +513,8 @@ jobs:
               "QueryComparerHardeningTests",
               "QueryNumericComparisonAllocationTests",
               "MemberValueReaderContractTests",
+              "EventQueryNumericRoutingTests",
+              "EventQueryNumericRoutingAllocationTests",
               "QueryReviewHardeningTests",
               "DifferentialFuzzTests"
             )
