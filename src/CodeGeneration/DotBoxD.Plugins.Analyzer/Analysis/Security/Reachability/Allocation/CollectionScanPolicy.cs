@@ -6,6 +6,7 @@ internal static class CollectionScanPolicy
 {
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string IReadOnlySetTypeName = "System.Collections.Generic.IReadOnlySet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
@@ -24,6 +25,7 @@ internal static class CollectionScanPolicy
         {
             (DictionaryTypeName, "TrimExcess", _) => "System.Collections.Generic.Dictionary.TrimExcess",
             (HashSetTypeName, _, _) => GetHashSetDisplayName(method.Name),
+            (IReadOnlySetTypeName, "SetEquals", _) => "System.Collections.Generic.IReadOnlySet.SetEquals",
             (SetInterfaceTypeName, "SetEquals", _) => "System.Collections.Generic.ISet.SetEquals",
             (ListTypeName, "TrueForAll", _) => "System.Collections.Generic.List.TrueForAll",
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
