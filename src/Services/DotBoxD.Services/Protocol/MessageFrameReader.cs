@@ -25,12 +25,12 @@ internal static class MessageFrameReader
 
     public static void ValidateOutgoingFrame(ReadOnlySpan<byte> frame, int maxMessageSize)
     {
-        if (maxMessageSize < MessageFramer.HeaderSize)
+        if (maxMessageSize < MessageFramer.HeaderSize || maxMessageSize > MessageFramer.MaxMessageSize)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxMessageSize),
                 maxMessageSize,
-                "Maximum message size must be at least the DotBoxD frame header size.");
+                $"Maximum message size must be between {MessageFramer.HeaderSize} and {MessageFramer.MaxMessageSize} bytes.");
         }
 
         if (frame.Length < MessageFramer.HeaderSize)

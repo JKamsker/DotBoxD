@@ -5,6 +5,8 @@ using DotBoxD.Services.Transport;
 namespace DotBoxD.Transports.NamedPipes;
 /// <summary>
 /// Server transport for accepting DotBoxD connections over a named pipe.
+/// The message size limit must be between <see cref="MessageFramer.HeaderSize"/> and
+/// <see cref="MessageFramer.MaxMessageSize"/> bytes, inclusive.
 /// </summary>
 public sealed class NamedPipeServerTransport : IServerTransport
 {
