@@ -506,6 +506,7 @@ jobs:
               "Fix_CMP_0026_Tests",
               "Fix_API_0027_Tests",
               "PinnedHttpTransportTests",
+              "SafePinnedHttpResponseDisposalTests",
               "ExpressionQueryTranslatorTests",
               "QuerySatisfiabilityTests",
               "QueryTextTests",
