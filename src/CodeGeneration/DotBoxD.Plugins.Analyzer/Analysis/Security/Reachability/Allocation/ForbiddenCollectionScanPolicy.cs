@@ -8,10 +8,11 @@ internal static class ForbiddenCollectionScanPolicy
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
+    private const string SortedSetMetadataName = "System.Collections.Generic.SortedSet`1";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
-    public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
+    public static bool TryGetDisplayName(IMethodSymbol method, Compilation compilation, out string forbidden)
     {
         if (method is not { IsStatic: false, MethodKind: MethodKind.Ordinary })
         {
@@ -45,7 +46,7 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsSetProperSubsetOf(method.Name, typeName))
+        if (IsSetProperSubsetOf(method, compilation, typeName))
         {
             forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.IsProperSubsetOf";
             return true;
@@ -91,12 +92,26 @@ internal static class ForbiddenCollectionScanPolicy
             _ => "HashSet",
         };
 
-    private static bool IsSetProperSubsetOf(string methodName, string typeName)
-        => methodName == "IsProperSubsetOf" &&
+    private static bool IsSetProperSubsetOf(IMethodSymbol method, Compilation compilation, string typeName)
+        => method.Name == "IsProperSubsetOf" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
-            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
+            IsFrameworkSortedSet(method.ContainingType, compilation) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+
+    private static bool IsFrameworkSortedSet(INamedTypeSymbol type, Compilation compilation)
+    {
+        var frameworkAssembly = compilation.References
+            .Select(compilation.GetAssemblyOrModuleSymbol)
+            .OfType<IAssemblySymbol>()
+            .FirstOrDefault(assembly => string.Equals(
+                assembly.Identity.Name,
+                "System.Collections",
+                StringComparison.Ordinal));
+        var frameworkSortedSet = frameworkAssembly?.GetTypeByMetadataName(SortedSetMetadataName);
+        return frameworkSortedSet is not null &&
+               SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, frameworkSortedSet);
+    }
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
