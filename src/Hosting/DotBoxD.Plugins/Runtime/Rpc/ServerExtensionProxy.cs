@@ -71,7 +71,10 @@ public class ServerExtensionProxy : DispatchProxy
         {
             return pending =>
             {
-                ConsumeUnit(pending.AsTask().GetAwaiter().GetResult());
+                var result = pending.IsCompletedSuccessfully
+                    ? pending.Result
+                    : pending.AsTask().GetAwaiter().GetResult();
+                ConsumeUnit(result);
                 return null;
             };
         }

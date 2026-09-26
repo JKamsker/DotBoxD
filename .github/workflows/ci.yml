@@ -390,6 +390,8 @@ jobs:
               "LivePropertyCacheLifetimeTests",
               "HostServiceReturnReaderLifetimeTests",
               "EventCapabilityCacheLifetimeTests",
+              "ServerExtensionVoidProxyAllocationTests",
+              "ServerExtensionVoidProxyTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
