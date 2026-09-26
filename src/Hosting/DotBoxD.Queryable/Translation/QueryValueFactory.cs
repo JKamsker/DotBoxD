@@ -88,28 +88,4 @@ internal static class QueryValueFactory
         return enumerable;
     }
 
-    /// <summary>Converts a captured collection into a list of <see cref="QueryValue"/>s.</summary>
-    public static IReadOnlyList<QueryValue> ToValues(IEnumerable enumerable, Expression expression)
-    {
-        var values = new List<QueryValue>();
-        try
-        {
-            foreach (var item in enumerable)
-            {
-                values.Add(ToValue(item, expression));
-            }
-        }
-        catch (QueryTranslationException)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new QueryTranslationException(
-                $"Could not enumerate the constant collection operand for Contains/in in '{expression}'.",
-                ex);
-        }
-
-        return values;
-    }
 }

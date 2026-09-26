@@ -72,6 +72,8 @@ Comparer checks read the framework collection's declaration and backing collecti
 Subclasses that customize enumeration retain the membership of the `Contains` method being called.
 Inherited framework membership is captured through the framework's public enumerator; `Enumerable.Contains`
 over queues, stacks, or enumerable-only sources still follows their generic enumeration.
+Capture preserves the element type accepted by the membership method, including signed/unsigned
+primitive-array views used through collection interfaces or spans.
 
 LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
 can still use the set's comparer. Translation follows the running framework's iterator dispatch and

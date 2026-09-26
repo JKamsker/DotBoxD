@@ -291,6 +291,7 @@ $defaultMinimums = @{
     QueryLinqContainsCaptureTests = 34
     QueryHiddenCollectionComparerTests = 70
     QueryFrameworkMembershipCaptureTests = 34
+    QueryArrayElementTypeCaptureTests = 64
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4

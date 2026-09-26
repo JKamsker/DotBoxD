@@ -550,6 +550,7 @@ jobs:
               "QueryLinqContainsCaptureTests",
               "QueryHiddenCollectionComparerTests",
               "QueryFrameworkMembershipCaptureTests",
+              "QueryArrayElementTypeCaptureTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",

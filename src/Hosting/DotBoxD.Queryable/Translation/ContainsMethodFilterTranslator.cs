@@ -53,15 +53,7 @@ internal static class ContainsMethodFilterTranslator
             ? PrepareSpanCollection(collection)
             : collection;
         var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
-        if (call.Method.DeclaringType == typeof(Enumerable))
-        {
-            filter = QueryFilter.In(path, LinqContainsCapture.Capture(capturedCollection, call, unwrapped));
-            return true;
-        }
-
-        var capturedMembership = CollectionContainsSupport.Capture(call, capturedCollection);
-        RejectUnsupportedContainsComparer(call, capturedCollection);
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedMembership, unwrapped));
+        filter = QueryFilter.In(path, ContainsCollectionCapture.Capture(capturedCollection, call, unwrapped));
         return true;
     }
 
