@@ -99,6 +99,7 @@ $defaultMinimums = @{
     Fix_PAL_0029_Tests = 4
     CompiledExpectedKeyCacheLifetimeTests = 3
     CompiledExecutableCacheHitAllocationTests = 1
+    CompiledLiteralTypeCacheTests = 1
     ParameterReaderBoxingAllocationTests = 8
     ParameterReaderDecimalConversionTests = 2
     ParameterReaderFormattableAllocationTests = 9

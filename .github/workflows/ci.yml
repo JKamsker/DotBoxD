@@ -402,6 +402,7 @@ jobs:
               "Fix_PAL_0029_Tests",
               "CompiledExpectedKeyCacheLifetimeTests",
               "CompiledExecutableCacheHitAllocationTests",
+              "CompiledLiteralTypeCacheTests",
               "ParameterReaderBoxingAllocationTests",
               "ParameterReaderDecimalConversionTests",
               "ParameterReaderFormattableAllocationTests",
