@@ -66,24 +66,35 @@ internal static class ParameterReader
         return accessors.ToArray();
     }
 
-    // Compiles instance => Convert.ToString((object?)((TDeclaring)instance).Property, InvariantCulture)
-    // so the cached path avoids a reflection GetValue invoke while preserving the exact invariant
-    // string conversion the original ParameterReader produced.
+    // Compile the getter once and preserve invariant conversion. A typed decimal formatter avoids
+    // the boxing allocation that survives the object-based Convert.ToString path.
     private static Func<object, string?> CompileReader(PropertyInfo property)
     {
         var instance = LinqExpression.Parameter(typeof(object), "instance");
         var typedInstance = LinqExpression.Convert(instance, property.DeclaringType!);
         var propertyAccess = LinqExpression.Property(typedInstance, property);
-        var boxedValue = LinqExpression.Convert(propertyAccess, typeof(object));
+        var body = InvariantStringConversion(propertyAccess);
+        return LinqExpression.Lambda<Func<object, string?>>(body, instance).Compile();
+    }
 
+    private static LinqExpression InvariantStringConversion(LinqExpression value)
+    {
+        if (value.Type == typeof(decimal) || value.Type == typeof(decimal?))
+        {
+            var formatter = typeof(ParameterReader).GetMethod(
+                nameof(FormatDecimal), BindingFlags.Static | BindingFlags.NonPublic)!;
+            return LinqExpression.Call(formatter, LinqExpression.Convert(value, typeof(decimal?)));
+        }
+
+        var boxedValue = LinqExpression.Convert(value, typeof(object));
         var convertToString = typeof(Convert).GetMethod(
             nameof(Convert.ToString),
             [typeof(object), typeof(IFormatProvider)])!;
         var invariant = LinqExpression.Constant(CultureInfo.InvariantCulture, typeof(IFormatProvider));
-        var body = LinqExpression.Call(convertToString, boxedValue, invariant);
-
-        return LinqExpression.Lambda<Func<object, string?>>(body, instance).Compile();
+        return LinqExpression.Call(convertToString, boxedValue, invariant);
     }
+
+    private static string? FormatDecimal(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
 
     private readonly record struct PropertyAccessor(string Name, Func<object, string?> Read);
 }

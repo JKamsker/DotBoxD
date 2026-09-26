@@ -402,6 +402,8 @@ jobs:
               "Fix_PAL_0029_Tests",
               "CompiledExpectedKeyCacheLifetimeTests",
               "CompiledExecutableCacheHitAllocationTests",
+              "ParameterReaderBoxingAllocationTests",
+              "ParameterReaderDecimalConversionTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
