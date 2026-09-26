@@ -635,6 +635,9 @@ jobs:
               "InstanceRegistryDisposalCompletionOrderTests",
               "RpcRemoteStreamLifetimeTests",
               "RpcRemoteStreamAllocationTests",
+              "RpcRemoteAsyncEnumerableLifetimeTests",
+              "RpcRemoteAsyncEnumerableDisposalTests",
+              "RpcRemoteAsyncEnumerableAllocationTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
