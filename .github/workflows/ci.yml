@@ -546,6 +546,8 @@ jobs:
               "QueryNestedDictionaryComparerTests",
               "QueryWrappedCollectionComparerTests",
               "QueryCustomContainsDispatchTests",
+              "QueryLinqContainsTests",
+              "QueryLinqContainsCaptureTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",

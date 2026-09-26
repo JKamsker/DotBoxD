@@ -111,6 +111,6 @@ internal static class CollectionContainsSupport
     {
         var assembly = method.DeclaringType!.Assembly;
         return assembly == typeof(List<>).Assembly || assembly == typeof(SortedSet<>).Assembly ||
-            assembly == typeof(ImmutableArray<>).Assembly;
+            assembly == typeof(ImmutableArray<>).Assembly || assembly == typeof(Enumerable).Assembly;
     }
 }

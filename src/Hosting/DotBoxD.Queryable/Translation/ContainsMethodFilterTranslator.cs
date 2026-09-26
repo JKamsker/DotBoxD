@@ -53,6 +53,12 @@ internal static class ContainsMethodFilterTranslator
             ? PrepareSpanCollection(collection)
             : collection;
         var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
+        if (call.Method.DeclaringType == typeof(Enumerable))
+        {
+            filter = QueryFilter.In(path, LinqContainsCapture.Capture(capturedCollection, call, unwrapped));
+            return true;
+        }
+
         CollectionContainsSupport.Validate(call, capturedCollection);
         RejectUnsupportedContainsComparer(call, capturedCollection);
         filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedCollection, unwrapped));
@@ -129,7 +135,7 @@ internal static class ContainsMethodFilterTranslator
         }
     }
 
-    private static void RejectUnsupportedContainsComparer(
+    internal static void RejectUnsupportedContainsComparer(
         MethodCallExpression call,
         object collection)
     {
@@ -139,7 +145,7 @@ internal static class ContainsMethodFilterTranslator
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection.");
+                "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection or ToArray() for enumeration membership.");
         }
     }
 

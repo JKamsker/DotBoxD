@@ -68,6 +68,13 @@ membership rules cannot be represented by that list of values. Default/ordinal f
 remain supported. When enumeration membership is intended, capture `collection.ToArray()` and query that
 snapshot; handwritten queries can also use the public `QueryFilter.In` primitive directly.
 
+LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
+can still use the set's comparer. Translation follows the running framework's iterator dispatch and
+validates delegated collections, including sources selected by `SelectMany`. Each selector runs once
+per captured element. Operators that use enumeration with default equality remain supported even if
+their underlying collections have custom membership rules. Unrecognized framework iterator layouts
+produce a translation diagnostic with the same explicit `ToArray()` escape hatch.
+
 ## A possible future bridge (not built)
 
 `EventQuery`'s portable `QueryFilter` / `QueryProjection` AST and the pipeline's `LoweredPipelineStep` are both
