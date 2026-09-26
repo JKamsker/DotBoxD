@@ -368,6 +368,7 @@ jobs:
               "InterpreterDebugTraceSecurityValidationTests",
               "InterpreterBindingAuditSecurityValidationTests",
               "InterpreterQuotaAuditEvidenceValidationTests",
+              "InterpreterInterruptedAuditEvidenceTests",
               "WorkerIsolationTests",
               "WorkerQuotaResultValidationTests",
               "WorkerResultHardeningTests",

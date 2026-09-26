@@ -65,6 +65,7 @@ $defaultMinimums = @{
     InterpreterDebugTraceSecurityValidationTests = 5
     InterpreterBindingAuditSecurityValidationTests = 6
     InterpreterQuotaAuditEvidenceValidationTests = 4
+    InterpreterInterruptedAuditEvidenceTests = 9
     WorkerIsolationTests = 11
     WorkerQuotaResultValidationTests = 2
     WorkerResultHardeningTests = 11
