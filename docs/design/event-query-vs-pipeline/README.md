@@ -60,13 +60,15 @@ The declared-type constructor is an additive public API so this behavior remains
 authoring helpers. Existing constructor and method signatures are retained; this addition requires no
 breaking-version bump and keeps the current package-versioning scheme.
 
-## Comparison operators
+## Comparison and logical operators
 
 Comparison translation checks the actual operator method as well as the expression's comparison kind.
 Standard scalar operators, nullable comparisons, and equivalent framework static equality methods remain
 supported. Custom operators and methods attached to a different comparison kind are rejected before
 capturing that comparison's constants. Compare public primitive members directly, or construct the
 portable comparison explicitly with `QueryFilter.Compare`, when custom value types are involved.
+Boolean negation also requires the intrinsic `!` operation. A `Not` expression with a custom method is
+rejected before translating its operand, because that method need not negate its input.
 
 ## Collection membership
 

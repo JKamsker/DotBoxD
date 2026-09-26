@@ -555,6 +555,7 @@ jobs:
               "QueryNullArraySpanCaptureTests",
               "QueryComparisonOperatorMethodTests",
               "QueryScalarOperatorCompatibilityTests",
+              "QueryLogicalOperatorMethodTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",

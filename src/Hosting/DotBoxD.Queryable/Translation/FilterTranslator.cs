@@ -50,6 +50,9 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
                 QueryFilter.And([Translate(b.Left), Translate(b.Right)]),
             BinaryExpression { NodeType: ExpressionType.OrElse } b =>
                 QueryFilter.Or([Translate(b.Left), Translate(b.Right)]),
+            UnaryExpression { NodeType: ExpressionType.Not, Method: not null } u =>
+                throw QueryTranslationException.Unsupported(u,
+                    "custom logical operator methods cannot be translated as boolean negation; use primitive boolean expressions instead."),
             UnaryExpression { NodeType: ExpressionType.Not } u =>
                 QueryFilter.Not(Translate(u.Operand)),
             _ => null!
