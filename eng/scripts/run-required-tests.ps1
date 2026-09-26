@@ -81,6 +81,7 @@ $defaultMinimums = @{
     CapabilityRevocationAllocationTests = 2
     PluginLiveUpdateModeTests = 2
     PendingLiveUpdateQueueTests = 5
+    LiveSettingExactRangeTests = 19
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9

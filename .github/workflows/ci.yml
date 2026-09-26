@@ -384,6 +384,7 @@ jobs:
               "CapabilityRevocationAllocationTests",
               "PluginLiveUpdateModeTests",
               "PendingLiveUpdateQueueTests",
+              "LiveSettingExactRangeTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
