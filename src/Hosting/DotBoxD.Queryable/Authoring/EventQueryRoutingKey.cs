@@ -25,35 +25,80 @@ internal readonly record struct EventQueryRoutingKey(
     long Ticks)
 {
     /// <summary>
-    /// Builds a routing key from a subscription's equality bound. Integer and floating values collapse to a
-    /// single numeric (<see cref="QueryValueKind.Number"/>) form keyed on the <see cref="double"/> value, so
-    /// a whole-number literal (<c>e.Score == 100</c>) routes to a floating member read as <c>100.0</c> — a
-    /// harmless collision since the full filter still runs on candidates. The exact kinds keep their own
-    /// distinct buckets so a <c>ulong</c> &gt; <see cref="long.MaxValue"/> never aliases a signed long and a
-    /// scale-varying decimal still routes consistently.
+    /// Builds a routing key in the numeric domain used by the comparer. Exact numeric operands share
+    /// decimal keys; a floating member or literal selects double keys. This permits mixed numeric kinds
+    /// without losing decimal scale invariance or integral precision in exact comparisons.
     /// </summary>
-    public static EventQueryRoutingKey FromValue(string path, QueryValue value) => value.Kind switch
+    public static EventQueryRoutingKey FromValue(
+        string path, QueryValue value, EventQueryNumericRouting numericRouting)
+    {
+        if (EventQueryNumericRoutingResolver.IsNumeric(value.Kind))
+        {
+            if (numericRouting == EventQueryNumericRouting.Exact)
+            {
+                var exact = ExactValue(value);
+                return new(path, QueryValueKind.Decimal, 0, 0, false, null, default, exact, 0, 0);
+            }
+
+            var floating = FloatingValue(value);
+            return new(path, QueryValueKind.Number, 0, floating, false, null, default, 0m, 0, 0);
+        }
+
+        return FromNonNumericValue(path, value);
+    }
+
+    private static decimal ExactValue(QueryValue value) => value.Kind switch
+    {
+        QueryValueKind.Integer => value.Integer,
+        QueryValueKind.UnsignedInteger => value.UnsignedInteger,
+        QueryValueKind.Decimal => value.Decimal,
+        _ => throw new InvalidOperationException("A floating member cannot use exact numeric routing."),
+    };
+
+    private static double FloatingValue(QueryValue value) => value.Kind switch
+    {
+        QueryValueKind.Integer => value.Integer,
+        QueryValueKind.UnsignedInteger => value.UnsignedInteger,
+        QueryValueKind.Decimal => (double)value.Decimal,
+        _ => value.Number,
+    };
+
+    public EventQueryNumericRouting NumericRouting => Kind switch
+    {
+        QueryValueKind.Decimal => EventQueryNumericRouting.Exact,
+        QueryValueKind.Number => EventQueryNumericRouting.Floating,
+        _ => EventQueryNumericRouting.None,
+    };
+
+    private static EventQueryRoutingKey FromNonNumericValue(string path, QueryValue value) => value.Kind switch
     {
         QueryValueKind.Boolean => new(path, value.Kind, 0, 0, value.Boolean, null, default, 0m, 0, 0),
-        QueryValueKind.Integer => new(path, QueryValueKind.Number, 0, value.Integer, false, null, default, 0m, 0, 0),
-        QueryValueKind.Number => new(path, QueryValueKind.Number, 0, value.Number, false, null, default, 0m, 0, 0),
-        QueryValueKind.String => new(path, value.Kind, 0, 0, false, value.String, default, 0m, 0, 0),
+        QueryValueKind.String => FromString(path, value.String),
         QueryValueKind.Guid => new(path, value.Kind, 0, 0, false, null, value.Guid, 0m, 0, 0),
-        QueryValueKind.Decimal => new(path, value.Kind, 0, 0, false, null, default, value.Decimal, 0, 0),
-        QueryValueKind.UnsignedInteger => new(path, value.Kind, 0, 0, false, null, default, 0m, value.UnsignedInteger, 0),
         QueryValueKind.Timestamp => new(path, value.Kind, 0, 0, false, null, default, 0m, 0, value.Timestamp.UtcTicks),
         _ => new(path, QueryValueKind.Null, 0, 0, false, null, default, 0m, 0, 0),
     };
+
+    private static EventQueryRoutingKey FromString(string path, string? text) =>
+        new(path, QueryValueKind.String, 0, 0, false, text, default, 0m, 0, 0);
 
     /// <summary>
     /// Builds a routing key from a runtime member value. Returns <see langword="false"/> for values that
     /// cannot form an equality key (null or unsupported types), which simply means no indexed match.
     /// </summary>
-    public static bool TryFromRuntime(string path, object? runtime, out EventQueryRoutingKey key)
+    public static bool TryFromRuntime(
+        string path, object? runtime, EventQueryNumericRouting numericRouting, out EventQueryRoutingKey key)
     {
+        if (runtime is string text)
+        {
+            // Runtime strings are already normalized; avoid allocating a temporary literal per path.
+            key = FromString(path, text);
+            return true;
+        }
+
         if (QueryValue.TryFromObject(runtime, out var value) && value.Kind != QueryValueKind.Null)
         {
-            key = FromValue(path, value);
+            key = FromValue(path, value, numericRouting);
             return true;
         }
 
@@ -63,9 +108,8 @@ internal readonly record struct EventQueryRoutingKey(
 
     /// <summary>
     /// A path-independent token for the key's value, used to build composite (multi-equality) routing keys
-    /// where the path order is implied by position. Each kind uses a distinct prefix so different kinds never
-    /// alias, and the exact kinds use their canonical (scale-normalized / instant) form so the route agrees
-    /// with the comparer's equality.
+    /// where the path order is implied by position. Numeric kinds share a prefix within their comparison
+    /// domain, and exact kinds use their canonical (scale-normalized / instant) form.
     /// </summary>
     public string ValueToken()
     {
@@ -111,12 +155,8 @@ internal readonly record struct EventQueryRoutingKey(
                 AppendGuidN(builder, Guid);
                 return;
             case QueryValueKind.Decimal:
-                // Decimal has no span format that yields the scale-normalized canonical form, so keep the string.
-                builder.Append('M').Append(QueryValue.CanonicalDecimal(Decimal));
-                return;
-            case QueryValueKind.UnsignedInteger:
-                builder.Append('U');
-                AppendFormatted(builder, UnsignedInteger);
+                builder.Append('M');
+                AppendDecimal(builder, Decimal);
                 return;
             case QueryValueKind.Timestamp:
                 builder.Append('T');
@@ -140,16 +180,22 @@ internal readonly record struct EventQueryRoutingKey(
         builder.Append(value.ToString(format, CultureInfo.InvariantCulture));
     }
 
-    private static void AppendFormatted(StringBuilder builder, ulong value)
+    private static void AppendDecimal(StringBuilder builder, decimal value)
     {
-        Span<char> buffer = stackalloc char[20];
-        if (value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture))
+        Span<char> buffer = stackalloc char[32];
+        if (!value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture))
         {
-            builder.Append(buffer[..written]);
+            builder.Append(QueryValue.CanonicalDecimal(value));
             return;
         }
 
-        builder.Append(value.ToString(CultureInfo.InvariantCulture));
+        var text = buffer[..written];
+        if (text.Contains('.'))
+        {
+            text = text.TrimEnd('0').TrimEnd('.');
+        }
+
+        builder.Append(text);
     }
 
     private static void AppendFormatted(StringBuilder builder, long value)

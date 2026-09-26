@@ -26,8 +26,8 @@ internal static class QueryValueFactory
             return false;
         }
 
-        var stripped = MemberPathReader.StripConvert(expression);
-        if (stripped is ConstantExpression constant)
+        // Conversions around a literal still need evaluation: they can round, truncate, throw, or call user code.
+        if (expression is ConstantExpression constant)
         {
             result = constant.Value;
             return true;
@@ -76,8 +76,8 @@ internal static class QueryValueFactory
             "Only bool, integral and floating types, string, and enums are supported.");
     }
 
-    /// <summary>Evaluates a parameter-free collection operand into a list of <see cref="QueryValue"/>s.</summary>
-    public static IReadOnlyList<QueryValue> ToValues(Expression expression, ParameterExpression parameter)
+    /// <summary>Captures a collection once so comparer validation and enumeration inspect the same instance.</summary>
+    public static IEnumerable EvaluateCollection(Expression expression, ParameterExpression parameter)
     {
         if (!TryEvaluateObject(expression, parameter, out var raw) || raw is not IEnumerable enumerable || raw is string)
         {
@@ -85,25 +85,7 @@ internal static class QueryValueFactory
                 expression, "the 'in'/Contains operand must be a constant array or collection.");
         }
 
-        var values = new List<QueryValue>();
-        try
-        {
-            foreach (var item in enumerable)
-            {
-                values.Add(ToValue(item, expression));
-            }
-        }
-        catch (QueryTranslationException)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new QueryTranslationException(
-                $"Could not enumerate the constant collection operand for Contains/in in '{expression}'.",
-                ex);
-        }
-
-        return values;
+        return enumerable;
     }
+
 }

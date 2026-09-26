@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Reflection;
 
@@ -7,26 +8,14 @@ internal static class CollectionComparerSupport
 {
     public static bool HasUnsupportedComparer(object collection)
     {
-        var comparer = GetComparer(collection, depth: 0);
-        if (comparer is null)
+        var comparer = GetComparer(collection);
+        if (comparer is null || ReferenceEquals(comparer, StringComparer.Ordinal))
         {
             return false;
         }
 
-        // Behavioral probes rather than identity checks against public singletons: an ordinal/default string
-        // comparer treats these pairs as distinct. Case-insensitive comparers match "a"/"A"; culture-sensitive
-        // case-sensitive comparers can match "a\0"/"a" because some cultures ignore embedded nulls.
-        // SortedSet<T> exposes ordering comparers, so compare equality must be checked there too.
-        if (comparer is IEqualityComparer<string> equalityComparer)
-        {
-            return equalityComparer.Equals("a", "A") || equalityComparer.Equals("a\0", "a");
-        }
-
-        if (comparer is IComparer<string> orderingComparer)
-        {
-            return orderingComparer.Compare("a", "A") == 0 || orderingComparer.Compare("a\0", "a") == 0;
-        }
-
+        // Sample comparisons cannot establish that an arbitrary comparer has portable equality semantics.
+        // Recognize the framework defaults by identity without invoking user comparer code.
         return HasCustomGenericComparer(comparer);
     }
 
@@ -41,11 +30,6 @@ internal static class CollectionComparerSupport
 
             var interfaceDefinition = interfaceType.GetGenericTypeDefinition();
             var elementType = interfaceType.GetGenericArguments()[0];
-            if (elementType == typeof(string))
-            {
-                continue;
-            }
-
             if (interfaceDefinition == typeof(IEqualityComparer<>))
             {
                 return !IsDefaultComparer(comparer, typeof(EqualityComparer<>), elementType);
@@ -53,7 +37,9 @@ internal static class CollectionComparerSupport
 
             if (interfaceDefinition == typeof(IComparer<>))
             {
-                return !IsDefaultComparer(comparer, typeof(Comparer<>), elementType);
+                // Default string ordering is culture-sensitive; only StringComparer.Ordinal is portable.
+                return elementType == typeof(string) ||
+                       !IsDefaultComparer(comparer, typeof(Comparer<>), elementType);
             }
         }
 
@@ -69,42 +55,101 @@ internal static class CollectionComparerSupport
         return ReferenceEquals(comparer, defaultComparer);
     }
 
-    private static object? GetComparer(object collection, int depth)
+    private static object? GetComparer(object collection)
     {
-        var type = collection.GetType();
-        var comparer = type.GetProperty("Comparer")?.GetValue(collection);
-        if (comparer is not null)
+        HashSet<object>? visited = null;
+        while (true)
         {
-            return comparer;
+            var type = collection.GetType();
+            var comparer = GetFrameworkComparer(collection, type);
+            if (comparer is not null)
+            {
+                return comparer;
+            }
+
+            var inner = CollectionWrapperReader.Read(collection, type) ?? GetKeyCollectionOwner(collection, type);
+            if (inner is null)
+            {
+                return null;
+            }
+
+            visited ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
+            if (!visited.Add(collection))
+            {
+                throw new QueryTranslationException("Cannot determine the comparer of a cyclic collection wrapper.");
+            }
+
+            collection = inner;
+        }
+    }
+
+    private static object? GetFrameworkComparer(object collection, Type type)
+    {
+        // Contains uses the framework collection's comparer, independent of any property a
+        // subclass hides or adds. Inspect that declaration without invoking unrelated user getters.
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (!CollectionContainsSupport.IsFrameworkType(current))
+            {
+                continue;
+            }
+
+            // Immutable sets and their builders expose their comparer as KeyComparer.
+            var propertyName = UsesKeyComparer(current) ? "KeyComparer" : "Comparer";
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            if (current.GetProperty(propertyName, flags) is { } property)
+            {
+                return property.GetValue(collection);
+            }
         }
 
-        if (depth >= 3)
+        return null;
+    }
+
+    private static object? GetKeyCollectionOwner(object collection, Type type)
+    {
+        if (type.DeclaringType is not { IsGenericType: true } declaringType)
         {
             return null;
+        }
+
+        // Key views preserve their owner's comparer but do not expose it publicly.
+        var definition = declaringType.GetGenericTypeDefinition();
+        if (string.Equals(type.Name, "KeyList", StringComparison.Ordinal) && definition == typeof(SortedList<,>))
+        {
+            return GetFieldValue(collection, "_dict");
         }
 
         if (!string.Equals(type.Name, "KeyCollection", StringComparison.Ordinal) ||
-            type.DeclaringType is not { IsGenericType: true } declaringType ||
-            !IsDictionaryKeyCollection(declaringType.GetGenericTypeDefinition()))
+            !IsDictionaryKeyCollection(definition))
         {
             return null;
         }
 
-        // Dictionary key views preserve their owner's comparer but do not expose it publicly.
-        return GetComparerFromField(collection, "_dictionary", depth) ??
-            GetComparerFromField(collection, "_collection", depth);
+        return GetFieldValue(collection, "_dictionary") ?? GetFieldValue(collection, "_collection");
     }
 
-    private static object? GetComparerFromField(object collection, string fieldName, int depth)
-    {
-        var inner = collection.GetType()
+    private static object? GetFieldValue(object collection, string fieldName) =>
+        collection.GetType()
             .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)
             ?.GetValue(collection);
-        return inner is null ? null : GetComparer(inner, depth + 1);
-    }
 
     private static bool IsDictionaryKeyCollection(Type type)
         => type == typeof(Dictionary<,>) ||
             type == typeof(SortedDictionary<,>) ||
             type == typeof(ReadOnlyDictionary<,>);
+
+    private static bool UsesKeyComparer(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(ImmutableHashSet<>) ||
+               definition == typeof(ImmutableHashSet<>.Builder) ||
+               definition == typeof(ImmutableSortedSet<>) ||
+               definition == typeof(ImmutableSortedSet<>.Builder);
+    }
 }

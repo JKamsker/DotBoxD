@@ -19,7 +19,14 @@ public sealed partial class PersistentCompiledArtifactCache
     {
         ArgumentNullException.ThrowIfNull(rootDirectory);
         _rootDirectory = Path.GetFullPath(rootDirectory);
-        Directory.CreateDirectory(_rootDirectory);
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(_rootDirectory);
+        }
+        else
+        {
+            Directory.CreateDirectory(_rootDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
         PersistentCompiledArtifactCacheRootGuard.Validate(_rootDirectory);
     }
     public bool EntryExists(string cacheKey)

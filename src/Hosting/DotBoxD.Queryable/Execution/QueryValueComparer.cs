@@ -66,7 +66,7 @@ public static partial class QueryValueComparer
 
     // Exact comparison for the integral/decimal kinds: when the runtime value is exact-numeric, compare via
     // decimal (no precision loss, full ulong range); only a float/double member falls back to double.
-    private static bool TryAreNumericEqual(object actual, decimal expected, Func<double> expectedAsDouble, out bool equal)
+    private static bool TryAreNumericEqual(object actual, decimal expected, double expectedAsDouble, out bool equal)
     {
         if (TryToDecimal(actual, out var dm))
         {
@@ -76,7 +76,7 @@ public static partial class QueryValueComparer
 
         if (TryToDouble(actual, out var d))
         {
-            equal = d.Equals(expectedAsDouble());
+            equal = d.Equals(expectedAsDouble);
             return true;
         }
 
@@ -89,14 +89,14 @@ public static partial class QueryValueComparer
             ? evaluator(actual, expected, ignoreCase)
             : null;
 
-    private static int? OrderedNumeric(object? actual, decimal expected, Func<double> expectedAsDouble)
+    private static int? OrderedNumeric(object? actual, decimal expected, double expectedAsDouble)
     {
         if (TryToDecimal(actual, out var dm))
         {
             return dm.CompareTo(expected);
         }
 
-        return TryToDouble(actual, out var d) ? d.CompareTo(expectedAsDouble()) : null;
+        return TryToDouble(actual, out var d) ? d.CompareTo(expectedAsDouble) : null;
     }
 
     private static bool StringMatch(object? actual, QueryValue expected, bool ignoreCase, MatchMode mode)
@@ -142,6 +142,10 @@ public static partial class QueryValueComparer
             case null:
             case bool:
             case string:
+            case DateTime:
+            case char:
+            case DBNull:
+            case not IConvertible:
                 result = 0;
                 return false;
             case Enum e:

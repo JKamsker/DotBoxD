@@ -54,9 +54,9 @@ public static class QueryFilterEvaluator
 
     private static bool EvaluateAnd(QueryFilter filter, object target, MemberValueReader reader, int depth, ref int budget)
     {
-        foreach (var child in filter.Children)
+        for (var i = 0; i < filter.Children.Count; i++)
         {
-            if (!EvaluateNode(child, target, reader, depth + 1, ref budget))
+            if (!EvaluateNode(filter.Children[i], target, reader, depth + 1, ref budget))
             {
                 return false;
             }
@@ -67,9 +67,9 @@ public static class QueryFilterEvaluator
 
     private static bool EvaluateOr(QueryFilter filter, object target, MemberValueReader reader, int depth, ref int budget)
     {
-        foreach (var child in filter.Children)
+        for (var i = 0; i < filter.Children.Count; i++)
         {
-            if (EvaluateNode(child, target, reader, depth + 1, ref budget))
+            if (EvaluateNode(filter.Children[i], target, reader, depth + 1, ref budget))
             {
                 return true;
             }
@@ -88,16 +88,7 @@ public static class QueryFilterEvaluator
     private static bool EvaluateIn(QueryFilter filter, object target, MemberValueReader reader)
     {
         EnsureInWidth(filter);
-        var actual = reader.Read(target, filter.Field);
-        foreach (var candidate in filter.Values)
-        {
-            if (QueryValueComparer.AreEqual(actual, candidate, filter.IgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return QueryValueComparer.IsAnyEqual(reader.Read(target, filter.Field), filter.Values, filter.IgnoreCase);
     }
 
     private static void Measure(QueryFilter filter, int depth, ref int budget)

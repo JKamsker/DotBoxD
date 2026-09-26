@@ -21,21 +21,31 @@ internal sealed class PreparedPlanIntegrityCache
     private static readonly TrustedReferenceMarker Marker = new();
 
     private readonly ConditionalWeakTable<ExecutionPlan, TrustedReferenceMarker> _trustedReferences = new();
-    private readonly ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan> _trusted = new();
+    private ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan>? _trusted;
 
     public void Register(ExecutionPlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
         _trustedReferences.Remove(plan);
         _trustedReferences.Add(plan, Marker);
-        _trusted[plan.PlanSeal] = plan;
+        var trusted = LazyInitializer.EnsureInitialized(ref _trusted, static () => new());
+        trusted[plan.PlanSeal] = plan;
     }
 
     public bool ContainsTrustedReference(ExecutionPlan plan)
         => _trustedReferences.TryGetValue(plan, out _);
 
     public bool TryGetTrusted(ExecutionPlanSeal seal, out ExecutionPlan trusted)
-        => _trusted.TryGetValue(seal, out trusted!);
+    {
+        var trustedPlans = Volatile.Read(ref _trusted);
+        if (trustedPlans is not null)
+        {
+            return trustedPlans.TryGetValue(seal, out trusted!);
+        }
+
+        trusted = null!;
+        return false;
+    }
 
     private sealed class TrustedReferenceMarker;
 }

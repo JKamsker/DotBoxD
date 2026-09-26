@@ -47,9 +47,13 @@ internal static class ContainsMethodFilterTranslator
         }
 
         ValidateSupportedContainsMethod(call);
-        var unwrapped = UnwrapSpan(collection);
-        RejectUnsupportedContainsComparer(call, unwrapped, parameter);
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
+        // Spans need special capture because they cannot be boxed. Other collection
+        // conversions must run before comparer validation and value capture.
+        var unwrapped = call.Method.DeclaringType == typeof(MemoryExtensions)
+            ? PrepareSpanCollection(collection)
+            : collection;
+        var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
+        filter = QueryFilter.In(path, ContainsCollectionCapture.Capture(capturedCollection, call, unwrapped));
         return true;
     }
 
@@ -109,7 +113,7 @@ internal static class ContainsMethodFilterTranslator
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "custom instance Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+                "custom instance Contains methods are not supported; use ToArray() when enumeration membership semantics are intended.");
         }
     }
 
@@ -119,24 +123,21 @@ internal static class ContainsMethodFilterTranslator
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "custom static Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+                "custom static Contains methods are not supported; use ToArray() when enumeration membership semantics are intended.");
         }
     }
 
-    private static void RejectUnsupportedContainsComparer(
+    internal static void RejectUnsupportedContainsComparer(
         MethodCallExpression call,
-        Expression collection,
-        ParameterExpression parameter)
+        object collection)
     {
         // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
         // semantics even when written as static Enumerable.Contains(source, item).
-        if (QueryValueFactory.TryEvaluateObject(collection, parameter, out var collectionObject) &&
-            collectionObject is not null &&
-            HasUnsupportedComparer(call, collectionObject))
+        if (HasUnsupportedComparer(call, collection))
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection.");
+                "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection or ToArray() for enumeration membership.");
         }
     }
 
@@ -191,20 +192,42 @@ internal static class ContainsMethodFilterTranslator
         return SupportedCollectionInterfaceDefinitions.Contains(definition);
     }
 
-    // `array.Contains(x)` binds to MemoryExtensions.Contains(ReadOnlySpan<T>, T); the source then appears as
-    // an implicit T[] -> ReadOnlySpan<T> conversion wrapping the real collection.
-    private static Expression UnwrapSpan(Expression collection)
+    // Framework array-to-span conversions preserve the entire array and map null to an empty span.
+    // Other span expressions must run before copying their selected values into a boxable array.
+    private static Expression PrepareSpanCollection(Expression collection)
     {
-        var stripped = MemberPathReader.StripConvert(collection);
-        if (stripped is MethodCallExpression { Method.Name: "op_Implicit" } conversion)
+        MethodInfo? method = null;
+        Expression? operand = null;
+        if (collection is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
         {
-            var operand = conversion.Object ?? (conversion.Arguments.Count == 1 ? conversion.Arguments[0] : null);
-            if (operand is not null)
-            {
-                return operand;
-            }
+            method = unary.Method;
+            operand = unary.Operand;
+        }
+        else if (collection is MethodCallExpression { Arguments.Count: 1 } call)
+        {
+            method = call.Method;
+            operand = call.Arguments[0];
         }
 
-        return stripped;
+        if (operand?.Type.IsArray == true && method is { Name: "op_Implicit" } && IsSpanType(method.DeclaringType))
+        {
+            var empty = Expression.Call(typeof(Array), nameof(Array.Empty), [operand.Type.GetElementType()!]);
+            return Expression.Coalesce(operand, empty);
+        }
+
+        return IsSpanType(collection.Type)
+            ? Expression.Call(collection, nameof(ReadOnlySpan<int>.ToArray), Type.EmptyTypes)
+            : collection;
+    }
+
+    private static bool IsSpanType(Type? type)
+    {
+        if (type is not { IsGenericType: true })
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(Span<>) || definition == typeof(ReadOnlySpan<>);
     }
 }

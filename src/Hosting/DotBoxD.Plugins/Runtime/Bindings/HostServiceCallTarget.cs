@@ -1,12 +1,12 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using LinqExpression = System.Linq.Expressions.Expression;
 
 namespace DotBoxD.Hosting.Execution;
 
 internal sealed class HostServiceCallTarget
 {
-    private static readonly ConcurrentDictionary<Type, Func<object?, CancellationToken, ValueTask<object?>>> ReturnReaders = new();
+    private static readonly ConditionalWeakTable<Type, Func<object?, CancellationToken, ValueTask<object?>>> ReturnReaders = new();
     private static readonly MethodInfo ReadGenericTaskMethod =
         typeof(HostServiceCallTarget).GetMethod(nameof(ReadGenericTaskAsync), BindingFlags.Static | BindingFlags.NonPublic)!;
     private static readonly MethodInfo ReadGenericValueTaskMethod =
@@ -22,7 +22,7 @@ internal sealed class HostServiceCallTarget
             .Select(static parameter => parameter.ParameterType)
             .ToArray();
         _invoke = CreateInvoker(method);
-        _readReturn = ReturnReaders.GetOrAdd(method.ReturnType, CreateReturnReader);
+        _readReturn = ReturnReaders.GetValue(method.ReturnType, CreateReturnReader);
     }
 
     public Type ReturnType { get; }

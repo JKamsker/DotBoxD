@@ -31,9 +31,9 @@ public static class CapabilityPattern
         {
             // Keep the trailing dot so "game.world.monster.*" requires a segment after
             // "game.world.monster." and does not match the bare prefix "game.world.monster".
-            var prefix = grantPattern[..^1];
+            var prefix = grantPattern.AsSpan(0, grantPattern.Length - 1);
             return requiredId.Length > prefix.Length
-                && requiredId.StartsWith(prefix, StringComparison.Ordinal);
+                && requiredId.AsSpan().StartsWith(prefix, StringComparison.Ordinal);
         }
 
         return false;

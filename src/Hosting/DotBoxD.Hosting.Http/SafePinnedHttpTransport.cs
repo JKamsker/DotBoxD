@@ -73,7 +73,13 @@ internal sealed class SafePinnedHttpResponse(HttpResponseMessage message, IDispo
 
     public void Dispose()
     {
-        Message.Dispose();
-        owner?.Dispose();
+        try
+        {
+            Message.Dispose();
+        }
+        finally
+        {
+            owner?.Dispose();
+        }
     }
 }

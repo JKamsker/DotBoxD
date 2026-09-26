@@ -19,7 +19,7 @@ internal static class SandboxWorkerBindingEvidence
         out bool representsCall)
     {
         representsCall = relationship !=
-            SandboxWorkerBindingEvidenceRelationship.TerminalQuotaFailureAfterSuccess;
+            SandboxWorkerBindingEvidenceRelationship.TerminalFailureAfterSuccess;
         if (auditEvent.BindingId is null ||
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
         {

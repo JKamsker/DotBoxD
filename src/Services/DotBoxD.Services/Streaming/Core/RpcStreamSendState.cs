@@ -1,3 +1,5 @@
+using DotBoxD.Services.Diagnostics;
+
 namespace DotBoxD.Services.Streaming.Core;
 
 internal sealed class RpcStreamSendState : IDisposable
@@ -85,6 +87,10 @@ internal sealed class RpcStreamSendState : IDisposable
         }
         catch (ObjectDisposedException)
         {
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Outbound stream cancellation callback failed", ex);
         }
     }
 

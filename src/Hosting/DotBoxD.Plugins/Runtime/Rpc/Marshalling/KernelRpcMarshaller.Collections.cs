@@ -1,6 +1,6 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 
 using LinqExpression = System.Linq.Expressions.Expression;
 
@@ -8,19 +8,17 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
-    private static readonly ConcurrentDictionary<Type, Func<IList, object>> ReadOnlyListWrapperFactoryCache = new();
-    private static readonly ConcurrentDictionary<(Type Key, Type Value), Func<IDictionary, object>> ReadOnlyDictionaryWrapperFactoryCache = new();
+    private static readonly ConditionalWeakTable<Type, Func<IList, object>> ReadOnlyListWrapperFactoryCache = new();
+    private static readonly ConditionalWeakTable<Type, Func<IDictionary, object>> ReadOnlyDictionaryWrapperFactoryCache = new();
 
     private static object CompleteList(Type targetType, Type elementType, IList list)
         => IsReadOnlyListTarget(targetType)
-            ? ReadOnlyListWrapperFactoryCache.GetOrAdd(elementType, CreateReadOnlyListWrapperFactory)(list)
+            ? ReadOnlyListWrapperFactoryCache.GetValue(elementType, CreateReadOnlyListWrapperFactory)(list)
             : list;
 
-    private static object CompleteDictionary(Type targetType, Type keyType, Type valueType, IDictionary dictionary)
+    private static object CompleteDictionary(Type targetType, IDictionary dictionary)
         => IsReadOnlyDictionaryTarget(targetType)
-            ? ReadOnlyDictionaryWrapperFactoryCache.GetOrAdd(
-                (keyType, valueType),
-                static types => CreateReadOnlyDictionaryWrapperFactory(types.Key, types.Value))(dictionary)
+            ? ReadOnlyDictionaryWrapperFactoryCache.GetValue(targetType, CreateReadOnlyDictionaryWrapperFactory)(dictionary)
             : dictionary;
 
     private static bool IsReadOnlyListTarget(Type type)
@@ -55,8 +53,9 @@ public static partial class KernelRpcMarshaller
             source).Compile();
     }
 
-    private static Func<IDictionary, object> CreateReadOnlyDictionaryWrapperFactory(Type keyType, Type valueType)
+    private static Func<IDictionary, object> CreateReadOnlyDictionaryWrapperFactory(Type targetType)
     {
+        var (keyType, valueType) = MapTypes(targetType)!.Value;
         var constructor = typeof(ReadOnlyDictionary<,>)
             .MakeGenericType(keyType, valueType)
             .GetConstructor([typeof(IDictionary<,>).MakeGenericType(keyType, valueType)])

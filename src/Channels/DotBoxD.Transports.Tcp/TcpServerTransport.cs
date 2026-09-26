@@ -10,6 +10,7 @@ public sealed class TcpServerTransport : IServerTransport
     private readonly IPAddress _address;
     private readonly int _port;
     private readonly SemaphoreSlim _acceptLock = new(1, 1);
+    private readonly object _lifecycleLock = new();
     private TcpListener? _listener;
     private Task<TcpClient>? _pendingAccept;
     private int _disposed;
@@ -51,41 +52,39 @@ public sealed class TcpServerTransport : IServerTransport
     public Task StartAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        if (Volatile.Read(ref _disposed) != 0)
+        lock (_lifecycleLock)
         {
-            throw new ObjectDisposedException(nameof(TcpServerTransport));
-        }
-        if (Interlocked.Exchange(ref _started, 1) != 0)
-        {
-            throw new InvalidOperationException("Server already started.");
-        }
-        try
-        {
-            var listener = new TcpListener(_address, _port);
-            listener.Start();
-            // Fire the pre-publish seam (null/no-op in production) so a deterministic test can race a
-            // concurrent DisposeAsync into the window between starting the listener and publishing it.
-            _onListenerStartedBeforePublishForTest?.Invoke();
-            _listener = listener;
-            // Dekker-style fence + re-check: a DisposeAsync that raced in after the _disposed guard above
-            // but before this publish saw a still-null _listener (its Interlocked.Exchange was a no-op), so
-            // it never stopped the listener we just published. Detect that and stop it here instead of
-            // leaking the bound port. Mirrors the client-side TcpTransport.ConnectAsync fix.
-            Interlocked.MemoryBarrier();
             if (Volatile.Read(ref _disposed) != 0)
             {
-                Interlocked.Exchange(ref _listener, null);
-                listener.Stop();
-                Volatile.Write(ref _started, 0);
                 throw new ObjectDisposedException(nameof(TcpServerTransport));
             }
-        }
-        catch
-        {
-            // Bind/listen failed (e.g. port in use). Reset so the transport can be started again
-            // and a half-constructed listener is not left in the field.
-            Volatile.Write(ref _started, 0);
-            throw;
+            if (Interlocked.Exchange(ref _started, 1) != 0)
+            {
+                throw new InvalidOperationException("Server already started.");
+            }
+            TcpListener? listener = null;
+            try
+            {
+                listener = new TcpListener(_address, _port);
+                listener.Start();
+                _onListenerStartedBeforePublishForTest?.Invoke();
+                // The test seam can reenter shutdown while startup holds the lifecycle lock.
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    throw new ObjectDisposedException(nameof(TcpServerTransport));
+                }
+                if (Volatile.Read(ref _started) == 0)
+                {
+                    throw new OperationCanceledException("Server startup was stopped.", ct);
+                }
+                _listener = listener;
+            }
+            catch
+            {
+                Volatile.Write(ref _started, 0);
+                listener?.Stop();
+                throw;
+            }
         }
         return Task.CompletedTask;
     }
@@ -139,11 +138,11 @@ public sealed class TcpServerTransport : IServerTransport
         // path instead of being leaked, mirroring the cancellation re-stash logic below.
         if (ct.IsCancellationRequested)
         {
-            RestashAcceptForCancellation(acceptTask);
+            RestashAcceptForCancellation(acceptTask, listener);
             throw new OperationCanceledException(ct);
         }
-        await WaitForAcceptOrCancellationAsync(acceptTask, ct).ConfigureAwait(false);
-        var client = await CompleteAcceptAsync(acceptTask, ct).ConfigureAwait(false);
+        await WaitForAcceptOrCancellationAsync(acceptTask, listener, ct).ConfigureAwait(false);
+        var client = await CompleteAcceptAsync(acceptTask, listener, ct).ConfigureAwait(false);
         try
         {
             return new TcpConnection(client, FrameReadIdleTimeout);
@@ -169,7 +168,7 @@ public sealed class TcpServerTransport : IServerTransport
         // Count fresh OS-level accepts so a deterministic test can prove that a pre-cancelled token
         // does not start (and orphan) one. Inert in production beyond a single Interlocked increment.
         Interlocked.Increment(ref _freshAcceptStartsForTest);
-        var acceptTask = listener.AcceptTcpClientAsync();
+        var acceptTask = TcpPendingAcceptOperations.Start(listener);
         // Fire the fresh-accept seam (null/no-op in production) so a deterministic test can race a
         // concurrent cancellation into the window between starting this fresh accept and the in-body
         // IsCancellationRequested check below.
@@ -177,7 +176,7 @@ public sealed class TcpServerTransport : IServerTransport
         return acceptTask;
     }
 
-    private async Task WaitForAcceptOrCancellationAsync(Task<TcpClient> acceptTask, CancellationToken ct)
+    private async Task WaitForAcceptOrCancellationAsync(Task<TcpClient> acceptTask, TcpListener listener, CancellationToken ct)
     {
         if (!ct.CanBeCanceled || acceptTask.IsCompleted)
         {
@@ -194,23 +193,24 @@ public sealed class TcpServerTransport : IServerTransport
             return;
         }
 
-        RestashAcceptForCancellation(acceptTask);
+        RestashAcceptForCancellation(acceptTask, listener);
         throw new OperationCanceledException(ct);
     }
 
-    private void RestashAcceptForCancellation(Task<TcpClient> acceptTask)
+    private void RestashAcceptForCancellation(Task<TcpClient> acceptTask, TcpListener listener)
     {
-        // Re-stash whatever accept we hold — a claimed one OR a freshly-started one — so the
-        // in-flight accept (and any socket it completes with) is reclaimed by the shutdown
-        // observation path instead of being orphaned.
-        _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
-        if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
+        lock (_lifecycleLock)
         {
-            ObservePendingAccept();
+            if (ReferenceEquals(listener, _listener) && Volatile.Read(ref _disposed) == 0)
+            {
+                _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
+                return;
+            }
         }
+        TcpPendingAcceptOperations.Observe(acceptTask);
     }
 
-    private async Task<TcpClient> CompleteAcceptAsync(Task<TcpClient> acceptTask, CancellationToken ct)
+    private async Task<TcpClient> CompleteAcceptAsync(Task<TcpClient> acceptTask, TcpListener listener, CancellationToken ct)
     {
         try
         {
@@ -220,7 +220,7 @@ public sealed class TcpServerTransport : IServerTransport
         {
             throw new OperationCanceledException(ct);
         }
-        catch (Exception) when (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
+        catch (Exception) when (!ReferenceEquals(listener, Volatile.Read(ref _listener)) || Volatile.Read(ref _disposed) != 0)
         {
             throw new OperationCanceledException();
         }
@@ -228,28 +228,32 @@ public sealed class TcpServerTransport : IServerTransport
     public Task StopAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        // Reset state so the transport can be restarted with StartAsync, and so a subsequent
-        // AcceptAsync surfaces "not started" instead of accepting on a stopped listener.
-        Volatile.Write(ref _started, 0);
-        var listener = Interlocked.Exchange(ref _listener, null);
-        listener?.Stop();
-        ObservePendingAccept();
+        lock (_lifecycleLock)
+        {
+            Volatile.Write(ref _started, 0);
+            var listener = Interlocked.Exchange(ref _listener, null);
+            listener?.Stop();
+            ObservePendingAccept();
+        }
         return Task.CompletedTask;
     }
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_lifecycleLock)
         {
-            return default;
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return default;
+            }
+            Volatile.Write(ref _started, 0);
+            var listener = Interlocked.Exchange(ref _listener, null);
+            listener?.Stop();
+            ObservePendingAccept();
         }
-        Volatile.Write(ref _started, 0);
-        var listener = Interlocked.Exchange(ref _listener, null);
-        listener?.Stop();
-        ObservePendingAccept();
         return default;
     }
     private void ObservePendingAccept()
-        => TcpPendingAcceptObserver.Observe(Interlocked.Exchange(ref _pendingAccept, null));
+        => TcpPendingAcceptOperations.Observe(Interlocked.Exchange(ref _pendingAccept, null));
     /// <summary>
     /// Atomically claims any stashed in-flight accept. Reads the field, fires the test seam (a no-op in
     /// production), then claims the stashed task with a <see cref="Interlocked.CompareExchange{T}"/> —

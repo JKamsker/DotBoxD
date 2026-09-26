@@ -6,6 +6,8 @@ namespace DotBoxD.Transports.NamedPipes;
 
 /// <summary>
 /// Client transport for connecting to a DotBoxD server over a named pipe.
+/// The message size limit must be between <see cref="MessageFramer.HeaderSize"/> and
+/// <see cref="MessageFramer.MaxMessageSize"/> bytes, inclusive.
 /// </summary>
 public sealed class NamedPipeClientTransport : ITransport
 {
@@ -232,12 +234,12 @@ public sealed class NamedPipeClientTransport : ITransport
 
     private static int ValidateMaxMessageSize(int maxMessageSize)
     {
-        if (maxMessageSize < MessageFramer.HeaderSize)
+        if (maxMessageSize < MessageFramer.HeaderSize || maxMessageSize > MessageFramer.MaxMessageSize)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxMessageSize),
                 maxMessageSize,
-                "Maximum message size must be at least the DotBoxD header size.");
+                $"Maximum message size must be between {MessageFramer.HeaderSize} and {MessageFramer.MaxMessageSize} bytes.");
         }
 
         return maxMessageSize;

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using DotBoxD.Queryable.Ast;
 
 namespace DotBoxD.Queryable.Translation;
@@ -13,12 +14,21 @@ namespace DotBoxD.Queryable.Translation;
 /// </summary>
 internal sealed class FilterTranslator(ParameterExpression parameter)
 {
+    private static readonly HashSet<Type> SupportedComparisonTypes =
+    [typeof(string), typeof(decimal), typeof(Guid), typeof(DateTime), typeof(DateTimeOffset), typeof(DateOnly)];
+
     private int _parameterIndex;
 
     /// <summary>Translates a predicate body into a filter AST.</summary>
     public QueryFilter Translate(Expression body)
     {
-        var expression = MemberPathReader.StripConvert(body);
+        if (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } &&
+            QueryValueFactory.TryEvaluateObject(body, parameter, out var raw) && raw is bool literal)
+        {
+            return literal ? QueryFilter.MatchAll : QueryFilter.Not(QueryFilter.MatchAll);
+        }
+
+        var expression = MemberPathReader.StripPathConvert(body, parameter);
         if (TryTranslateLogical(expression, out var logical))
         {
             return logical;
@@ -73,6 +83,7 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
 
     private QueryFilter TranslateComparison(BinaryExpression binary, QueryComparisonOperator op)
     {
+        ValidateComparisonMethod(binary);
         if (MemberPathReader.TryReadPath(binary.Left, parameter, out var leftPath) &&
             QueryValueFactory.TryEvaluateObject(binary.Right, parameter, out var rightRaw))
         {
@@ -87,6 +98,35 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
 
         throw QueryTranslationException.Unsupported(
             binary, "one side of a comparison must be an event member and the other a constant.");
+    }
+
+    private static void ValidateComparisonMethod(BinaryExpression binary)
+    {
+        if (binary.Method is not { } method)
+        {
+            return;
+        }
+
+        if (method.DeclaringType is { } type && SupportedComparisonTypes.Contains(type))
+        {
+            var name = binary.NodeType switch
+            {
+                ExpressionType.Equal when method.Name == nameof(object.Equals) => nameof(object.Equals),
+                ExpressionType.Equal => "op_Equality",
+                ExpressionType.NotEqual => "op_Inequality",
+                _ => "op_" + binary.NodeType
+            };
+            var expected = type.GetMethod(
+                name, BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly, [type, type]);
+            if (method == expected)
+            {
+                return;
+            }
+        }
+
+        throw QueryTranslationException.Unsupported(binary,
+            "the operator method does not match a supported scalar comparison; compare primitive members " +
+            "directly or construct a QueryFilter explicitly.");
     }
 
     private QueryFilter TranslateBooleanMember(MemberExpression member)

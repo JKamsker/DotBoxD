@@ -6,14 +6,15 @@ namespace DotBoxD.Hosting.Execution;
 
 public sealed partial class SandboxHost
 {
-    private readonly ConcurrentDictionary<string, RevokedCapability> _revokedCapabilities =
-        new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, RevokedCapability>? _revokedCapabilities;
 
     public void RevokeCapability(string capabilityId, string reason = "")
     {
         ThrowIfDisposed();
         ValidateCapabilityId(capabilityId);
-        _revokedCapabilities[capabilityId] = new RevokedCapability(
+        var revokedCapabilities = LazyInitializer.EnsureInitialized(
+            ref _revokedCapabilities, static () => new(StringComparer.Ordinal));
+        revokedCapabilities[capabilityId] = new RevokedCapability(
             capabilityId,
             SanitizeReason(reason),
             DateTimeOffset.UtcNow);
@@ -24,31 +25,33 @@ public sealed partial class SandboxHost
         string entrypoint,
         out RevokedCapability revoked)
     {
-        if (_revokedCapabilities.IsEmpty)
+        var revokedCapabilities = Volatile.Read(ref _revokedCapabilities);
+        if (revokedCapabilities is null || revokedCapabilities.IsEmpty)
         {
             revoked = null!;
             return false;
         }
 
         var requiredCapabilities = plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities;
-        foreach (var capabilityId in requiredCapabilities)
+        for (var i = 0; i < requiredCapabilities.Count; i++)
         {
-            if (_revokedCapabilities.TryGetValue(capabilityId, out revoked!))
+            if (revokedCapabilities.TryGetValue(requiredCapabilities[i], out revoked!))
             {
                 return true;
             }
         }
 
-        foreach (var revokedCapability in _revokedCapabilities.Values)
+        foreach (var entry in revokedCapabilities)
         {
+            var revokedCapability = entry.Value;
             if (!CapabilityPattern.IsWildcard(revokedCapability.Id))
             {
                 continue;
             }
 
-            foreach (var capabilityId in requiredCapabilities)
+            for (var i = 0; i < requiredCapabilities.Count; i++)
             {
-                if (CapabilityPattern.Matches(revokedCapability.Id, capabilityId))
+                if (CapabilityPattern.Matches(revokedCapability.Id, requiredCapabilities[i]))
                 {
                     revoked = revokedCapability;
                     return true;
@@ -72,8 +75,10 @@ public sealed partial class SandboxHost
         }
 
         var now = plan.Policy.GrantClock;
-        foreach (var capabilityId in plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities)
+        var requiredCapabilities = plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities;
+        for (var i = 0; i < requiredCapabilities.Count; i++)
         {
+            var capabilityId = requiredCapabilities[i];
             if (!plan.Policy.GrantsCapability(capabilityId, now))
             {
                 denial = new UnavailableCapabilityDenial(new UnavailableCapability(capabilityId, now));

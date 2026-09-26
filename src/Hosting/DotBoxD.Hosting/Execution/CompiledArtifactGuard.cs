@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using DotBoxD.Kernels.Compiler;
@@ -19,9 +20,9 @@ internal static class CompiledArtifactGuard
     // The boxed/optimized cache keys for a prepared plan and entrypoint are a pure, deterministic
     // function of the plan identity, the entrypoint, and the static default verification policy.
     // Memoize them so steady-state dispatches do not rebuild and re-hash both cache-key strings on
-    // every compiled run. Keyed by plan identity (PlanHash folds the module/policy/binding hashes
-    // and determinism flag that CacheKeyBuilder.Build reads) plus the entrypoint.
-    private static readonly ConcurrentDictionary<(string PlanHash, string Entrypoint), ExpectedCacheKeys> ExpectedCacheKeyCache =
+    // every compiled run. Keep each plan's entrypoint keys only while that plan remains in use,
+    // rather than retaining every distinct plan hash and entrypoint for the process lifetime.
+    private static readonly ConditionalWeakTable<ExecutionPlan, ConcurrentDictionary<string, ExpectedCacheKeys>> ExpectedCacheKeyCache =
         new();
     private static readonly ManifestMatchRule[] ManifestMatchRules =
     [
@@ -175,12 +176,12 @@ internal static class CompiledArtifactGuard
     }
 
     private static ExpectedCacheKeys ExpectedKeysFor(ExecutionPlan plan, string entrypoint)
-        => ExpectedCacheKeyCache.GetOrAdd(
-            (plan.PlanHash, entrypoint),
-            static (_, state) => new ExpectedCacheKeys(
-                CacheKeyBuilder.Build(state.Plan, state.Entrypoint, DefaultVerificationPolicy, optimize: false),
-                CacheKeyBuilder.Build(state.Plan, state.Entrypoint, DefaultVerificationPolicy, optimize: true)),
-            (Plan: plan, Entrypoint: entrypoint));
+        => ExpectedCacheKeyCache.GetValue(plan, static _ => new(StringComparer.Ordinal)).GetOrAdd(
+            entrypoint,
+            static (id, currentPlan) => new ExpectedCacheKeys(
+                CacheKeyBuilder.Build(currentPlan, id, DefaultVerificationPolicy, optimize: false),
+                CacheKeyBuilder.Build(currentPlan, id, DefaultVerificationPolicy, optimize: true)),
+            plan);
 
     private readonly record struct ExpectedCacheKeys(string BoxedValues, string Optimized);
 

@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DotBoxD.Kernels.Policies;
 
@@ -24,7 +24,8 @@ internal static class ParameterReader
     // Keyed by the concrete parameter runtime type. Each entry is the ordered set of readable
     // accessors in the same order GetProperties returned them, so the produced dictionary key
     // order and duplicate-name behavior match the original per-grant reflection path exactly.
-    private static readonly ConcurrentDictionary<Type, PropertyAccessor[]> AccessorsByType = new();
+    // Weak keys release parameter types after their values have been copied into grant snapshots.
+    private static readonly ConditionalWeakTable<Type, PropertyAccessor[]> AccessorsByType = new();
 
     public static IReadOnlyDictionary<string, string> Read(object parameters)
     {
@@ -34,7 +35,7 @@ internal static class ParameterReader
                 new Dictionary<string, string>(values, StringComparer.Ordinal));
         }
 
-        var accessors = AccessorsByType.GetOrAdd(parameters.GetType(), BuildAccessors);
+        var accessors = AccessorsByType.GetValue(parameters.GetType(), BuildAccessors);
         var dictionary = new Dictionary<string, string>(accessors.Length, StringComparer.Ordinal);
         for (var i = 0; i < accessors.Length; i++)
         {
@@ -65,24 +66,48 @@ internal static class ParameterReader
         return accessors.ToArray();
     }
 
-    // Compiles instance => Convert.ToString((object?)((TDeclaring)instance).Property, InvariantCulture)
-    // so the cached path avoids a reflection GetValue invoke while preserving the exact invariant
-    // string conversion the original ParameterReader produced.
+    // Compile the getter once and preserve invariant conversion. Typed value formatters avoid
+    // boxing allocations that survive the object-based Convert.ToString path.
     private static Func<object, string?> CompileReader(PropertyInfo property)
     {
         var instance = LinqExpression.Parameter(typeof(object), "instance");
         var typedInstance = LinqExpression.Convert(instance, property.DeclaringType!);
         var propertyAccess = LinqExpression.Property(typedInstance, property);
-        var boxedValue = LinqExpression.Convert(propertyAccess, typeof(object));
+        var body = InvariantStringConversion(propertyAccess);
+        return LinqExpression.Lambda<Func<object, string?>>(body, instance).Compile();
+    }
 
+    private static LinqExpression InvariantStringConversion(LinqExpression value)
+    {
+        if (value.Type == typeof(decimal) || value.Type == typeof(decimal?))
+        {
+            var formatter = typeof(ParameterReader).GetMethod(
+                nameof(FormatDecimal), BindingFlags.Static | BindingFlags.NonPublic)!;
+            return LinqExpression.Call(formatter, LinqExpression.Convert(value, typeof(decimal?)));
+        }
+
+        var valueType = Nullable.GetUnderlyingType(value.Type) ?? value.Type;
+        if (valueType.IsValueType && typeof(IFormattable).IsAssignableFrom(valueType)
+            && !typeof(IConvertible).IsAssignableFrom(valueType))
+        {
+            // Convert.ToString gives IConvertible precedence over IFormattable.
+            var formatter = typeof(ParameterReader).GetMethod(
+                nameof(FormatFormattable), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(valueType);
+            return LinqExpression.Call(formatter, LinqExpression.Convert(value, typeof(Nullable<>).MakeGenericType(valueType)));
+        }
+
+        var boxedValue = LinqExpression.Convert(value, typeof(object));
         var convertToString = typeof(Convert).GetMethod(
             nameof(Convert.ToString),
             [typeof(object), typeof(IFormatProvider)])!;
         var invariant = LinqExpression.Constant(CultureInfo.InvariantCulture, typeof(IFormatProvider));
-        var body = LinqExpression.Call(convertToString, boxedValue, invariant);
-
-        return LinqExpression.Lambda<Func<object, string?>>(body, instance).Compile();
+        return LinqExpression.Call(convertToString, boxedValue, invariant);
     }
+
+    private static string? FormatDecimal(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
+
+    private static string? FormatFormattable<T>(T? value) where T : struct, IFormattable
+        => value?.ToString(null, CultureInfo.InvariantCulture);
 
     private readonly record struct PropertyAccessor(string Name, Func<object, string?> Read);
 }

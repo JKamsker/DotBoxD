@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
@@ -15,7 +16,7 @@ public sealed class TcpDedicatedReceiveOperationRetentionTests
     {
         var probe = await CreateProbeAsync();
 
-        ForceGc();
+        await WaitForCollectionAsync(probe);
 
         Assert.False(probe.Connection.IsAlive);
         Assert.False(probe.Client.IsAlive);
@@ -77,11 +78,25 @@ public sealed class TcpDedicatedReceiveOperationRetentionTests
         Assert.Equal(MessageType.Response, type);
     }
 
-    private static void ForceGc()
+    private static async Task WaitForCollectionAsync(RetentionProbe probe)
     {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        var elapsed = Stopwatch.StartNew();
+        do
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            if (!probe.Connection.IsAlive && !probe.Client.IsAlive &&
+                !probe.Stream.IsAlive && !probe.CallerCancellation.IsAlive)
+            {
+                return;
+            }
+
+            // Completion can resume this test before producer and disposal stacks unwind.
+            // Keep the result unconsumed so a persistent reference still fails the assertions.
+            await Task.Delay(10);
+        }
+        while (elapsed.Elapsed < Guard);
     }
 
     private sealed record RetentionProbe(

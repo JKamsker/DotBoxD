@@ -42,12 +42,12 @@ internal static class NamedPipeServerTransportValidation
 
     internal static int ValidateMaxMessageSize(int value, string paramName)
     {
-        if (value < MessageFramer.HeaderSize)
+        if (value < MessageFramer.HeaderSize || value > MessageFramer.MaxMessageSize)
         {
             throw new ArgumentOutOfRangeException(
                 paramName,
                 value,
-                "Maximum message size must be at least the DotBoxD header size.");
+                $"Maximum message size must be between {MessageFramer.HeaderSize} and {MessageFramer.MaxMessageSize} bytes.");
         }
 
         return value;

@@ -5,6 +5,8 @@ using DotBoxD.Services.Transport;
 namespace DotBoxD.Transports.NamedPipes;
 /// <summary>
 /// Server transport for accepting DotBoxD connections over a named pipe.
+/// The message size limit must be between <see cref="MessageFramer.HeaderSize"/> and
+/// <see cref="MessageFramer.MaxMessageSize"/> bytes, inclusive.
 /// </summary>
 public sealed class NamedPipeServerTransport : IServerTransport
 {
@@ -45,20 +47,16 @@ public sealed class NamedPipeServerTransport : IServerTransport
     public Task StartAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
-        // Publish _stopCts BEFORE marking the server started, both under _sync (the same lock StopAsync
-        // and AcceptAsync read these under). This closes the partial-initialization window: a concurrent
-        // StopAsync can never observe _started == 1 with _stopCts == null (which leaked the CTS), and a
-        // concurrent AcceptAsync can never spuriously throw "Server not started." mid-start.
-        var stopCts = new CancellationTokenSource();
+        // Validate and publish under the same lock as stop/disposal so a delayed start cannot revive
+        // a disposed server or replace a cancellation source still owned by an in-flight stop.
         lock (_sync)
         {
+            ThrowIfDisposed();
             if (Volatile.Read(ref _started) != 0)
             {
-                stopCts.Dispose();
                 throw new InvalidOperationException("Server already started.");
             }
-            _stopCts = stopCts;
+            _stopCts = new CancellationTokenSource();
             Volatile.Write(ref _started, 1);
         }
         // Test seam (null/no-op in production): fires after the atomic publish so a test can race
@@ -70,8 +68,8 @@ public sealed class NamedPipeServerTransport : IServerTransport
         }
         return Task.CompletedTask;
     }
-    /// <summary>Test-only seam: invoked inside <see cref="StartAsync"/> between marking the server started
-    /// and assigning <c>_stopCts</c>. Never set in production.</summary>
+    /// <summary>Test-only seam: invoked after <see cref="StartAsync"/> publishes its state and releases
+    /// the lifecycle lock. Never set in production.</summary>
     internal Func<Task>? _onStartTransitionForTest;
     /// <summary>Test accessor: current started flag.</summary>
     internal int StartedForTest => Volatile.Read(ref _started);
@@ -159,14 +157,14 @@ public sealed class NamedPipeServerTransport : IServerTransport
     public Task StopAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        if (Interlocked.Exchange(ref _started, 0) == 0)
-        {
-            return Task.CompletedTask;
-        }
-        // Null and capture _stopCts under _sync, then cancel+dispose the captured source outside the lock.
+        // Mark stopped and detach its source atomically with respect to StartAsync.
         CancellationTokenSource? stopCts;
         lock (_sync)
         {
+            if (Interlocked.Exchange(ref _started, 0) == 0)
+            {
+                return Task.CompletedTask;
+            }
             stopCts = _stopCts;
             _stopCts = null;
             // Cancel BEFORE disposing the pending stream. Disposing the stream wakes a blocked
