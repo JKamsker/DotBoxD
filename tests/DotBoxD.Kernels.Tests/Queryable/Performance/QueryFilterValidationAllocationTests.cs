@@ -8,13 +8,13 @@ public sealed class QueryFilterValidationAllocationTests(ITestOutputHelper outpu
 {
     [Theory]
     [Trait("Category", "AllocationMeasurement")]
-    [InlineData(QueryFilterKind.MatchAll, true, 0)]
-    [InlineData(QueryFilterKind.Not, false, 0)]
-    [InlineData(QueryFilterKind.And, true, 32)]
-    [InlineData(QueryFilterKind.Or, true, 32)]
-    [InlineData(QueryFilterKind.Compare, true, 32)]
-    [InlineData(QueryFilterKind.In, true, 64)]
-    public void Evaluation_avoids_per_node_validation_allocations(QueryFilterKind kind, bool expected, int byteBudget)
+    [InlineData(QueryFilterKind.MatchAll, true)]
+    [InlineData(QueryFilterKind.Not, false)]
+    [InlineData(QueryFilterKind.And, true)]
+    [InlineData(QueryFilterKind.Or, true)]
+    [InlineData(QueryFilterKind.Compare, true)]
+    [InlineData(QueryFilterKind.In, true)]
+    public void Evaluation_of_reference_value_filters_does_not_allocate(QueryFilterKind kind, bool expected)
     {
         var filter = CreateFilter(kind);
         var reader = new MemberValueReader();
@@ -38,8 +38,7 @@ public sealed class QueryFilterValidationAllocationTests(ITestOutputHelper outpu
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         output.WriteLine($"{kind}: {allocated / iterations} bytes per evaluation.");
         Assert.Equal(expected ? iterations : 0, matches);
-        // Existing path parsing and list traversal may allocate; validation must not add a scratch array per node.
-        Assert.InRange(allocated, 0, (long)byteBudget * iterations);
+        Assert.Equal(0, allocated);
     }
 
     private static QueryFilter CreateFilter(QueryFilterKind kind) => kind switch
