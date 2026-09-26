@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Reflection;
 
@@ -57,7 +58,9 @@ internal static class CollectionComparerSupport
     private static object? GetComparer(object collection, int depth)
     {
         var type = collection.GetType();
-        var comparer = type.GetProperty("Comparer")?.GetValue(collection);
+        // Immutable sets and their builders expose the membership comparer as KeyComparer.
+        var propertyName = UsesKeyComparer(type) ? "KeyComparer" : "Comparer";
+        var comparer = type.GetProperty(propertyName)?.GetValue(collection);
         if (comparer is not null)
         {
             return comparer;
@@ -92,4 +95,18 @@ internal static class CollectionComparerSupport
         => type == typeof(Dictionary<,>) ||
             type == typeof(SortedDictionary<,>) ||
             type == typeof(ReadOnlyDictionary<,>);
+
+    private static bool UsesKeyComparer(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(ImmutableHashSet<>) ||
+               definition == typeof(ImmutableHashSet<>.Builder) ||
+               definition == typeof(ImmutableSortedSet<>) ||
+               definition == typeof(ImmutableSortedSet<>.Builder);
+    }
 }
