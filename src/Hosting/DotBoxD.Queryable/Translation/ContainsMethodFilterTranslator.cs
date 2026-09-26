@@ -53,6 +53,7 @@ internal static class ContainsMethodFilterTranslator
             ? PrepareSpanCollection(collection)
             : collection;
         var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
+        CollectionContainsSupport.Validate(call, capturedCollection);
         RejectUnsupportedContainsComparer(call, capturedCollection);
         filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedCollection, unwrapped));
         return true;
@@ -114,7 +115,7 @@ internal static class ContainsMethodFilterTranslator
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "custom instance Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+                "custom instance Contains methods are not supported; use ToArray() when enumeration membership semantics are intended.");
         }
     }
 
@@ -124,7 +125,7 @@ internal static class ContainsMethodFilterTranslator
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "custom static Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+                "custom static Contains methods are not supported; use ToArray() when enumeration membership semantics are intended.");
         }
     }
 

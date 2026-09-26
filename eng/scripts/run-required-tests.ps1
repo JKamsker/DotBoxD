@@ -286,6 +286,7 @@ $defaultMinimums = @{
     QuerySortedListComparerTests = 10
     QueryNestedDictionaryComparerTests = 13
     QueryWrappedCollectionComparerTests = 19
+    QueryCustomContainsDispatchTests = 51
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4

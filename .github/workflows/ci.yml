@@ -545,6 +545,7 @@ jobs:
               "QuerySortedListComparerTests",
               "QueryNestedDictionaryComparerTests",
               "QueryWrappedCollectionComparerTests",
+              "QueryCustomContainsDispatchTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",

@@ -69,7 +69,7 @@ internal static class CollectionComparerSupport
                 return comparer;
             }
 
-            var inner = GetWrappedCollection(collection, type) ?? GetKeyCollectionOwner(collection, type);
+            var inner = CollectionWrapperReader.Read(collection, type) ?? GetKeyCollectionOwner(collection, type);
             if (inner is null)
             {
                 return null;
@@ -83,29 +83,6 @@ internal static class CollectionComparerSupport
 
             collection = inner;
         }
-    }
-
-    private static object? GetWrappedCollection(object collection, Type type)
-    {
-        // These framework wrappers delegate membership to their protected backing collection.
-        // Walk base types as inherited Contains implementations keep those same semantics.
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            if (!current.IsGenericType)
-            {
-                continue;
-            }
-
-            var definition = current.GetGenericTypeDefinition();
-            var propertyName = definition == typeof(ReadOnlySet<>) ? "Set" :
-                definition == typeof(Collection<>) || definition == typeof(ReadOnlyCollection<>) ? "Items" : null;
-            if (propertyName is not null)
-            {
-                return current.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(collection);
-            }
-        }
-
-        return null;
     }
 
     private static object? GetKeyCollectionOwner(object collection, Type type)

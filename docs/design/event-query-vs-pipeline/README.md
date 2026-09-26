@@ -60,6 +60,14 @@ The declared-type constructor is an additive public API so this behavior remains
 authoring helpers. Existing constructor and method signatures are retained; this addition requires no
 breaking-version bump and keeps the current package-versioning scheme.
 
+## Collection membership
+
+`Contains` captures collection values into a portable membership filter. Custom implementations reached
+through collection interfaces, virtual methods, or framework wrappers are rejected: their executable
+membership rules cannot be represented by that list of values. Default/ordinal framework collections
+remain supported. When enumeration membership is intended, capture `collection.ToArray()` and query that
+snapshot; handwritten queries can also use the public `QueryFilter.In` primitive directly.
+
 ## A possible future bridge (not built)
 
 `EventQuery`'s portable `QueryFilter` / `QueryProjection` AST and the pipeline's `LoweredPipelineStep` are both
