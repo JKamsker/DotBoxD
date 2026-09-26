@@ -73,11 +73,14 @@ internal readonly record struct EventQueryRoutingKey(
     private static EventQueryRoutingKey FromNonNumericValue(string path, QueryValue value) => value.Kind switch
     {
         QueryValueKind.Boolean => new(path, value.Kind, 0, 0, value.Boolean, null, default, 0m, 0, 0),
-        QueryValueKind.String => new(path, value.Kind, 0, 0, false, value.String, default, 0m, 0, 0),
+        QueryValueKind.String => FromString(path, value.String),
         QueryValueKind.Guid => new(path, value.Kind, 0, 0, false, null, value.Guid, 0m, 0, 0),
         QueryValueKind.Timestamp => new(path, value.Kind, 0, 0, false, null, default, 0m, 0, value.Timestamp.UtcTicks),
         _ => new(path, QueryValueKind.Null, 0, 0, false, null, default, 0m, 0, 0),
     };
+
+    private static EventQueryRoutingKey FromString(string path, string? text) =>
+        new(path, QueryValueKind.String, 0, 0, false, text, default, 0m, 0, 0);
 
     /// <summary>
     /// Builds a routing key from a runtime member value. Returns <see langword="false"/> for values that
@@ -86,6 +89,13 @@ internal readonly record struct EventQueryRoutingKey(
     public static bool TryFromRuntime(
         string path, object? runtime, EventQueryNumericRouting numericRouting, out EventQueryRoutingKey key)
     {
+        if (runtime is string text)
+        {
+            // Runtime strings are already normalized; avoid allocating a temporary literal per path.
+            key = FromString(path, text);
+            return true;
+        }
+
         if (QueryValue.TryFromObject(runtime, out var value) && value.Kind != QueryValueKind.Null)
         {
             key = FromValue(path, value, numericRouting);

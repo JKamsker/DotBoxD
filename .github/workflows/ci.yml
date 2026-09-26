@@ -565,6 +565,8 @@ jobs:
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
               "EventQueryRoutingBufferTests",
+              "EventQueryStringRoutingAllocationTests",
+              "EventQueryStringRoutingTests",
               "EventIndexNumericComparisonTests",
               "EventIndexNumericAllocationTests",
               "EventIndexMatcherAllocationTests",
