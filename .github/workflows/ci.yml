@@ -400,6 +400,8 @@ jobs:
               "MarshallerCacheAllocationTests",
               "ParameterReaderCacheLifetimeTests",
               "Fix_PAL_0029_Tests",
+              "CompiledExpectedKeyCacheLifetimeTests",
+              "CompiledExecutableCacheHitAllocationTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
