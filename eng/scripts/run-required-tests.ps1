@@ -86,6 +86,7 @@ $defaultMinimums = @{
     LiveContextInheritanceTests = 10
     LivePropertyCacheLifetimeTests = 3
     HostServiceReturnReaderLifetimeTests = 4
+    EventCapabilityCacheLifetimeTests = 3
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9

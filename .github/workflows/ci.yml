@@ -389,6 +389,7 @@ jobs:
               "LiveContextInheritanceTests",
               "LivePropertyCacheLifetimeTests",
               "HostServiceReturnReaderLifetimeTests",
+              "EventCapabilityCacheLifetimeTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",

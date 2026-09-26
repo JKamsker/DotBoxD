@@ -1,12 +1,12 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Plugins.Runtime.Input;
 
 internal static class PluginEventCapabilityValidator
 {
-    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, string>> CapabilityParameters = new();
+    private static readonly ConditionalWeakTable<Type, IReadOnlyDictionary<string, string>> CapabilityParameters = new();
 
     public static void Validate<TEvent>(
         ExecutionPlan plan,
@@ -38,7 +38,7 @@ internal static class PluginEventCapabilityValidator
 
     private static IReadOnlySet<string> RequiredCapabilities<TEvent>(IReadOnlyList<Parameter> parameters)
     {
-        var parameterCapabilities = CapabilityParameters.GetOrAdd(
+        var parameterCapabilities = CapabilityParameters.GetValue(
             typeof(TEvent),
             static eventType => BuildCapabilityParameters(eventType));
         if (parameterCapabilities.Count == 0)
