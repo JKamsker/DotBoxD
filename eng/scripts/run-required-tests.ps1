@@ -306,6 +306,7 @@ $defaultMinimums = @{
     MemberValueReaderHierarchyTests = 18
     EventQueryNumericRoutingTests = 11
     EventQueryNumericRoutingAllocationTests = 1
+    EventQueryRoutingBufferTests = 8
     EventIndexNumericComparisonTests = 18
     EventIndexNumericAllocationTests = 1
     EventIndexMatcherAllocationTests = 4

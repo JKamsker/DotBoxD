@@ -564,6 +564,7 @@ jobs:
               "MemberValueReaderHierarchyTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
+              "EventQueryRoutingBufferTests",
               "EventIndexNumericComparisonTests",
               "EventIndexNumericAllocationTests",
               "EventIndexMatcherAllocationTests",

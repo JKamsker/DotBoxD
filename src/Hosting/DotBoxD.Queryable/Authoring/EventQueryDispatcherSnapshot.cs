@@ -8,6 +8,7 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
     public static readonly EventQueryDispatcherSnapshot<TEvent> Empty = new([]);
 
     private const string Separator = "\u0001";
+    private const int MaxRetainedKeyCapacity = 1024;
 
     private readonly EventQuerySubscriptionEntry<TEvent>[] _all;
     private readonly EventQuerySubscriptionEntry<TEvent>[] _broad;
@@ -113,7 +114,17 @@ internal sealed class EventQueryDispatcherSnapshot<TEvent>
         {
             if (reuseThreadBuilder)
             {
-                builder.Clear();
+                // Bound the buffer retained per thread/event type after a transient large key.
+                // Discard before Clear, which can consolidate large chunks into another large buffer.
+                if (builder.Capacity > MaxRetainedKeyCapacity)
+                {
+                    _eventKeyBuilder = null;
+                }
+                else
+                {
+                    builder.Clear();
+                }
+
                 _eventKeyBuilderInUse = false;
             }
         }
