@@ -289,6 +289,7 @@ $defaultMinimums = @{
     QueryCustomContainsDispatchTests = 51
     QueryLinqContainsTests = 83
     QueryLinqContainsCaptureTests = 34
+    QueryHiddenCollectionComparerTests = 70
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4

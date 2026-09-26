@@ -67,6 +67,8 @@ through collection interfaces, virtual methods, or framework wrappers are reject
 membership rules cannot be represented by that list of values. Default/ordinal framework collections
 remain supported. When enumeration membership is intended, capture `collection.ToArray()` and query that
 snapshot; handwritten queries can also use the public `QueryFilter.In` primitive directly.
+Comparer checks read the framework collection's declaration and backing collections; unrelated
+`Comparer` properties added or hidden by subclasses are not evaluated.
 
 LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
 can still use the set's comparer. Translation follows the running framework's iterator dispatch and

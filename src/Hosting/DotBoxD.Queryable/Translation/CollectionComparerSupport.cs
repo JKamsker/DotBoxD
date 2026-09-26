@@ -61,9 +61,7 @@ internal static class CollectionComparerSupport
         while (true)
         {
             var type = collection.GetType();
-            // Immutable sets and their builders expose the membership comparer as KeyComparer.
-            var propertyName = UsesKeyComparer(type) ? "KeyComparer" : "Comparer";
-            var comparer = type.GetProperty(propertyName)?.GetValue(collection);
+            var comparer = GetFrameworkComparer(collection, type);
             if (comparer is not null)
             {
                 return comparer;
@@ -83,6 +81,29 @@ internal static class CollectionComparerSupport
 
             collection = inner;
         }
+    }
+
+    private static object? GetFrameworkComparer(object collection, Type type)
+    {
+        // Contains uses the framework collection's comparer, independent of any property a
+        // subclass hides or adds. Inspect that declaration without invoking unrelated user getters.
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (!CollectionContainsSupport.IsFrameworkType(current))
+            {
+                continue;
+            }
+
+            // Immutable sets and their builders expose their comparer as KeyComparer.
+            var propertyName = UsesKeyComparer(current) ? "KeyComparer" : "Comparer";
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            if (current.GetProperty(propertyName, flags) is { } property)
+            {
+                return property.GetValue(collection);
+            }
+        }
+
+        return null;
     }
 
     private static object? GetKeyCollectionOwner(object collection, Type type)

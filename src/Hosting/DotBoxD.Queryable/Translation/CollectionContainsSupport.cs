@@ -107,9 +107,11 @@ internal static class CollectionContainsSupport
         return method;
     }
 
-    private static bool IsFrameworkImplementation(MethodInfo method)
+    private static bool IsFrameworkImplementation(MethodInfo method) => IsFrameworkType(method.DeclaringType!);
+
+    public static bool IsFrameworkType(Type type)
     {
-        var assembly = method.DeclaringType!.Assembly;
+        var assembly = type.Assembly;
         return assembly == typeof(List<>).Assembly || assembly == typeof(SortedSet<>).Assembly ||
             assembly == typeof(ImmutableArray<>).Assembly || assembly == typeof(Enumerable).Assembly;
     }
