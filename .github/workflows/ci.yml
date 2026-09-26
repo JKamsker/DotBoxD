@@ -396,6 +396,8 @@ jobs:
               "ServerExtensionValueTaskProxyTests",
               "GameServerCancellationDiagnosticTests",
               "GameServerDiagnosticFailureTests",
+              "MarshallerCacheLifetimeTests",
+              "MarshallerCacheAllocationTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",

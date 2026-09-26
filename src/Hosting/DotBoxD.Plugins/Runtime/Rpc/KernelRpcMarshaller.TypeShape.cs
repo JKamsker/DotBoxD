@@ -1,6 +1,6 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 using LinqExpression = System.Linq.Expressions.Expression;
 
@@ -8,12 +8,13 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
-    private static readonly ConcurrentDictionary<Type, OptionalType> ElementTypeCache = new();
-    private static readonly ConcurrentDictionary<Type, OptionalMapTypes> MapTypeCache = new();
-    private static readonly ConcurrentDictionary<Type, Func<int, IList>> ListFactoryCache = new();
-    private static readonly ConcurrentDictionary<(Type Key, Type Value), Func<int, IDictionary>> DictionaryFactoryCache = new();
-    private static readonly ConcurrentDictionary<Type, RecordShape> RecordShapeCache = new();
-    private static readonly ConcurrentDictionary<Type, OptionalRecordShape> DtoShapeCache = new();
+    // Cache lifetimes follow the model types, including both generic arguments of a dictionary target.
+    private static readonly ConditionalWeakTable<Type, OptionalType> ElementTypeCache = new();
+    private static readonly ConditionalWeakTable<Type, OptionalMapTypes> MapTypeCache = new();
+    private static readonly ConditionalWeakTable<Type, Func<int, IList>> ListFactoryCache = new();
+    private static readonly ConditionalWeakTable<Type, Func<int, IDictionary>> DictionaryFactoryCache = new();
+    private static readonly ConditionalWeakTable<Type, RecordShape> RecordShapeCache = new();
+    private static readonly ConditionalWeakTable<Type, OptionalRecordShape> DtoShapeCache = new();
 
     private static readonly HashSet<Type> NonDtoShapeTypes =
     [
@@ -22,10 +23,10 @@ public static partial class KernelRpcMarshaller
     ];
 
     private static Type? ElementType(Type type)
-        => ElementTypeCache.GetOrAdd(type, static candidate => new OptionalType(FindElementType(candidate))).Value;
+        => ElementTypeCache.GetValue(type, static candidate => new OptionalType(FindElementType(candidate))).Value;
 
     private static (Type Key, Type Value)? MapTypes(Type type)
-        => MapTypeCache.GetOrAdd(type, static candidate => new OptionalMapTypes(FindMapTypes(candidate))).Value;
+        => MapTypeCache.GetValue(type, static candidate => new OptionalMapTypes(FindMapTypes(candidate))).Value;
 
     private static (Type Key, Type Value)? FindMapTypes(Type type)
     {
@@ -72,7 +73,7 @@ public static partial class KernelRpcMarshaller
     }
 
     private static RecordShape? DtoShape(Type type)
-        => DtoShapeCache.GetOrAdd(type, static candidate => new OptionalRecordShape(FindDtoShape(candidate))).Value;
+        => DtoShapeCache.GetValue(type, static candidate => new OptionalRecordShape(FindDtoShape(candidate))).Value;
 
     private static RecordShape? FindDtoShape(Type type)
     {
@@ -106,10 +107,10 @@ public static partial class KernelRpcMarshaller
         => type.IsClass || type.IsValueType;
 
     private static IList CreateList(Type elementType, int capacity)
-        => ListFactoryCache.GetOrAdd(elementType, CreateListFactory)(capacity);
+        => ListFactoryCache.GetValue(elementType, CreateListFactory)(capacity);
 
-    private static IDictionary CreateDictionary(Type keyType, Type valueType, int capacity)
-        => DictionaryFactoryCache.GetOrAdd((keyType, valueType), CreateDictionaryFactory)(capacity);
+    private static IDictionary CreateDictionary(Type targetType, int capacity)
+        => DictionaryFactoryCache.GetValue(targetType, CreateDictionaryFactory)(capacity);
 
     // An IEnumerable<T> reaches here only after the recognized list/map shapes have been ruled out, so any
     // remaining one — e.g. ImmutableArray<T>, ImmutableList<T>, Queue<T> — exposes only scalar getters
@@ -140,8 +141,9 @@ public static partial class KernelRpcMarshaller
         return CompileCollectionFactory<IList>(constructor);
     }
 
-    private static Func<int, IDictionary> CreateDictionaryFactory((Type Key, Type Value) types)
+    private static Func<int, IDictionary> CreateDictionaryFactory(Type targetType)
     {
+        var types = MapTypes(targetType)!.Value;
         var constructor = typeof(Dictionary<,>)
             .MakeGenericType(types.Key, types.Value)
             .GetConstructor([typeof(int)])
@@ -159,7 +161,7 @@ public static partial class KernelRpcMarshaller
     }
 
     private static RecordShape GetRecordShape(Type type)
-        => RecordShapeCache.GetOrAdd(type, static candidate =>
+        => RecordShapeCache.GetValue(type, static candidate =>
         {
             var discovered = RecordMemberDiscovery.Discover(candidate);
             var members = new RecordMember[discovered.Count];
@@ -212,9 +214,9 @@ public static partial class KernelRpcMarshaller
         token[0] == 0xb4 && token[1] == 0xa0 && token[2] == 0x36 && token[3] == 0x95 &&
         token[4] == 0x45 && token[5] == 0xf0 && token[6] == 0xa1 && token[7] == 0xbe;
 
-    private readonly record struct OptionalType(Type? Value);
+    private sealed record OptionalType(Type? Value);
 
-    private readonly record struct OptionalMapTypes((Type Key, Type Value)? Value);
+    private sealed record OptionalMapTypes((Type Key, Type Value)? Value);
 
-    private readonly record struct OptionalRecordShape(RecordShape? Value);
+    private sealed record OptionalRecordShape(RecordShape? Value);
 }

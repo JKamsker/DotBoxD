@@ -313,7 +313,7 @@ public static partial class KernelRpcMarshaller
     private static object MapFromSandboxValue(MapValue map, Type type, (Type Key, Type Value) mapTypes)
     {
         RejectUnsupportedMapKeyType(mapTypes.Key);
-        var result = CreateDictionary(mapTypes.Key, mapTypes.Value, map.Values.Count);
+        var result = CreateDictionary(type, map.Values.Count);
         foreach (var pair in map.Entries)
         {
             var key = FromSandboxValue(pair.Key, mapTypes.Key)
@@ -321,7 +321,7 @@ public static partial class KernelRpcMarshaller
             result[key] = FromSandboxValue(pair.Value, mapTypes.Value);
         }
 
-        return CompleteDictionary(type, mapTypes.Key, mapTypes.Value, result);
+        return CompleteDictionary(type, result);
     }
 
     private static NotSupportedException CannotMarshalEnum(
