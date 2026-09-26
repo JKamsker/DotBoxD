@@ -92,7 +92,9 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
         var execution = incumbent.ShouldHandleAsync(EventAdapter.Instance, new ReplacementEvent()).AsTask();
         await binding.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var replacement = await server.InstallAsync(CreatePackage());
+        var replacement = await server.InstallAsync(CreatePackage())
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.True(incumbent.IsRevoked);
         Assert.Same(replacement, server.Kernels.Get("replacement-cancellation-callback"));
@@ -237,8 +239,9 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
 
         public async ValueTask<SandboxValue> InvokeAsync(CancellationToken cancellationToken)
         {
+            var delay = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             Started.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            await delay.ConfigureAwait(false);
             return SandboxValue.FromBool(true);
         }
     }
