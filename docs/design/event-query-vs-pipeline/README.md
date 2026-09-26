@@ -102,6 +102,10 @@ Capture preserves the element type accepted by the membership method, including 
 primitive-array views used through collection interfaces or spans.
 Null arrays converted to spans are captured as empty membership, matching the framework conversion;
 null collection operands remain invalid.
+The framework span overload with a comparer also supports enum and nullable arrays. Its comparer must
+be a captured null, the element type's default equality comparer, or `StringComparer.Ordinal` for strings.
+Both arguments run once in order before the span is copied. Custom or event-dependent comparers and broad
+reference element types (such as `object`, which can mix distinct CLR equality domains) are rejected.
 
 LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
 can still use the set's comparer. Translation follows the running framework's iterator dispatch and

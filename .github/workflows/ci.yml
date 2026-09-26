@@ -569,6 +569,8 @@ jobs:
               "EventQueryDispatcherLifecycleTests",
               "QueryEnumConversionTests",
               "QueryEnumConversionCompatibilityTests",
+              "QuerySpanComparerTests",
+              "QuerySpanComparerCaptureTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",

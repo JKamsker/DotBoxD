@@ -49,10 +49,12 @@ internal static class ContainsMethodFilterTranslator
         ValidateSupportedContainsMethod(call);
         // Spans need special capture because they cannot be boxed. Other collection
         // conversions must run before comparer validation and value capture.
-        var unwrapped = call.Method.DeclaringType == typeof(MemoryExtensions)
+        var unwrapped = call.Method.DeclaringType == typeof(MemoryExtensions) && call.Arguments.Count == 2
             ? PrepareSpanCollection(collection)
             : collection;
-        var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
+        var capturedCollection = call.Arguments.Count == 3
+            ? SpanContainsCapture.Capture(call, parameter)
+            : QueryValueFactory.EvaluateCollection(unwrapped, parameter);
         filter = QueryFilter.In(path, ContainsCollectionCapture.Capture(capturedCollection, call, unwrapped));
         return true;
     }
@@ -86,7 +88,7 @@ internal static class ContainsMethodFilterTranslator
     {
         collection = null!;
         item = null!;
-        if (call.Arguments.Count != 2)
+        if (call.Arguments.Count != 2 && !SpanContainsCapture.IsSupportedOverload(call))
         {
             return false;
         }
