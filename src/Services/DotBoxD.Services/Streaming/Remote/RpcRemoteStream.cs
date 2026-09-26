@@ -5,7 +5,7 @@ namespace DotBoxD.Services.Streaming.Remote;
 
 internal sealed class RpcRemoteStream : Stream
 {
-    private readonly RpcStreamReceiver _receiver;
+    private RpcStreamReceiver? _receiver;
     private RpcStreamChunk? _current;
     private int _offset;
     private int _disposed;
@@ -61,8 +61,15 @@ internal sealed class RpcRemoteStream : Stream
     {
         if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0)
         {
-            _receiver.Cancel();
-            _current?.Dispose();
+            var receiver = Interlocked.Exchange(ref _receiver, null)!;
+            try
+            {
+                receiver.Cancel();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _current, null)?.Dispose();
+            }
         }
 
         base.Dispose(disposing);
@@ -70,7 +77,8 @@ internal sealed class RpcRemoteStream : Stream
 
     private async ValueTask<int> ReadCoreAsync(Memory<byte> buffer, CancellationToken ct)
     {
-        if (Volatile.Read(ref _disposed) != 0)
+        var receiver = Volatile.Read(ref _receiver);
+        if (Volatile.Read(ref _disposed) != 0 || receiver is null)
         {
             throw new ObjectDisposedException(nameof(RpcRemoteStream));
         }
@@ -82,18 +90,27 @@ internal sealed class RpcRemoteStream : Stream
 
         ct.ThrowIfCancellationRequested();
 
-        while (_current is null || _offset >= _current.Payload.Length)
+        var current = Volatile.Read(ref _current);
+        while (current is null || _offset >= current.Payload.Length)
         {
-            _current?.Dispose();
-            _current = await _receiver.ReadChunkAsync(ct).ConfigureAwait(false);
+            Interlocked.Exchange(ref _current, null)?.Dispose();
+            current = await receiver.ReadChunkAsync(ct).ConfigureAwait(false);
+            Interlocked.Exchange(ref _current, current);
+            // A read waking during disposal must not restore the receiver through its chunk.
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                Interlocked.Exchange(ref _current, null)?.DisposeWithoutCredit();
+                throw new ObjectDisposedException(nameof(RpcRemoteStream));
+            }
+
             _offset = 0;
-            if (_current is null)
+            if (current is null)
             {
                 return 0;
             }
         }
 
-        var source = _current.Payload.Slice(_offset);
+        var source = current.Payload.Slice(_offset);
         var count = Math.Min(buffer.Length, source.Length);
         source.Slice(0, count).CopyTo(buffer);
         _offset += count;

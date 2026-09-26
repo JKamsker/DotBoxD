@@ -633,6 +633,8 @@ jobs:
               "InstanceRegistryFailureObservationTests",
               "InstanceRegistryLeaseLifetimeTests",
               "InstanceRegistryDisposalCompletionOrderTests",
+              "RpcRemoteStreamLifetimeTests",
+              "RpcRemoteStreamAllocationTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
