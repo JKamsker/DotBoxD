@@ -11,7 +11,8 @@ namespace DotBoxD.Queryable.Authoring;
 /// to compiled when hot) and, on a match, the projection is materialized and dispatched. Subscriptions with
 /// no equality predicate are evaluated against every event (an explicit broad fallback).
 /// </summary>
-internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Func<bool>? isDisposed)
+internal sealed class EventQueryDispatcher<TEvent>(
+    MemberValueReader reader, Func<bool>? isDisposed, Action<EventQueryDispatcher<TEvent>> onEmpty)
 {
     private readonly object _gate = new();
     private long _eventsObserved;
@@ -168,9 +169,17 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
 
     private void Remove(EventQuerySubscriptionEntry<TEvent> entry)
     {
+        bool empty;
         lock (_gate)
         {
             _snapshot = _snapshot.Without(entry);
+            empty = _snapshot.IsEmpty;
+        }
+
+        if (empty)
+        {
+            // Registration takes the host lock first; release our lock before notifying the host.
+            onEmpty(this);
         }
     }
 

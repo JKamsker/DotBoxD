@@ -56,6 +56,11 @@ Handwritten query ASTs can use the same behavior with `new MemberValueReader(typ
 root type and rejects targets that are not instances of that type. The parameterless constructor retains
 runtime-type lookup for callers that intentionally read arbitrary event shapes.
 
+Active query subscriptions strongly retain their event types. After the last subscription is disposed,
+an empty dispatcher can release an otherwise unused collectible type. Dispatchers remain reusable while
+their type is alive, preserving event counters across idle periods. Retained diagnostic handles and other
+registries keep their independent ownership of the types they still use.
+
 The declared-type constructor is an additive public API so this behavior remains available without the
 authoring helpers. Existing constructor and method signatures are retained; this addition requires no
 breaking-version bump and keeps the current package-versioning scheme.
