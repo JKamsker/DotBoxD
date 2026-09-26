@@ -297,6 +297,7 @@ $defaultMinimums = @{
     QueryComparisonOperatorMethodTests = 30
     QueryScalarOperatorCompatibilityTests = 34
     QueryLogicalOperatorMethodTests = 10
+    QueryReferenceComparisonTests = 40
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4

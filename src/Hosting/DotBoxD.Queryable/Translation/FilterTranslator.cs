@@ -90,17 +90,31 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
         if (MemberPathReader.TryReadPath(binary.Left, parameter, out var leftPath) &&
             QueryValueFactory.TryEvaluateObject(binary.Right, parameter, out var rightRaw))
         {
-            return QueryFilter.Compare(leftPath, op, MakeValue(rightRaw, binary.Right));
+            return QueryFilter.Compare(leftPath, op, MakeComparisonValue(binary, rightRaw, binary.Right));
         }
 
         if (MemberPathReader.TryReadPath(binary.Right, parameter, out var rightPath) &&
             QueryValueFactory.TryEvaluateObject(binary.Left, parameter, out var leftRaw))
         {
-            return QueryFilter.Compare(rightPath, Flip(op), MakeValue(leftRaw, binary.Left));
+            return QueryFilter.Compare(rightPath, Flip(op), MakeComparisonValue(binary, leftRaw, binary.Left));
         }
 
         throw QueryTranslationException.Unsupported(
             binary, "one side of a comparison must be an event member and the other a constant.");
+    }
+
+    private QueryValue MakeComparisonValue(BinaryExpression binary, object? raw, Expression source)
+    {
+        if (raw is not null && binary.Method is null &&
+            binary.NodeType is ExpressionType.Equal or ExpressionType.NotEqual &&
+            !binary.Left.Type.IsValueType && !binary.Right.Type.IsValueType)
+        {
+            throw QueryTranslationException.Unsupported(binary,
+                "reference identity against a non-null object cannot be represented by a portable value comparison; " +
+                "compare a primitive member or use a supported scalar value operator instead.");
+        }
+
+        return MakeValue(raw, source);
     }
 
     private static void ValidateComparisonMethod(BinaryExpression binary)

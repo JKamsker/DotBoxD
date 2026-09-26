@@ -69,6 +69,9 @@ capturing that comparison's constants. Compare public primitive members directly
 portable comparison explicitly with `QueryFilter.Compare`, when custom value types are involved.
 Boolean negation also requires the intrinsic `!` operation. A `Not` expression with a custom method is
 rejected before translating its operand, because that method need not negate its input.
+Reference identity comparisons against non-null objects are rejected: a portable value cannot preserve
+the identity of a captured CLR object. Null reference checks and ordinary string value equality remain
+supported. Use primitive members or supported scalar value operators when authoring portable comparisons.
 
 ## Collection membership
 

@@ -556,6 +556,7 @@ jobs:
               "QueryComparisonOperatorMethodTests",
               "QueryScalarOperatorCompatibilityTests",
               "QueryLogicalOperatorMethodTests",
+              "QueryReferenceComparisonTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",
