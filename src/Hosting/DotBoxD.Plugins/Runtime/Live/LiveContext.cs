@@ -35,7 +35,8 @@ internal class LiveContextProxy<T> : DispatchProxy where T : class
 
     private static void RejectIndexers()
     {
-        if (typeof(T).GetProperties().Any(static property => property.GetIndexParameters().Length > 0))
+        if (LiveContextPropertyDiscovery.GetProperties(typeof(T))
+            .Any(static property => property.GetIndexParameters().Length > 0))
         {
             throw LiveSettingTypeConverter.Diagnostic(
                 $"Live context binding '{typeof(T).Name}' cannot declare indexer properties.");
@@ -68,7 +69,7 @@ internal class LiveContextProxy<T> : DispatchProxy where T : class
     private static IReadOnlyDictionary<MethodInfo, LiveContextAccessor> CreateAccessors()
     {
         var accessors = new Dictionary<MethodInfo, LiveContextAccessor>();
-        foreach (var property in typeof(T).GetProperties())
+        foreach (var property in LiveContextPropertyDiscovery.GetProperties(typeof(T)))
         {
             if (property.GetMethod is { } getter)
             {
@@ -97,10 +98,20 @@ internal static class LiveContextFactory
             throw LiveSettingTypeConverter.Diagnostic("Live context bindings must use an interface type.");
         }
 
-        var definitions = typeof(T).GetProperties()
-            .Select(CreateDefinition)
-            .ToArray();
-        var settings = LiveSettingStore.FromDefinitions(definitions);
+        var definitions = new Dictionary<string, LiveSettingDefinition>(StringComparer.Ordinal);
+        foreach (var property in LiveContextPropertyDiscovery.GetProperties(typeof(T)))
+        {
+            var definition = CreateDefinition(property);
+            if (definitions.TryGetValue(definition.Name, out var existing) && existing.Type != definition.Type)
+            {
+                throw LiveSettingTypeConverter.Diagnostic(
+                    $"Live setting '{definition.Name}' has conflicting inherited property types.");
+            }
+
+            definitions.TryAdd(definition.Name, definition);
+        }
+
+        var settings = LiveSettingStore.FromDefinitions(definitions.Values);
         var context = new LiveContext<T>(name, settings);
         initialize?.Invoke(context.Value);
         return context;

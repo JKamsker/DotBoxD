@@ -82,6 +82,7 @@ $defaultMinimums = @{
     PluginLiveUpdateModeTests = 2
     PendingLiveUpdateQueueTests = 5
     LiveSettingExactRangeTests = 19
+    LiveContextInheritanceTests = 10
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9

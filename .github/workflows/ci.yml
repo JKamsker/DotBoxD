@@ -385,6 +385,7 @@ jobs:
               "PluginLiveUpdateModeTests",
               "PendingLiveUpdateQueueTests",
               "LiveSettingExactRangeTests",
+              "LiveContextInheritanceTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
