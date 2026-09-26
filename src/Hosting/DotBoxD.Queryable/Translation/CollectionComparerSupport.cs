@@ -71,14 +71,24 @@ internal static class CollectionComparerSupport
             return null;
         }
 
-        if (!string.Equals(type.Name, "KeyCollection", StringComparison.Ordinal) ||
-            type.DeclaringType is not { IsGenericType: true } declaringType ||
-            !IsDictionaryKeyCollection(declaringType.GetGenericTypeDefinition()))
+        if (type.DeclaringType is not { IsGenericType: true } declaringType)
         {
             return null;
         }
 
-        // Dictionary key views preserve their owner's comparer but do not expose it publicly.
+        // Key views preserve their owner's comparer but do not expose it publicly.
+        var definition = declaringType.GetGenericTypeDefinition();
+        if (string.Equals(type.Name, "KeyList", StringComparison.Ordinal) && definition == typeof(SortedList<,>))
+        {
+            return GetComparerFromField(collection, "_dict", depth);
+        }
+
+        if (!string.Equals(type.Name, "KeyCollection", StringComparison.Ordinal) ||
+            !IsDictionaryKeyCollection(definition))
+        {
+            return null;
+        }
+
         return GetComparerFromField(collection, "_dictionary", depth) ??
             GetComparerFromField(collection, "_collection", depth);
     }
