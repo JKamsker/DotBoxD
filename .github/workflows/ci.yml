@@ -398,6 +398,8 @@ jobs:
               "GameServerDiagnosticFailureTests",
               "MarshallerCacheLifetimeTests",
               "MarshallerCacheAllocationTests",
+              "ParameterReaderCacheLifetimeTests",
+              "Fix_PAL_0029_Tests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",

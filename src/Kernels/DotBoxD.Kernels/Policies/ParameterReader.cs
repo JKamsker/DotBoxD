@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DotBoxD.Kernels.Policies;
 
@@ -24,7 +24,8 @@ internal static class ParameterReader
     // Keyed by the concrete parameter runtime type. Each entry is the ordered set of readable
     // accessors in the same order GetProperties returned them, so the produced dictionary key
     // order and duplicate-name behavior match the original per-grant reflection path exactly.
-    private static readonly ConcurrentDictionary<Type, PropertyAccessor[]> AccessorsByType = new();
+    // Weak keys release parameter types after their values have been copied into grant snapshots.
+    private static readonly ConditionalWeakTable<Type, PropertyAccessor[]> AccessorsByType = new();
 
     public static IReadOnlyDictionary<string, string> Read(object parameters)
     {
@@ -34,7 +35,7 @@ internal static class ParameterReader
                 new Dictionary<string, string>(values, StringComparer.Ordinal));
         }
 
-        var accessors = AccessorsByType.GetOrAdd(parameters.GetType(), BuildAccessors);
+        var accessors = AccessorsByType.GetValue(parameters.GetType(), BuildAccessors);
         var dictionary = new Dictionary<string, string>(accessors.Length, StringComparer.Ordinal);
         for (var i = 0; i < accessors.Length; i++)
         {
