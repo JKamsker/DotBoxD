@@ -81,6 +81,25 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
         Assert.Equal(SandboxErrorCode.PolicyDenied, failure.Error.Code);
     }
 
+    [Fact]
+    public async Task InstallAsync_preserves_revoked_result_when_cancellation_callbacks_complete()
+    {
+        var binding = new CancellationOnlyBinding();
+        using var server = PluginServer.Create(
+            configureHost: builder => builder.AddBinding(binding.Descriptor()),
+            defaultPolicy: CreatePolicy());
+        var incumbent = await server.InstallAsync(CreatePackage());
+        var execution = incumbent.ShouldHandleAsync(EventAdapter.Instance, new ReplacementEvent()).AsTask();
+        await binding.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var replacement = await server.InstallAsync(CreatePackage());
+
+        Assert.True(incumbent.IsRevoked);
+        Assert.Same(replacement, server.Kernels.Get("replacement-cancellation-callback"));
+        var failure = await Assert.ThrowsAsync<SandboxRuntimeException>(async () => await execution);
+        Assert.Equal(SandboxErrorCode.PolicyDenied, failure.Error.Code);
+    }
+
     private static BindingDescriptor Descriptor(ICancellationCallbackBinding binding)
         => new(
             BindingId,
@@ -204,6 +223,20 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
                         }
                     }
                 });
+            Started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            return SandboxValue.FromBool(true);
+        }
+    }
+
+    private sealed class CancellationOnlyBinding : ICancellationCallbackBinding
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BindingDescriptor Descriptor() => KernelReplacementCancellationCallbackSurpriseTests.Descriptor(this);
+
+        public async ValueTask<SandboxValue> InvokeAsync(CancellationToken cancellationToken)
+        {
             Started.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
             return SandboxValue.FromBool(true);
