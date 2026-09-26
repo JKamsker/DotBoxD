@@ -47,7 +47,7 @@ internal static class ForbiddenCollectionScanPolicy
 
         if (IsSetProperSubsetOf(method.Name, typeName))
         {
-            forbidden = "System.Collections.Generic.ISet.IsProperSubsetOf";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.IsProperSubsetOf";
             return true;
         }
 
@@ -93,7 +93,10 @@ internal static class ForbiddenCollectionScanPolicy
 
     private static bool IsSetProperSubsetOf(string methodName, string typeName)
         => methodName == "IsProperSubsetOf" &&
-           string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal);
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);
