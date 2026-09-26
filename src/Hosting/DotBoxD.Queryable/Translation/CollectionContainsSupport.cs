@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Immutable;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -6,11 +7,11 @@ namespace DotBoxD.Queryable.Translation;
 
 internal static class CollectionContainsSupport
 {
-    public static void Validate(MethodCallExpression call, object collection)
+    public static IEnumerable Capture(MethodCallExpression call, object collection)
     {
         try
         {
-            ValidateImplementation(call, collection);
+            return CaptureImplementation(call, collection);
         }
         catch (Exception error) when (error is not QueryTranslationException and not OperationCanceledException)
         {
@@ -20,7 +21,7 @@ internal static class CollectionContainsSupport
         }
     }
 
-    private static void ValidateImplementation(MethodCallExpression call, object collection)
+    private static IEnumerable CaptureImplementation(MethodCallExpression call, object collection)
     {
         var method = MembershipMethod(call, collection);
         HashSet<object>? visited = null;
@@ -36,7 +37,7 @@ internal static class CollectionContainsSupport
             var inner = CollectionWrapperReader.Read(collection, implementation.DeclaringType!);
             if (inner is null)
             {
-                return;
+                return FrameworkValues(call, collection, implementation);
             }
 
             visited ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
@@ -47,6 +48,44 @@ internal static class CollectionContainsSupport
 
             collection = inner;
             method = CollectionContainsMethod(method.GetParameters()[0].ParameterType);
+        }
+
+        return (IEnumerable)collection;
+    }
+
+    private static IEnumerable FrameworkValues(MethodCallExpression call, object collection, MethodInfo implementation)
+    {
+        if (IsFrameworkType(collection.GetType()))
+        {
+            return (IEnumerable)collection;
+        }
+
+        // A subclass can replace either enumeration interface without changing inherited Contains.
+        // Its framework base exposes the same stored values through the public GetEnumerator primitive.
+        var enumerate = implementation.DeclaringType!.GetMethod(nameof(IEnumerable.GetEnumerator), Type.EmptyTypes);
+        if (enumerate is null || !typeof(IEnumerator).IsAssignableFrom(enumerate.ReturnType) ||
+            !IsFrameworkImplementation(ResolveImplementation(enumerate, collection.GetType())))
+        {
+            throw QueryTranslationException.Unsupported(call,
+                "framework Contains values cannot be captured through a public enumerator; use ToArray() when enumeration membership is intended.");
+        }
+
+        return EnumerateFramework(collection, enumerate);
+    }
+
+    private static IEnumerable EnumerateFramework(object collection, MethodInfo enumerate)
+    {
+        var enumerator = (IEnumerator)enumerate.Invoke(collection, parameters: null)!;
+        try
+        {
+            while (enumerator.MoveNext())
+            {
+                yield return enumerator.Current;
+            }
+        }
+        finally
+        {
+            (enumerator as IDisposable)?.Dispose();
         }
     }
 

@@ -69,6 +69,9 @@ remain supported. When enumeration membership is intended, capture `collection.T
 snapshot; handwritten queries can also use the public `QueryFilter.In` primitive directly.
 Comparer checks read the framework collection's declaration and backing collections; unrelated
 `Comparer` properties added or hidden by subclasses are not evaluated.
+Subclasses that customize enumeration retain the membership of the `Contains` method being called.
+Inherited framework membership is captured through the framework's public enumerator; `Enumerable.Contains`
+over queues, stacks, or enumerable-only sources still follows their generic enumeration.
 
 LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
 can still use the set's comparer. Translation follows the running framework's iterator dispatch and

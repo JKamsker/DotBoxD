@@ -59,9 +59,9 @@ internal static class ContainsMethodFilterTranslator
             return true;
         }
 
-        CollectionContainsSupport.Validate(call, capturedCollection);
+        var capturedMembership = CollectionContainsSupport.Capture(call, capturedCollection);
         RejectUnsupportedContainsComparer(call, capturedCollection);
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedCollection, unwrapped));
+        filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedMembership, unwrapped));
         return true;
     }
 

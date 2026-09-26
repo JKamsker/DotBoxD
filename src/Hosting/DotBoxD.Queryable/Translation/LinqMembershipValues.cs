@@ -21,9 +21,9 @@ internal sealed class LinqMembershipValues<T>(MethodCallExpression call)
             IEnumerable<T> values;
             if (source is ICollection<T>)
             {
-                CollectionContainsSupport.Validate(call, source);
+                var captured = CollectionContainsSupport.Capture(call, source);
                 ContainsMethodFilterTranslator.RejectUnsupportedContainsComparer(call, source);
-                values = source;
+                values = captured is IEnumerable<T> typed ? typed : captured.Cast<T>();
             }
             else if (LinqIteratorReader.ContainsOwner(source) is { } owner)
             {
