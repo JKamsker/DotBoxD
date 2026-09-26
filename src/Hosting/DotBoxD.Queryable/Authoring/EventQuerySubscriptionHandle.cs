@@ -8,11 +8,12 @@ namespace DotBoxD.Queryable.Authoring;
 /// subscription (and its index entries) from the dispatcher. The counters expose how indexed dispatch
 /// behaved: how many events the dispatcher saw versus how many actually reached this subscription's filter
 /// and handler — evidence that the index prefiltered instead of fanning every event out to every subscriber.
+/// After disposal, diagnostics remain available without retaining this subscription's completed callbacks.
 /// </summary>
 public sealed class EventQuerySubscriptionHandle : IDisposable
 {
     private readonly Func<long> _eventsObserved;
-    private readonly Func<bool> _isCompiled;
+    private bool _isCompiled;
     private Action? _unsubscribe;
     private long _filterEvaluations;
     private long _matches;
@@ -23,14 +24,12 @@ public sealed class EventQuerySubscriptionHandle : IDisposable
         EventQueryPlan plan,
         string fingerprint,
         Func<long> eventsObserved,
-        Func<bool> isCompiled,
         Action unsubscribe)
     {
         Document = document;
         Plan = plan;
         Fingerprint = fingerprint;
         _eventsObserved = eventsObserved;
-        _isCompiled = isCompiled;
         _unsubscribe = unsubscribe;
     }
 
@@ -56,7 +55,7 @@ public sealed class EventQuerySubscriptionHandle : IDisposable
     public long Dispatches => Interlocked.Read(ref _dispatches);
 
     /// <summary>Whether this subscription's filter has been promoted to the compiled (hot-path) tier.</summary>
-    public bool IsCompiled => _isCompiled();
+    public bool IsCompiled => Volatile.Read(ref _isCompiled);
 
     internal bool IsDisposed => Volatile.Read(ref _unsubscribe) is null;
 
@@ -68,6 +67,8 @@ public sealed class EventQuerySubscriptionHandle : IDisposable
     internal void RecordMatch() => Interlocked.Increment(ref _matches);
 
     internal void RecordDispatch() => Interlocked.Increment(ref _dispatches);
+
+    internal void RecordCompilation() => Volatile.Write(ref _isCompiled, true);
 
     /// <summary>Removes the subscription from its dispatcher. Safe to call more than once.</summary>
     public void Dispose() => Interlocked.Exchange(ref _unsubscribe, null)?.Invoke();

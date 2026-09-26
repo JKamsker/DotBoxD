@@ -43,9 +43,6 @@ internal sealed class EventQuerySubscriptionEntry<TEvent>
     /// <summary>Whether this subscription can be index-routed (has at least one equality key).</summary>
     public bool IsRoutable => RoutingKeys.Count > 0;
 
-    /// <summary>Whether the filter has been promoted to the compiled tier.</summary>
-    public bool IsCompiled => Volatile.Read(ref _compiled) is not null;
-
     /// <summary>Evaluates the filter against <paramref name="e"/>, promoting to the compiled tier when hot.</summary>
     public bool Matches(TEvent e, MemberValueReader reader)
     {
@@ -69,6 +66,7 @@ internal sealed class EventQuerySubscriptionEntry<TEvent>
         {
             compiled = QueryFilterCompiler.Compile(_filter, reader);
             Volatile.Write(ref _compiled, compiled);
+            Handle.RecordCompilation();
             return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)

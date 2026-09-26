@@ -28,8 +28,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
         var fingerprint = QueryFingerprint.Compute(document);
         var routingKeys = RoutingKeysFor(plan);
         EventQuerySubscriptionEntry<TEvent> entry = null!;
+        // A method group keeps the diagnostic reader out of the unsubscribe closure that captures entry.
         var handle = new EventQuerySubscriptionHandle(
-            document, plan, fingerprint, () => EventsObserved, () => entry.IsCompiled, () => Remove(entry));
+            document, plan, fingerprint, ReadEventsObserved, () => Remove(entry));
         entry = new EventQuerySubscriptionEntry<TEvent>(document.Filter, routingKeys, project, dispatch, handle);
         lock (_gate)
         {
@@ -162,6 +163,8 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
 
     private bool IsDisposed(EventQuerySubscriptionEntry<TEvent> entry)
         => entry.Handle.IsDisposed || isDisposed?.Invoke() == true;
+
+    private long ReadEventsObserved() => EventsObserved;
 
     private void Remove(EventQuerySubscriptionEntry<TEvent> entry)
     {

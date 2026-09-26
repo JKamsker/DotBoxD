@@ -6,7 +6,7 @@ public bool Boolean { get; }
 public bool Equals(QueryValue? other) =>
 public bool HasSubscriptions<TEvent>() => TryGetDispatcher<TEvent>() is not null
 public bool IgnoreCase { get; init; }
-public bool IsCompiled => _isCompiled()
+public bool IsCompiled => Volatile.Read(ref _isCompiled)
 public bool IsEquality => Operator == QueryComparisonOperator.Equal
 public bool IsRoutable => RoutingKeys.Count > 0
 public const int MaxDepth = 32

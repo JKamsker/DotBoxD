@@ -305,6 +305,7 @@ $defaultMinimums = @{
     QueryBooleanValueTests = 10
     QueryMemberConversionMethodTests = 22
     QueryNumericConversionCompatibilityTests = 36
+    EventQueryHandleRetentionTests = 7
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4

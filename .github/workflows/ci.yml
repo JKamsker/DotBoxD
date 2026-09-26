@@ -564,6 +564,7 @@ jobs:
               "QueryBooleanValueTests",
               "QueryMemberConversionMethodTests",
               "QueryNumericConversionCompatibilityTests",
+              "EventQueryHandleRetentionTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",
