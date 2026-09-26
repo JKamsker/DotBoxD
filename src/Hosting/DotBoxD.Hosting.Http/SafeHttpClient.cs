@@ -91,7 +91,8 @@ public static class SafeHttpClient
         }
         catch (Exception)
         {
-            var error = new SandboxError(SandboxErrorCode.HostFailure, "net.http.get failed");
+            var error = context.CancellationToken.IsCancellationRequested || cancellationToken.IsCancellationRequested
+                ? new SandboxError(SandboxErrorCode.Cancelled, "net.http.get cancelled") : new SandboxError(SandboxErrorCode.HostFailure, "net.http.get failed");
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), error.Code);
             throw new SandboxRuntimeException(error);
         }
@@ -137,7 +138,6 @@ public static class SafeHttpClient
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: user info is not allowed");
         }
-
         RequireAllowedScheme(grantOptions, uri);
         RequireAllowedHost(grantOptions, uri);
         return new SafeHttpRequest(
