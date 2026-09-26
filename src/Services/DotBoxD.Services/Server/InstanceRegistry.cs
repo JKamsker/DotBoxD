@@ -115,12 +115,9 @@ public sealed class InstanceRegistry : IInstanceRegistry
 
         var disposal = RemoveForDisposal(serviceName, instanceId);
 
-        if (disposal is not null)
+        if (disposal?.TryStartDisposal() is true)
         {
-            if (disposal.IsReady)
-            {
-                DisposeAndComplete(disposal);
-            }
+            DisposeAndComplete(disposal);
         }
     }
 
@@ -133,9 +130,13 @@ public sealed class InstanceRegistry : IInstanceRegistry
 
         if (disposal is not null)
         {
-            if (disposal.IsReady)
+            if (disposal.TryStartDisposal())
             {
                 await DisposeAndCompleteAsync(disposal).ConfigureAwait(false);
+            }
+            else
+            {
+                await disposal.Completion.Task.ConfigureAwait(false);
             }
         }
     }
@@ -145,7 +146,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var disposal in DrainAll())
         {
-            if (disposal.IsReady)
+            if (disposal.TryStartDisposal())
             {
                 DisposeAndComplete(disposal, reportFailure: true);
             }
@@ -162,7 +163,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var disposal in DrainAll())
         {
-            if (disposal.IsReady)
+            if (disposal.TryStartDisposal())
             {
                 await DisposeAndCompleteAsync(disposal, reportFailure: true).ConfigureAwait(false);
             }
@@ -219,7 +220,14 @@ public sealed class InstanceRegistry : IInstanceRegistry
 
         if (disposal is not null)
         {
-            await DisposeAndCompleteAsync(disposal).ConfigureAwait(false);
+            if (disposal.TryStartDisposal())
+            {
+                await DisposeAndCompleteAsync(disposal).ConfigureAwait(false);
+            }
+            else
+            {
+                await disposal.Completion.Task.ConfigureAwait(false);
+            }
         }
     }
 

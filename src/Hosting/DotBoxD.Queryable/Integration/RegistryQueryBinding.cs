@@ -15,7 +15,7 @@ internal sealed class RegistryQueryBinding(SubscriptionRegistry registry)
     private readonly HashSet<Type> _forwarded = [];
 
     /// <summary>The query host bound to the registry.</summary>
-    public EventQueryHost Host { get; } = new(() => registry.IsDisposed);
+    public EventQueryHost Host { get; } = new(() => registry.IsDisposed, registry.LifecycleGate);
 
     /// <summary>Installs the per-type forwarding subscription exactly once.</summary>
     public void EnsureForwarder<TEvent>()

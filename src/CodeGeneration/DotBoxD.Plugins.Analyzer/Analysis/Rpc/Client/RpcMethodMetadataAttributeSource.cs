@@ -19,8 +19,48 @@ internal static class RpcMethodMetadataAttributeSource
                         "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
                     break;
 
+                case "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute");
+                    break;
+
                 case "System.ObsoleteAttribute":
                     AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
+                    break;
+
+                case "System.Runtime.Versioning.ObsoletedOSPlatformAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute");
+                    break;
+
+                case "System.Runtime.Versioning.SupportedOSPlatformAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.SupportedOSPlatformAttribute");
+                    break;
+
+                case "System.Runtime.Versioning.UnsupportedOSPlatformAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute");
                     break;
             }
         }

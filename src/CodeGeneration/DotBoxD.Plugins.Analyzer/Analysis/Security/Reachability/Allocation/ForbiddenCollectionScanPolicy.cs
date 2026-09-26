@@ -6,6 +6,8 @@ internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -25,15 +27,27 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsForbiddenHashSetScan(method.Name, typeName))
+        if (IsForbiddenSetScan(method.Name, typeName))
         {
-            forbidden = $"System.Collections.Generic.HashSet.{method.Name}";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.{method.Name}";
+            return true;
+        }
+
+        if (IsISetIsSupersetOf(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Generic.ISet.IsSupersetOf";
             return true;
         }
 
         if (IsSetOverlaps(method.Name, typeName))
         {
-            forbidden = $"System.Collections.Generic.{OverlapsCollectionType(typeName)}.Overlaps";
+            forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.Overlaps";
+            return true;
+        }
+
+        if (IsSetProperSubsetOf(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Generic.ISet.IsProperSubsetOf";
             return true;
         }
 
@@ -51,17 +65,35 @@ internal static class ForbiddenCollectionScanPolicy
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
-    private static bool IsForbiddenHashSetScan(string methodName, string typeName)
+    private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
-           string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal);
+           (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
+
+    private static bool IsISetIsSupersetOf(string methodName, string typeName)
+        => methodName == "IsSupersetOf" && string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal);
 
     private static bool IsSetOverlaps(string methodName, string typeName)
         => methodName == "Overlaps" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
 
-    private static string OverlapsCollectionType(string typeName)
-        => string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal) ? "ISet" : "HashSet";
+    private static string SetCollectionType(string typeName)
+        => typeName switch
+        {
+            ReadOnlySetInterfaceTypeName => "IReadOnlySet",
+            SetInterfaceTypeName => "ISet",
+            SortedSetTypeName => "SortedSet",
+            _ => "HashSet",
+        };
+
+    private static bool IsSetProperSubsetOf(string methodName, string typeName)
+        => methodName == "IsProperSubsetOf" &&
+           string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal);
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);

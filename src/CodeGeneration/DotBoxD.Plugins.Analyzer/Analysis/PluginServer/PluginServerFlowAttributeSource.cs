@@ -123,6 +123,13 @@ internal static class PluginServerFlowAttributeSource
 
     private static string? AttributeLine(AttributeData attribute, bool targetReturn, bool includeExperimental)
     {
+        var platformCompatibilityAttribute =
+            PluginServerPlatformCompatibilityAttributeFormatter.Format(attribute);
+        if (platformCompatibilityAttribute is not null)
+        {
+            return MemberOnlyAttribute(targetReturn, platformCompatibilityAttribute);
+        }
+
         switch (GetFrameworkAttributeName(attribute))
         {
             case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":

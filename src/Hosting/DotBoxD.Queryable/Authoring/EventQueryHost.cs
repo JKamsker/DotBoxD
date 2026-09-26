@@ -17,7 +17,7 @@ namespace DotBoxD.Queryable.Authoring;
 public sealed class EventQueryHost : IEventQuerySource
 {
     private readonly MemberValueReader _reader = new();
-    private readonly object _gate = new();
+    private readonly object _gate;
     private readonly Func<bool>? _isDisposed;
     // Read lock-free on the hot PublishAsync/HasSubscriptions path; the dispatcher set only mutates on
     // Register, which still serializes through _gate so each event type creates exactly one dispatcher.
@@ -25,13 +25,14 @@ public sealed class EventQueryHost : IEventQuerySource
 
     /// <summary>Creates an independent in-process event-query host.</summary>
     public EventQueryHost()
-        : this(isDisposed: null)
+        : this(isDisposed: null, lifecycleGate: null)
     {
     }
 
-    internal EventQueryHost(Func<bool>? isDisposed)
+    internal EventQueryHost(Func<bool>? isDisposed, object? lifecycleGate)
     {
         _isDisposed = isDisposed;
+        _gate = lifecycleGate ?? new object();
     }
 
     /// <inheritdoc />
@@ -58,6 +59,7 @@ public sealed class EventQueryHost : IEventQuerySource
     {
         ArgumentNullException.ThrowIfNull(predicates);
         ArgumentNullException.ThrowIfNull(handler);
+        ObjectDisposedException.ThrowIf(_isDisposed?.Invoke() == true, this);
 
         var filter = BuildFilter(predicates);
         QuerySatisfiability.EnsureSatisfiable(filter);
@@ -66,7 +68,11 @@ public sealed class EventQueryHost : IEventQuerySource
         var plan = EventQueryPlanner.Plan(document);
 
         ValueTask Dispatch(object? projected, HookContext context) => handler((TProjection)projected!, context);
-        return GetOrAddDispatcher<TEvent>().Register(document, plan, project, Dispatch);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed?.Invoke() == true, this);
+            return GetOrAddDispatcher<TEvent>().Register(document, plan, project, Dispatch);
+        }
     }
 
     private static QueryFilter BuildFilter<TEvent>(IReadOnlyList<Expression<Func<TEvent, bool>>> predicates)

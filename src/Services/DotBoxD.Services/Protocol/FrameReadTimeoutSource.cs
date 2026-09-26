@@ -39,7 +39,13 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         var readToken = Start(ownerToken, timeout);
         try
         {
-            return await stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
+            var bytesRead = await stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
+            if (IsTimeoutCancellation(ownerToken))
+            {
+                throw CreateTimeoutException(timeout);
+            }
+
+            return bytesRead;
         }
         catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
         {

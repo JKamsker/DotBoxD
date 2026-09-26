@@ -97,13 +97,14 @@ public sealed class Fix_ALG_0019_Tests
         var failing = new ThrowingLiveSetting("Second");
         var store = new LiveSettingStore([first, failing]);
 
-        Assert.Throws<InvalidOperationException>(() => store.SetMany(
+        var exception = Assert.Throws<AggregateException>(() => store.SetMany(
             new Dictionary<string, object?>
             {
                 ["First"] = 2,
                 ["Second"] = 3
             }));
 
+        Assert.Contains(exception.Flatten().InnerExceptions, error => error.Message == "boom");
         Assert.Equal(1, store.Get<int>("First"));
     }
 
