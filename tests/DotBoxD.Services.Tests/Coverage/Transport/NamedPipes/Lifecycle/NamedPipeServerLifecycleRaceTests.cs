@@ -79,8 +79,8 @@ public sealed class NamedPipeServerLifecycleRaceTests
             interleavedFailure = Record.Exception(whileBlocked);
         }
 
-        await pending.WaitAsync(Timeout);
         Assert.Null(interleavedFailure);
+        await pending.WaitAsync(Timeout);
     }
 
     private static string CreatePipeName() => "dotboxd-lifecycle-" + Guid.NewGuid().ToString("N");
