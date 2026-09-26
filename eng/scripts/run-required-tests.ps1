@@ -92,6 +92,7 @@ $defaultMinimums = @{
     ServerExtensionValueTaskProxyAllocationTests = 1
     ServerExtensionValueTaskProxyTests = 3
     GameServerCancellationDiagnosticTests = 4
+    GameServerDiagnosticFailureTests = 6
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9

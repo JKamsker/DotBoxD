@@ -114,7 +114,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"[server] server extension install failed: {ex}");
+            ReportServerExtensionFailure("install", ex);
             throw;
         }
     }
@@ -142,8 +142,20 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"[server] server extension invoke failed: {ex}");
+            ReportServerExtensionFailure("invoke", ex);
             throw;
+        }
+    }
+
+    private static void ReportServerExtensionFailure(string operation, Exception error)
+    {
+        try
+        {
+            Console.Error.WriteLine($"[server] server extension {operation} failed: {error}");
+        }
+        catch
+        {
+            // A closed or faulting diagnostic writer must not replace the operation's exception.
         }
     }
 
