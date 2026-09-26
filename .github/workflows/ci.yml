@@ -386,6 +386,7 @@ jobs:
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
+              "RegistryFanoutConcurrencyTests",
               "RemoteRunLocalChainRuntimeTests",
               "RemoteRunLocalValidationTests",
               "GeneratedRemoteHookChainFallbackTests",

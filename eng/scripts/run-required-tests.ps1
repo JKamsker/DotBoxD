@@ -83,6 +83,7 @@ $defaultMinimums = @{
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9
+    RegistryFanoutConcurrencyTests = 6
     RemoteRunLocalChainRuntimeTests = 74
     RemoteRunLocalValidationTests = 9
     GeneratedRemoteHookChainFallbackTests = 38
