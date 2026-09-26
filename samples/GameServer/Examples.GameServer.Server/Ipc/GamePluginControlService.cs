@@ -136,7 +136,15 @@ internal sealed class GamePluginControlService : IGamePluginControlService
                 $"Server extension '{pluginId}' is not owned by this plugin session.");
         }
 
-        return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+        try
+        {
+            return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[server] server extension invoke failed: {ex}");
+            throw;
+        }
     }
 
     public ValueTask UpdateSettingsAsync(
