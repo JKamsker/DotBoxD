@@ -262,6 +262,7 @@ $defaultMinimums = @{
     StreamDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4
     QueryCollectionConversionTests = 12
+    QuerySpanCollectionConversionTests = 8
     QueryConstantConversionTests = 12
     QueryNumericComparisonAllocationTests = 12
     QueryFilterValidationAllocationTests = 6

@@ -522,6 +522,7 @@ jobs:
               "QueryNestedDictionaryComparerTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
+              "QuerySpanCollectionConversionTests",
               "QueryConstantConversionTests",
               "QueryNumericComparisonAllocationTests",
               "QueryFilterValidationAllocationTests",

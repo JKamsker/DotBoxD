@@ -47,10 +47,10 @@ internal static class ContainsMethodFilterTranslator
         }
 
         ValidateSupportedContainsMethod(call);
-        // Only span-based framework calls need an array operand unwrapped. Other collection
+        // Spans need special capture because they cannot be boxed. Other collection
         // conversions must run before comparer validation and value capture.
         var unwrapped = call.Method.DeclaringType == typeof(MemoryExtensions)
-            ? UnwrapSpan(collection)
+            ? PrepareSpanCollection(collection)
             : collection;
         var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
         RejectUnsupportedContainsComparer(call, capturedCollection);
@@ -193,20 +193,41 @@ internal static class ContainsMethodFilterTranslator
         return SupportedCollectionInterfaceDefinitions.Contains(definition);
     }
 
-    // `array.Contains(x)` binds to MemoryExtensions.Contains(ReadOnlySpan<T>, T); the source then appears as
-    // an implicit T[] -> ReadOnlySpan<T> conversion wrapping the real collection.
-    private static Expression UnwrapSpan(Expression collection)
+    // Framework array-to-span conversions preserve the entire array. Other span expressions
+    // must run before copying their selected values into a boxable array.
+    private static Expression PrepareSpanCollection(Expression collection)
     {
-        var stripped = MemberPathReader.StripConvert(collection);
-        if (stripped is MethodCallExpression { Method.Name: "op_Implicit" } conversion)
+        MethodInfo? method = null;
+        Expression? operand = null;
+        if (collection is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
         {
-            var operand = conversion.Object ?? (conversion.Arguments.Count == 1 ? conversion.Arguments[0] : null);
-            if (operand is not null)
-            {
-                return operand;
-            }
+            method = unary.Method;
+            operand = unary.Operand;
+        }
+        else if (collection is MethodCallExpression { Arguments.Count: 1 } call)
+        {
+            method = call.Method;
+            operand = call.Arguments[0];
         }
 
-        return stripped;
+        if (operand?.Type.IsArray == true && method is { Name: "op_Implicit" } && IsSpanType(method.DeclaringType))
+        {
+            return operand;
+        }
+
+        return IsSpanType(collection.Type)
+            ? Expression.Call(collection, nameof(ReadOnlySpan<int>.ToArray), Type.EmptyTypes)
+            : collection;
+    }
+
+    private static bool IsSpanType(Type? type)
+    {
+        if (type is not { IsGenericType: true })
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(Span<>) || definition == typeof(ReadOnlySpan<>);
     }
 }
