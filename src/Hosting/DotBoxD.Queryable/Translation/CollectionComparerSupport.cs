@@ -8,7 +8,7 @@ internal static class CollectionComparerSupport
 {
     public static bool HasUnsupportedComparer(object collection)
     {
-        var comparer = GetComparer(collection, depth: 0);
+        var comparer = GetComparer(collection);
         if (comparer is null || ReferenceEquals(comparer, StringComparer.Ordinal))
         {
             return false;
@@ -55,22 +55,38 @@ internal static class CollectionComparerSupport
         return ReferenceEquals(comparer, defaultComparer);
     }
 
-    private static object? GetComparer(object collection, int depth)
+    private static object? GetComparer(object collection)
     {
-        var type = collection.GetType();
-        // Immutable sets and their builders expose the membership comparer as KeyComparer.
-        var propertyName = UsesKeyComparer(type) ? "KeyComparer" : "Comparer";
-        var comparer = type.GetProperty(propertyName)?.GetValue(collection);
-        if (comparer is not null)
+        HashSet<object>? visited = null;
+        while (true)
         {
-            return comparer;
-        }
+            var type = collection.GetType();
+            // Immutable sets and their builders expose the membership comparer as KeyComparer.
+            var propertyName = UsesKeyComparer(type) ? "KeyComparer" : "Comparer";
+            var comparer = type.GetProperty(propertyName)?.GetValue(collection);
+            if (comparer is not null)
+            {
+                return comparer;
+            }
 
-        if (depth >= 3)
-        {
-            return null;
-        }
+            var inner = GetKeyCollectionOwner(collection, type);
+            if (inner is null)
+            {
+                return null;
+            }
 
+            visited ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
+            if (!visited.Add(collection))
+            {
+                throw new QueryTranslationException("Cannot determine the comparer of a cyclic collection wrapper.");
+            }
+
+            collection = inner;
+        }
+    }
+
+    private static object? GetKeyCollectionOwner(object collection, Type type)
+    {
         if (type.DeclaringType is not { IsGenericType: true } declaringType)
         {
             return null;
@@ -80,7 +96,7 @@ internal static class CollectionComparerSupport
         var definition = declaringType.GetGenericTypeDefinition();
         if (string.Equals(type.Name, "KeyList", StringComparison.Ordinal) && definition == typeof(SortedList<,>))
         {
-            return GetComparerFromField(collection, "_dict", depth);
+            return GetFieldValue(collection, "_dict");
         }
 
         if (!string.Equals(type.Name, "KeyCollection", StringComparison.Ordinal) ||
@@ -89,17 +105,13 @@ internal static class CollectionComparerSupport
             return null;
         }
 
-        return GetComparerFromField(collection, "_dictionary", depth) ??
-            GetComparerFromField(collection, "_collection", depth);
+        return GetFieldValue(collection, "_dictionary") ?? GetFieldValue(collection, "_collection");
     }
 
-    private static object? GetComparerFromField(object collection, string fieldName, int depth)
-    {
-        var inner = collection.GetType()
+    private static object? GetFieldValue(object collection, string fieldName) =>
+        collection.GetType()
             .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)
             ?.GetValue(collection);
-        return inner is null ? null : GetComparer(inner, depth + 1);
-    }
 
     private static bool IsDictionaryKeyCollection(Type type)
         => type == typeof(Dictionary<,>) ||

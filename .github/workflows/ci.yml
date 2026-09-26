@@ -519,6 +519,7 @@ jobs:
               "QueryCustomStringComparerTests",
               "QueryImmutableCollectionComparerTests",
               "QuerySortedListComparerTests",
+              "QueryNestedDictionaryComparerTests",
               "QueryCollectionCaptureTests",
               "QueryConstantConversionTests",
               "QueryNumericComparisonAllocationTests",
