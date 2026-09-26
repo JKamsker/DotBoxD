@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
@@ -31,7 +30,7 @@ public abstract class RpcStreamAttachment
         }
 
         RequireHandle(handle, RpcStreamKind.Binary);
-        return new StreamAttachment(handle, stream, leaveOpen);
+        return new RpcBinaryStreamAttachment(handle, stream, leaveOpen);
     }
 
     /// <summary>
@@ -49,7 +48,7 @@ public abstract class RpcStreamAttachment
         }
 
         RequireHandle(handle, RpcStreamKind.Binary);
-        return new PipeAttachment(handle, pipe, completeReader);
+        return new RpcPipeAttachment(handle, pipe, completeReader);
     }
 
     public static RpcStreamAttachment FromAsyncEnumerable<T>(
@@ -130,137 +129,5 @@ public abstract class RpcStreamAttachment
         {
             throw new ArgumentException($"Stream handle kind must be {expected}.", nameof(handle));
         }
-    }
-
-    private sealed class StreamAttachment : RpcStreamAttachment
-    {
-        private const int ChunkSize = 64 * 1024;
-        private readonly Stream _stream;
-        private readonly bool _leaveOpen;
-
-        public StreamAttachment(RpcStreamHandle handle, Stream stream, bool leaveOpen)
-            : base(handle)
-        {
-            _stream = stream;
-            _leaveOpen = leaveOpen;
-        }
-
-        internal override async Task PumpCoreAsync(
-            RpcStreamManager streams,
-            ISerializer serializer,
-            CancellationToken ct)
-        {
-            var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
-            Exception? pumpFailure = null;
-            try
-            {
-                while (true)
-                {
-                    var read = await _stream.ReadAsync(buffer.AsMemory(0, ChunkSize), ct).ConfigureAwait(false);
-                    if (read == 0)
-                    {
-                        return;
-                    }
-
-                    await streams.SendStreamItemAsync(Handle.StreamId, buffer.AsMemory(0, read), ct)
-                        .ConfigureAwait(false);
-                }
-            }
-            catch (Exception ex)
-            {
-                pumpFailure = ex;
-                throw;
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
-            }
-        }
-
-        private protected override ValueTask DisposeSourceCoreAsync() =>
-            _leaveOpen ? default : DisposeStreamAsync(_stream);
-
-        private protected override bool OwnsSource => !_leaveOpen;
-    }
-
-    private sealed class PipeAttachment : RpcStreamAttachment
-    {
-        private readonly Pipe _pipe;
-        private readonly bool _completeReader;
-
-        public PipeAttachment(RpcStreamHandle handle, Pipe pipe, bool completeReader)
-            : base(handle)
-        {
-            _pipe = pipe;
-            _completeReader = completeReader;
-        }
-
-        internal override async Task PumpCoreAsync(
-            RpcStreamManager streams,
-            ISerializer serializer,
-            CancellationToken ct)
-        {
-            Exception? pumpFailure = null;
-            try
-            {
-                while (true)
-                {
-                    var result = await _pipe.Reader.ReadAsync(ct).ConfigureAwait(false);
-                    var buffer = result.Buffer;
-                    try
-                    {
-                        if (result.IsCanceled)
-                        {
-                            return;
-                        }
-
-                        foreach (var segment in buffer)
-                        {
-                            if (!segment.IsEmpty)
-                            {
-                                await streams.SendStreamItemAsync(Handle.StreamId, segment, ct).ConfigureAwait(false);
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        // A canceled read has not handed any of its buffered bytes to the sender.
-                        _pipe.Reader.AdvanceTo(result.IsCanceled ? buffer.Start : buffer.End);
-                    }
-
-                    if (result.IsCompleted)
-                    {
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                pumpFailure = ex;
-                throw;
-            }
-            finally
-            {
-                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
-            }
-        }
-
-        private protected override ValueTask DisposeSourceCoreAsync() =>
-            _completeReader ? _pipe.Reader.CompleteAsync() : default;
-
-        private protected override bool OwnsSource => _completeReader;
-    }
-
-
-    private static async ValueTask DisposeStreamAsync(Stream stream)
-    {
-        if (stream is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-            return;
-        }
-
-        stream.Dispose();
     }
 }

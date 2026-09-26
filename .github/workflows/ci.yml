@@ -641,6 +641,9 @@ jobs:
               "RpcStreamingContextLifetimeTests",
               "RpcPeerProvideDispatcherTests",
               "RpcPeerProvideContractCompatibilityTests",
+              "RpcStreamAttachmentLifetimeTests",
+              "RpcStreamAttachmentPeerLifetimeTests",
+              "RpcStreamAttachmentAllocationTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
