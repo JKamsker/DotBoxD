@@ -259,6 +259,7 @@ $defaultMinimums = @{
     QueryImmutableCollectionComparerTests = 14
     QuerySortedListComparerTests = 10
     QueryNestedDictionaryComparerTests = 13
+    QueryWrappedCollectionComparerTests = 19
     StreamDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4
     QueryCollectionConversionTests = 12
