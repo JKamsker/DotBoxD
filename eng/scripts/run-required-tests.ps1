@@ -297,6 +297,7 @@ $defaultMinimums = @{
     QueryFilterValidationAllocationTests = 6
     QueryFieldPathAllocationTests = 15
     MemberValueReaderContractTests = 10
+    MemberValueReaderInterfaceTests = 19
     EventQueryNumericRoutingTests = 11
     EventQueryNumericRoutingAllocationTests = 1
     EventIndexNumericComparisonTests = 18

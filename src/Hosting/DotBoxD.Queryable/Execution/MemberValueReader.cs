@@ -83,7 +83,7 @@ public sealed class MemberValueReader
     {
         try
         {
-            MemberInfo? member = type.GetProperty(name, MemberFlags);
+            MemberInfo? member = ResolveProperty(type, name);
             if (member is PropertyInfo property &&
                 (property.GetMethod is not { IsPublic: true } || property.GetIndexParameters().Length != 0))
             {
@@ -100,5 +100,30 @@ public sealed class MemberValueReader
             throw new InvalidOperationException(
                 $"Event type '{type.FullName}' has an ambiguous member '{name}' for query path '{path}'.", ex);
         }
+    }
+
+    private static PropertyInfo? ResolveProperty(Type type, string name)
+    {
+        var property = type.GetProperty(name, MemberFlags);
+        if (property is not null || !type.IsInterface)
+        {
+            return property;
+        }
+
+        // Interface reflection does not include inherited properties. Keep the most-derived
+        // declarations, deduplicate diamonds, and reject unrelated declarations as ambiguous.
+        var inherited = type.GetInterfaces()
+            .SelectMany(parent => parent.GetProperties(MemberFlags))
+            .Where(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal))
+            .Distinct()
+            .ToArray();
+        var matches = inherited.Where(candidate => !inherited.Any(other =>
+            other.DeclaringType!.GetInterfaces().Contains(candidate.DeclaringType!))).ToArray();
+        return matches.Length switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new AmbiguousMatchException($"Interface '{type.FullName}' has ambiguous property '{name}'.")
+        };
     }
 }

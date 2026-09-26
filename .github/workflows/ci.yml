@@ -555,6 +555,7 @@ jobs:
               "QueryFilterValidationAllocationTests",
               "QueryFieldPathAllocationTests",
               "MemberValueReaderContractTests",
+              "MemberValueReaderInterfaceTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
               "EventIndexNumericComparisonTests",
