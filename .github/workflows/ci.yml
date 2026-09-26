@@ -521,6 +521,7 @@ jobs:
               "QueryConstantConversionTests",
               "QueryNumericComparisonAllocationTests",
               "QueryFilterValidationAllocationTests",
+              "QueryFieldPathAllocationTests",
               "MemberValueReaderContractTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",

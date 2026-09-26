@@ -207,9 +207,10 @@ internal static class QueryFilterInvariants
             return false;
         }
 
-        foreach (var segment in field.Split('.'))
+        var path = field.AsSpan();
+        foreach (var segment in path.Split('.'))
         {
-            if (!IsIdentifierSegment(segment))
+            if (!IsIdentifierSegment(path[segment]))
             {
                 return false;
             }
@@ -218,7 +219,7 @@ internal static class QueryFilterInvariants
         return true;
     }
 
-    private static bool IsIdentifierSegment(string segment)
+    private static bool IsIdentifierSegment(ReadOnlySpan<char> segment)
     {
         if (segment.Length == 0 || !(char.IsLetter(segment[0]) || segment[0] == '_'))
         {
