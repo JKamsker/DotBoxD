@@ -1,6 +1,6 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DotBoxD.Codecs.MessagePack;
 using Xunit;
 
@@ -52,9 +52,10 @@ public sealed class MessagePackConstructorReplayPublicationTests
         var guardsField = typeof(ConstructorReplayGuard).GetField(
             "Guards",
             BindingFlags.NonPublic | BindingFlags.Static);
-        var guards = Assert.IsAssignableFrom<ConcurrentDictionary<Type, ConstructorReplayGuard>>(
+        var guards = Assert.IsAssignableFrom<ConditionalWeakTable<Type, ConstructorReplayGuard>>(
             guardsField?.GetValue(null));
-        return guards[type];
+        Assert.True(guards.TryGetValue(type, out var guard));
+        return guard;
     }
 
     private static FieldInfo GetGuardField(string name) =>

@@ -627,6 +627,7 @@ jobs:
               "TcpServerRestartAcceptTests",
               "StreamDedicatedReceiveOperationRetentionTests",
               "TcpDedicatedReceiveOperationRetentionTests",
+              "ConstructorReplayGuardLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `

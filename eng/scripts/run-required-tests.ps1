@@ -314,6 +314,7 @@ $defaultMinimums = @{
     QuerySpanComparerCaptureTests = 22
     StreamDedicatedReceiveOperationRetentionTests = 1
     TcpDedicatedReceiveOperationRetentionTests = 1
+    ConstructorReplayGuardLifetimeTests = 9
     QueryCollectionCaptureTests = 4
     QueryCollectionConversionTests = 12
     QuerySpanCollectionConversionTests = 8
