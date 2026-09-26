@@ -215,6 +215,7 @@ $defaultMinimums = @{
     NamedPipeServerTransportCancellationRegressionTests = 2
     NamedPipeServerLifecycleRaceTests = 2
     TcpServerLifecycleRaceTests = 2
+    TcpServerRestartAcceptTests = 3
     UnsupportedShapeCoverageTests = 8
     UnsupportedDtoConstructibilityTests = 1
     UnsupportedDtoPayloadShapeTests = 5

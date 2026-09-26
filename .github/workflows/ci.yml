@@ -564,6 +564,7 @@ jobs:
               "NamedPipeServerTransportCancellationRegressionTests",
               "NamedPipeServerLifecycleRaceTests",
               "TcpServerLifecycleRaceTests",
+              "TcpServerRestartAcceptTests",
               "StreamDedicatedReceiveOperationRetentionTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
