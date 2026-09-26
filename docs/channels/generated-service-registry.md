@@ -62,6 +62,14 @@ peer.Provide(dispatcher);
 the peer directly. This is the preferred shape for frameworks, plugin hosts, and sidecars
 that expose `Provide<TService>(...)` or `Remote<TService>()` style APIs.
 
+Handwritten `IServiceDispatcher` implementations can be passed directly with
+`peer.Provide(new MyDispatcher())`, without a cast or generated registration. The
+service-provider overload `peer.Provide<MyDispatcher>()` also provides the resolved
+dispatcher directly. When `TService` is an interface contract, `Provide<TService>`
+continues to use that contract's registered factory, even if the implementation also
+implements `IServiceDispatcher`. Pass it as `IServiceDispatcher` to select the direct
+dispatcher overload instead.
+
 ## Generated Service Catalog
 
 Use `DotBoxDGenerated.Services` when you need the list of generated services without

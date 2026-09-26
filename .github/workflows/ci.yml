@@ -639,6 +639,8 @@ jobs:
               "RpcRemoteAsyncEnumerableDisposalTests",
               "RpcRemoteAsyncEnumerableAllocationTests",
               "RpcStreamingContextLifetimeTests",
+              "RpcPeerProvideDispatcherTests",
+              "RpcPeerProvideContractCompatibilityTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
