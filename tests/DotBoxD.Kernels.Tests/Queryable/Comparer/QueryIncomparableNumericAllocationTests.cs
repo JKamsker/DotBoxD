@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using Xunit.Abstractions;
@@ -38,6 +39,8 @@ public sealed class QueryIncomparableNumericAllocationTests(ITestOutputHelper ou
     [InlineData("dbnull", true, QueryComparisonOperator.Equal)]
     [InlineData("dbnull", true, QueryComparisonOperator.NotEqual)]
     [InlineData("dbnull", true, QueryComparisonOperator.GreaterThan)]
+    // Keep tiered optimization of this measurement loop outside the allocation budget.
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public void Incomparable_values_are_rejected_without_allocations(
         string actualKind, bool exactExpected, QueryComparisonOperator comparison)
     {

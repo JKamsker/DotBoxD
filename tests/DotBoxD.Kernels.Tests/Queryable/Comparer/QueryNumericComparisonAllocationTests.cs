@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using Xunit.Abstractions;
@@ -20,6 +21,8 @@ public sealed class QueryNumericComparisonAllocationTests(ITestOutputHelper outp
     [InlineData(QueryValueKind.Decimal, true, QueryComparisonOperator.Equal)]
     [InlineData(QueryValueKind.Decimal, false, QueryComparisonOperator.GreaterThan)]
     [InlineData(QueryValueKind.Decimal, true, QueryComparisonOperator.GreaterThan)]
+    // Keep tiered optimization of this measurement loop outside the allocation budget.
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public void CompareNumeric_DoesNotAllocatePerComparison(
         QueryValueKind kind,
         bool floatingActual,
