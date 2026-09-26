@@ -17,27 +17,30 @@ internal sealed class PendingLiveUpdateQueue
     }
 
     private Exception? _lastError;
+    private long _errorVersion;
 
     public void Enqueue(Action update)
     {
-        var task = Task.Run(() =>
-        {
-            try
-            {
-                update();
-            }
-            catch (Exception ex)
-            {
-                lock (_gate)
-                {
-                    _lastError = ex;
-                }
-
-                throw;
-            }
-        });
+        Task task;
         lock (_gate)
         {
+            task = Task.Run(() =>
+            {
+                try
+                {
+                    update();
+                }
+                catch (Exception ex)
+                {
+                    lock (_gate)
+                    {
+                        _lastError = ex;
+                        _errorVersion++;
+                    }
+
+                    throw;
+                }
+            });
             _pending.Add(task);
         }
 
@@ -69,32 +72,42 @@ internal sealed class PendingLiveUpdateQueue
     {
         cancellationToken.ThrowIfCancellationRequested();
         Task[] pending;
+        long errorVersion;
         lock (_gate)
         {
             _pending.RemoveAll(task => task.IsCompletedSuccessfully);
             pending = _pending.ToArray();
+            errorVersion = _errorVersion;
         }
 
         try
         {
             await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || LastError is not null)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            var failure = LastError ?? ex;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var observed = new HashSet<Task>(pending);
             lock (_gate)
             {
-                _pending.RemoveAll(task => task.IsCompleted);
-                _lastError = failure;
+                // Later enqueues were not awaited by this flush and must keep their failures.
+                _pending.RemoveAll(observed.Contains);
+                _lastError ??= ex;
             }
 
-            throw new InvalidOperationException("A fire-and-forget live setting update failed.", failure);
+            throw new InvalidOperationException("A fire-and-forget live setting update failed.", ex);
         }
 
         lock (_gate)
         {
-            _pending.RemoveAll(task => task.IsCompleted);
-            _lastError = null;
+            _pending.RemoveAll(task => task.IsCompletedSuccessfully);
+            if (_errorVersion == errorVersion)
+            {
+                _lastError = null;
+            }
         }
     }
 }

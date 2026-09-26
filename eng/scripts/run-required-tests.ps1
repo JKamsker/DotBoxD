@@ -80,6 +80,7 @@ $defaultMinimums = @{
     CapabilityPatternAllocationTests = 6
     CapabilityRevocationAllocationTests = 2
     PluginLiveUpdateModeTests = 2
+    PendingLiveUpdateQueueTests = 5
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9

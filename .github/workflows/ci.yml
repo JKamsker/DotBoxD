@@ -383,6 +383,7 @@ jobs:
               "CapabilityPatternAllocationTests",
               "CapabilityRevocationAllocationTests",
               "PluginLiveUpdateModeTests",
+              "PendingLiveUpdateQueueTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
