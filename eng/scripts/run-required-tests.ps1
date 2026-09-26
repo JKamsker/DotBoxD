@@ -303,6 +303,7 @@ $defaultMinimums = @{
     EventQueryDeclaredTypeTests = 10
     MemberValueReaderDeclaredTypeTests = 12
     EventQueryDispatchEdgeCaseTests = 8
+    MemberValueReaderHierarchyTests = 18
     EventQueryNumericRoutingTests = 11
     EventQueryNumericRoutingAllocationTests = 1
     EventIndexNumericComparisonTests = 18

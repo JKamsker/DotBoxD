@@ -116,7 +116,7 @@ public sealed class MemberValueReader
     {
         try
         {
-            MemberInfo? member = ResolveProperty(type, name);
+            var member = type.IsInterface ? ResolveInterfaceProperty(type, name) : ResolveClassMember(type, name);
             if (member is PropertyInfo property &&
                 (property.GetMethod is not { IsPublic: true } || property.GetIndexParameters().Length != 0))
             {
@@ -124,7 +124,6 @@ public sealed class MemberValueReader
                     $"Event property '{type.FullName}.{name}' must have a public parameterless getter for query path '{path}'.");
             }
 
-            member ??= type.GetField(name, MemberFlags);
             return member ?? throw new InvalidOperationException(
                 $"Event type '{type.FullName}' has no public instance member '{name}' for query path '{path}'.");
         }
@@ -135,10 +134,28 @@ public sealed class MemberValueReader
         }
     }
 
-    private static PropertyInfo? ResolveProperty(Type type, string name)
+    private static MemberInfo? ResolveClassMember(Type type, string name)
+    {
+        // Resolve each declaration level before moving to its base, so an inherited property
+        // cannot displace a nearer field or make a nearer property appear ambiguous.
+        const BindingFlags flags = MemberFlags | BindingFlags.DeclaredOnly;
+        for (Type? current = type; current is not null; current = current.BaseType)
+        {
+            MemberInfo? member = current.GetProperty(name, flags);
+            member ??= current.GetField(name, flags);
+            if (member is not null)
+            {
+                return member;
+            }
+        }
+
+        return null;
+    }
+
+    private static PropertyInfo? ResolveInterfaceProperty(Type type, string name)
     {
         var property = type.GetProperty(name, MemberFlags);
-        if (property is not null || !type.IsInterface)
+        if (property is not null)
         {
             return property;
         }

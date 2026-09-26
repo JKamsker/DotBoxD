@@ -561,6 +561,7 @@ jobs:
               "EventQueryDeclaredTypeTests",
               "MemberValueReaderDeclaredTypeTests",
               "EventQueryDispatchEdgeCaseTests",
+              "MemberValueReaderHierarchyTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
               "EventIndexNumericComparisonTests",
