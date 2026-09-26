@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace DotBoxD.Queryable.Translation;
 
@@ -98,7 +99,7 @@ internal static class MemberPathReader
         var current = expression ?? throw new ArgumentNullException(nameof(expression));
         while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
         {
-            if (!IsTransparentPathConversion(unary.Operand.Type, unary.Type))
+            if (!IsTransparentPathConversion(unary.Operand.Type, unary.Type) || !IsTransparentConversionMethod(unary))
             {
                 if (ReferencesParameter(unary.Operand, parameter))
                 {
@@ -120,6 +121,20 @@ internal static class MemberPathReader
         member.Expression?.Type is { } declaringType &&
         Nullable.GetUnderlyingType(declaringType) is not null &&
         (member.Member.Name == "HasValue" || member.Member.Name == "Value");
+
+    private static bool IsTransparentConversionMethod(UnaryExpression conversion)
+    {
+        if (conversion.Method is not { } method)
+        {
+            return true;
+        }
+
+        // Integral-to-decimal widening uses a framework operator, including lifted nullable forms.
+        // Matching only operand types would also discard arbitrary user-supplied conversion methods.
+        var source = Nullable.GetUnderlyingType(conversion.Operand.Type) ?? conversion.Operand.Type;
+        return method == typeof(decimal).GetMethod(
+            "op_Implicit", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly, [source]);
+    }
 
     private static bool IsTransparentPathConversion(Type source, Type target)
     {
