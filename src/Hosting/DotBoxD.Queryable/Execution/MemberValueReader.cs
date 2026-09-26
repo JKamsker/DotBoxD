@@ -6,7 +6,8 @@ namespace DotBoxD.Queryable.Execution;
 
 /// <summary>
 /// Reads dotted member paths (for example <c>AttackerId</c> or <c>Source.Id</c>) off runtime event objects
-/// via cached reflection. The resolved property/field chain is cached per (runtime type, path); a
+/// via cached reflection. Paths use the declared root type when one is supplied, otherwise the target's
+/// runtime type. The resolved property/field chain is cached per (root type, path); a
 /// <see langword="null"/> anywhere along the chain short-circuits to <see langword="null"/>. The reader is
 /// thread-safe and intended to be shared across a dispatcher.
 /// </summary>
@@ -16,6 +17,29 @@ public sealed class MemberValueReader
 
     // A shared reader must not keep transient event types alive after their instances are gone.
     private readonly ConditionalWeakTable<Type, ConcurrentDictionary<string, MemberInfo[]>> _chains = new();
+    private readonly Type? _rootType;
+
+    /// <summary>Creates a reader that resolves paths from each target's runtime type.</summary>
+    public MemberValueReader()
+    {
+    }
+
+    /// <summary>
+    /// Creates a reader that resolves paths from <paramref name="rootType"/>, preserving declared
+    /// interface members and base members hidden by a target's runtime type. Targets must be instances
+    /// of this closed, boxable type. Virtual getters still dispatch to their runtime overrides.
+    /// </summary>
+    public MemberValueReader(Type rootType)
+    {
+        ArgumentNullException.ThrowIfNull(rootType);
+        if (rootType.ContainsGenericParameters || rootType.IsByRef || rootType.IsPointer ||
+            rootType.IsFunctionPointer || rootType.IsByRefLike || rootType == typeof(void))
+        {
+            throw new ArgumentException("The root type must be a closed, boxable type.", nameof(rootType));
+        }
+
+        _rootType = rootType;
+    }
 
     /// <summary>Reads the value at <paramref name="path"/> from <paramref name="target"/>, or <see langword="null"/>.</summary>
     public object? Read(object target, string path)
@@ -23,7 +47,12 @@ public sealed class MemberValueReader
         ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        var type = target.GetType();
+        var type = _rootType ?? target.GetType();
+        if (_rootType is not null && !type.IsInstanceOfType(target))
+        {
+            throw new ArgumentException($"The target must be an instance of '{type}'.", nameof(target));
+        }
+
         var chain = _chains.GetValue(type, static _ => new(StringComparer.Ordinal)).GetOrAdd(
             path, static (currentPath, rootType) => ResolveChain(rootType, currentPath), type);
         object? current = target;

@@ -9,19 +9,22 @@ namespace DotBoxD.Kernels.Tests.Queryable;
 public sealed class MemberValueReaderCacheAllocationTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData("Value")]
-    [InlineData("Field")]
-    [InlineData("Child.Value")]
-    public void Warm_member_path_reads_remain_allocation_free(string path)
+    [InlineData("Value", false)]
+    [InlineData("Field", false)]
+    [InlineData("Child.Value", false)]
+    [InlineData("Value", true)]
+    [InlineData("Field", true)]
+    [InlineData("Child.Value", true)]
+    public void Warm_member_path_reads_remain_allocation_free(string path, bool declaredType)
     {
-        var reader = new MemberValueReader();
+        var reader = declaredType ? new MemberValueReader(typeof(EventState)) : new MemberValueReader();
         var value = new EventState();
         Assert.Equal("value", reader.Read(value, path));
         _ = Measure(reader, value, path);
 
         var bytes = Measure(reader, value, path);
 
-        output.WriteLine($"{path}: {bytes / 1000D} B/read");
+        output.WriteLine($"{path}, declaredType={declaredType}: {bytes / 1000D} B/read");
         Assert.Equal(0, bytes);
     }
 

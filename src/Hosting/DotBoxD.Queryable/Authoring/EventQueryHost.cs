@@ -16,7 +16,6 @@ namespace DotBoxD.Queryable.Authoring;
 /// </summary>
 public sealed class EventQueryHost : IEventQuerySource
 {
-    private readonly MemberValueReader _reader = new();
     private readonly object _gate;
     private readonly Func<bool>? _isDisposed;
     // Read lock-free on the hot PublishAsync/HasSubscriptions path; the dispatcher set only mutates on
@@ -114,7 +113,7 @@ public sealed class EventQueryHost : IEventQuerySource
         {
             if (!_dispatchers.TryGetValue(typeof(TEvent), out var existing))
             {
-                existing = new EventQueryDispatcher<TEvent>(_reader, _isDisposed);
+                existing = new EventQueryDispatcher<TEvent>(new MemberValueReader(typeof(TEvent)), _isDisposed);
                 _dispatchers[typeof(TEvent)] = existing;
             }
 

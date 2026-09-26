@@ -45,6 +45,21 @@ So this is a category difference, not a missing annotation. The shared *vocabula
 - **Building a dynamic, host-side subscription** whose predicate is only known at runtime (built from user
   input, config, or captured state): use `EventQuery<TEvent>`.
 
+## Declared event types and public execution primitives
+
+An authored `EventQuery<TEvent>` resolves filter paths from `TEvent`. Explicit interface implementations
+and base members hidden by a runtime event class therefore keep the member identity used by the authored
+predicate and projection. Virtual getters still dispatch to runtime overrides.
+
+Handwritten query ASTs can use the same behavior with `new MemberValueReader(typeof(TEvent))`, passed to
+`QueryFilterEvaluator.Evaluate` or `QueryFilterCompiler.Compile`. The reader requires a closed, boxable
+root type and rejects targets that are not instances of that type. The parameterless constructor retains
+runtime-type lookup for callers that intentionally read arbitrary event shapes.
+
+The declared-type constructor is an additive public API so this behavior remains available without the
+authoring helpers. Existing constructor and method signatures are retained; this addition requires no
+breaking-version bump and keeps the current package-versioning scheme.
+
 ## A possible future bridge (not built)
 
 `EventQuery`'s portable `QueryFilter` / `QueryProjection` AST and the pipeline's `LoweredPipelineStep` are both

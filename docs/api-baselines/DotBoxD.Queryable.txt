@@ -67,6 +67,8 @@ public long EventsObserved => _eventsObserved()
 public long FilterEvaluations => Interlocked.Read(ref _filterEvaluations)
 public long Integer { get; }
 public long Matches => Interlocked.Read(ref _matches)
+public MemberValueReader()
+public MemberValueReader(Type rootType)
 public object? Read(object target, string path)
 public override EventQueryDocument Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 public override int GetHashCode()
