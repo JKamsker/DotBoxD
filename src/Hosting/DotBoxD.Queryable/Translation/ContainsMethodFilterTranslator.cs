@@ -192,8 +192,8 @@ internal static class ContainsMethodFilterTranslator
         return SupportedCollectionInterfaceDefinitions.Contains(definition);
     }
 
-    // Framework array-to-span conversions preserve the entire array. Other span expressions
-    // must run before copying their selected values into a boxable array.
+    // Framework array-to-span conversions preserve the entire array and map null to an empty span.
+    // Other span expressions must run before copying their selected values into a boxable array.
     private static Expression PrepareSpanCollection(Expression collection)
     {
         MethodInfo? method = null;
@@ -211,7 +211,8 @@ internal static class ContainsMethodFilterTranslator
 
         if (operand?.Type.IsArray == true && method is { Name: "op_Implicit" } && IsSpanType(method.DeclaringType))
         {
-            return operand;
+            var empty = Expression.Call(typeof(Array), nameof(Array.Empty), [operand.Type.GetElementType()!]);
+            return Expression.Coalesce(operand, empty);
         }
 
         return IsSpanType(collection.Type)

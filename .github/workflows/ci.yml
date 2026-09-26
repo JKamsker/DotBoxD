@@ -551,6 +551,7 @@ jobs:
               "QueryHiddenCollectionComparerTests",
               "QueryFrameworkMembershipCaptureTests",
               "QueryArrayElementTypeCaptureTests",
+              "QueryNullArraySpanCaptureTests",
               "QueryCollectionCaptureTests",
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",
