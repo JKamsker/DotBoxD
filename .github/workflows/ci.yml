@@ -638,6 +638,9 @@ jobs:
               "RpcRemoteAsyncEnumerableLifetimeTests",
               "RpcRemoteAsyncEnumerableDisposalTests",
               "RpcRemoteAsyncEnumerableAllocationTests",
+              "RpcStreamingContextLifetimeTests",
+              "RpcStreamingContextPeerLifetimeTests",
+              "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `

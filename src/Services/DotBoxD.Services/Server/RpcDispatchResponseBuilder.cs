@@ -91,6 +91,7 @@ internal sealed class RpcDispatchResponseBuilder
         // reported as ServiceNotFound instead of escaping as an internal lookup error.
         if (dispatcher is null)
         {
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
             var error = RpcErrors.ServiceNotFound();
             telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
             return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);

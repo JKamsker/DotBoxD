@@ -180,6 +180,7 @@ internal sealed partial class RpcPeerInboundDispatcher
             await using (outbound.ConfigureAwait(false))
             {
                 registered = true;
+                streaming.ReleaseResponseOwnership();
                 outbound.Start();
                 await outbound.WaitAsync().ConfigureAwait(false);
             }
@@ -188,16 +189,14 @@ internal sealed partial class RpcPeerInboundDispatcher
         {
             if (!registered)
             {
-                await stream.DisposeSourceBestEffortAsync("Inbound response stream source cleanup failed")
-                    .ConfigureAwait(false);
+                await streaming.AbandonResponseAsync().ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
             if (!registered)
             {
-                await stream.DisposeSourceBestEffortAsync("Inbound response stream source cleanup failed")
-                    .ConfigureAwait(false);
+                await streaming.AbandonResponseAsync().ConfigureAwait(false);
             }
 
             _dispatchError(inbound, ex);
