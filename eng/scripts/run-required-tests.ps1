@@ -93,6 +93,7 @@ $defaultMinimums = @{
     ServerExtensionValueTaskProxyTests = 3
     GameServerCancellationDiagnosticTests = 4
     GameServerDiagnosticFailureTests = 6
+    GameServerPolicyTests = 4
     MarshallerCacheLifetimeTests = 18
     MarshallerCacheAllocationTests = 10
     ParameterReaderCacheLifetimeTests = 3
