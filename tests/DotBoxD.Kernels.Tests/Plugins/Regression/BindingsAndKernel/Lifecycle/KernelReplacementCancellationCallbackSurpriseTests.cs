@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
@@ -43,7 +44,44 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await execution);
     }
 
-    private static BindingDescriptor Descriptor(ThrowingCancellationCallbackBinding binding)
+    [Fact]
+    public async Task InstallAsync_completes_when_incumbent_cancellation_callback_joins_its_execution()
+    {
+        var binding = new SelfJoiningCancellationCallbackBinding();
+        using var server = PluginServer.Create(
+            configureHost: builder => builder.AddBinding(binding.Descriptor()),
+            defaultPolicy: CreatePolicy());
+        var incumbent = await server.InstallAsync(CreatePackage());
+        var execution = incumbent.ShouldHandleAsync(EventAdapter.Instance, new ReplacementEvent()).AsTask();
+        await binding.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        binding.ExecutionToJoin.TrySetResult(execution);
+
+        var replacementTask = Task.Run(async () => await server.InstallAsync(CreatePackage()));
+        InstalledKernel replacement;
+        try
+        {
+            replacement = await replacementTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            binding.AllowCancellationCallbackToReturn.TrySetResult();
+            try
+            {
+                await replacementTask.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch
+            {
+                // Preserve the original timeout while allowing the test callback to unwind.
+            }
+        }
+
+        Assert.True(incumbent.IsRevoked);
+        Assert.Same(replacement, server.Kernels.Get("replacement-cancellation-callback"));
+        var failure = await Assert.ThrowsAsync<SandboxRuntimeException>(async () => await execution);
+        Assert.Equal(SandboxErrorCode.PolicyDenied, failure.Error.Code);
+    }
+
+    private static BindingDescriptor Descriptor(ICancellationCallbackBinding binding)
         => new(
             BindingId,
             SemVersion.One,
@@ -111,7 +149,12 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
             .WithWallTime(TimeSpan.FromSeconds(5))
             .Build();
 
-    private sealed class ThrowingCancellationCallbackBinding
+    private interface ICancellationCallbackBinding
+    {
+        ValueTask<SandboxValue> InvokeAsync(CancellationToken cancellationToken);
+    }
+
+    private sealed class ThrowingCancellationCallbackBinding : ICancellationCallbackBinding
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ExecutionObservedCancellation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -131,6 +174,39 @@ public sealed class KernelReplacementCancellationCallbackSurpriseTests
             {
                 ExecutionObservedCancellation.TrySetResult();
             }
+        }
+    }
+
+    private sealed class SelfJoiningCancellationCallbackBinding : ICancellationCallbackBinding
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<Task> ExecutionToJoin { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource AllowCancellationCallbackToReturn { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BindingDescriptor Descriptor() => KernelReplacementCancellationCallbackSurpriseTests.Descriptor(this);
+
+        public async ValueTask<SandboxValue> InvokeAsync(CancellationToken cancellationToken)
+        {
+            using var registration = cancellationToken.Register(
+                () =>
+                {
+                    var execution = ExecutionToJoin.Task.GetAwaiter().GetResult();
+                    var terminal = Task.WhenAny(execution, AllowCancellationCallbackToReturn.Task).GetAwaiter().GetResult();
+                    if (ReferenceEquals(terminal, execution))
+                    {
+                        try
+                        {
+                            execution.GetAwaiter().GetResult();
+                        }
+                        catch
+                        {
+                            // The callback only joins the execution; its terminal is asserted by the test.
+                        }
+                    }
+                });
+            Started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            return SandboxValue.FromBool(true);
         }
     }
 
