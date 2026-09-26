@@ -163,7 +163,7 @@ public static QueryProjection TranslateProjection<TEvent, TProjection>( Expressi
 public static QueryProjectionField FromConstant(string name, QueryValue constant)
 public static QueryProjectionField FromMember(string name, string path)
 public static QueryTranslationException Unsupported(Expression expression, string? reason = null)
-public static QueryValue FromBoolean(bool value) => new(QueryValueKind.Boolean, value, 0, 0, null)
+public static QueryValue FromBoolean(bool value) => value ? TrueValue : FalseValue
 public static QueryValue FromDecimal(decimal value) => new(QueryValueKind.Decimal, value)
 public static QueryValue FromGuid(Guid value) => new(QueryValueKind.Guid, value)
 public static QueryValue FromInteger(long value) => new(QueryValueKind.Integer, false, value, 0, null)

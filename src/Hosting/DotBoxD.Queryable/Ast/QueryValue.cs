@@ -12,6 +12,9 @@ namespace DotBoxD.Queryable.Ast;
 /// </summary>
 public sealed partial record QueryValue
 {
+    private static readonly QueryValue FalseValue = new(QueryValueKind.Boolean, false, 0, 0, null);
+    private static readonly QueryValue TrueValue = new(QueryValueKind.Boolean, true, 0, 0, null);
+
     private QueryValue(QueryValueKind kind, bool boolean, long integer, double number, string? text)
     {
         Kind = kind;
@@ -116,8 +119,8 @@ public sealed partial record QueryValue
     /// <summary>The shared <c>null</c> literal.</summary>
     public static QueryValue Null { get; } = new(QueryValueKind.Null, false, 0, 0, null);
 
-    /// <summary>Creates a boolean value.</summary>
-    public static QueryValue FromBoolean(bool value) => new(QueryValueKind.Boolean, value, 0, 0, null);
+    /// <summary>Returns a shared immutable boolean value. Capture metadata can be attached to a separate <c>with</c> copy.</summary>
+    public static QueryValue FromBoolean(bool value) => value ? TrueValue : FalseValue;
 
     /// <summary>Creates a signed integral value.</summary>
     public static QueryValue FromInteger(long value) => new(QueryValueKind.Integer, false, value, 0, null);
