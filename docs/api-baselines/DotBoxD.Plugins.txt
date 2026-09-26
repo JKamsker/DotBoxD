@@ -4,7 +4,6 @@
 
 protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 public async Task DrainAsync()
-public ValueTask DispatchAsync( string subscriptionId, ReadOnlyMemory<byte> projectedValue, HookContext context, CancellationToken cancellationToken = default)
 public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public async ValueTask HandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask ModifySettingsAsync( IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
@@ -18,7 +17,9 @@ public async ValueTask<InstalledKernel> InstallServerExtensionAsync( PluginPacka
 public async ValueTask<InstalledKernel> InstallStagedAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public async ValueTask<SandboxValue> InvokeServerExtensionAsync( IReadOnlyList<SandboxValue> arguments, CancellationToken cancellationToken = default)
 public async ValueTask<string> RegisterServerExtensionAsync<TService, TKernel>( SandboxPolicy? policy = null, CancellationToken cancellationToken = default) where TService : class where TKernel : class
+public bool AllowUnsigned { get; }
 public bool BoolValue { get; }
+public bool Completed { get; init; } = true
 public bool CouldMatch(TEvent value)
 public bool HasIndex => _checks.Count > 0
 public bool IndexCoversPredicate { get; init; }
@@ -28,6 +29,7 @@ public bool LocalTerminal { get; init; }
 public bool Owns(string pluginId)
 public bool ReadBool()
 public bool Register<TEvent>( IPluginEventAdapter<TEvent> adapter, InstalledKernel kernel, IReadOnlyList<IndexedPredicate> predicates, bool indexCoversPredicate)
+public bool RequiresAdditionalPermission => Added.Count != 0
 public bool ResultLocalTerminal { get; init; }
 public bool Succeeded { get; init; }
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
@@ -42,6 +44,9 @@ public class HookStage<TEvent, TCurrent, TContext>
 public class ServerExtensionProxy : DispatchProxy
 public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEvent>
 public class SubscriptionStage<TEvent, TCurrent, TContext>
+public const int CurrentFormatVersion = 1
+public const int CurrentSchemaVersion = 1
+public const int MaximumJsonLength = 16 * 1024 * 1024
 public const string CapabilityId = "host.message.write"
 public const string SendBindingId = "host.message.send"
 public delegate ValueTask RemoteLocalPush(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken cancellationToken)
@@ -94,6 +99,7 @@ public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError
 public Exception? LastAsyncUpdateError => Kernel.LastAsyncUpdateError
 public ExecutionMode ActualMode { get; init; }
 public ExecutionMode RequestedMode { get; init; }
+public ExecutionTrace Redact(Func<ExecutionTrace, ExecutionTrace> redact)
 public Func<KernelWireTerminal, KernelWireTerminal>? ClassifyOverride { get; init; }
 public Guid ReadGuid()
 public HookPipeline<TEvent, HookContext> On<TEvent>()
@@ -177,6 +183,8 @@ public interface ILiveSetting
 public interface IServerExtensionClientRegistry :
 public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtensionWireClient
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()
+public IReadOnlyList<BindingSignature> Bindings { get => _bindings; init => _bindings = Array.AsReadOnly(value.ToArray()); }
+public IReadOnlyList<CapabilityGrant> Grants { get => _grants; init => _grants = Array.AsReadOnly(value.ToArray()); }
 public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value, nameof(Subscriptions)); }
 public IReadOnlyList<IndexedPredicate> HonoredPredicates { get; }
 public IReadOnlyList<IndexedPredicate> IndexedPredicates { get; init; }
@@ -185,9 +193,17 @@ public IReadOnlyList<InstalledKernel> Snapshot()
 public IReadOnlyList<LiveSettingDefinition> Definitions { get; }
 public IReadOnlyList<LiveSettingDefinition> LiveSettings { get => _liveSettings; init => _liveSettings = PluginModelCopy.List(value, nameof(LiveSettings)); }
 public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot()
+public IReadOnlyList<RecordedBindingCall> Calls { get => _calls; init => _calls = Array.AsReadOnly(value.ToArray()); }
+public IReadOnlyList<SandboxAuditEvent> AuditEvents { get => _auditEvents; init => _auditEvents = Array.AsReadOnly(value.ToArray()); }
+public IReadOnlyList<string> Added { get; }
+public IReadOnlyList<string> DeclaredOpaqueIdTypes { get => _opaqueTypes; init => _opaqueTypes = Array.AsReadOnly(value.ToArray()); }
 public IReadOnlyList<string> Effects { get => _effects; init => _effects = PluginModelCopy.List(value, nameof(Effects)); }
 public IReadOnlyList<string> GetRequiredCapabilities(PluginPackage package)
+public IReadOnlyList<string> Removed { get; }
 public IReadOnlyList<string> RequiredCapabilities { get; init; }
+public IReadOnlyList<string> Unchanged { get; }
+public IReadOnlyList<TraceValue> Arguments { get => _arguments; init => _arguments = Array.AsReadOnly(value.ToArray()); }
+public IReadOnlyList<TraceValue> Items { get => _items; init => _items = Array.AsReadOnly(value.ToArray()); }
 public IRExpressionBuilder Expression => expression
 public IRFunc<TInput, bool> Filter( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public IRFunc<TInput, TContext, bool> FilterWithContext<TContext>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
@@ -228,6 +244,7 @@ public PluginManifest Manifest { get; }
 public PluginPackage Package { get; }
 public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
 public PluginSession CreateSession()
+public PluginTrustPolicy(IEnumerable<PluginPublisherKey> approvedKeys, bool allowUnsigned = false)
 public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
 public readonly record struct KernelWireTerminal( KernelWireKind Kind, string? CallbackSubscriptionId, Type? ResultType, int Priority)
 public readonly record struct WireCallbacks(RemoteLocalPush? LocalPush, RemoteLocalResultRequest? LocalResult)
@@ -500,6 +517,8 @@ public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>( Func<TEvent, HookCo
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>( Func<TEvent, TNext> projection, IRFunc<TEvent, TNext>? irProjection = null)
 public SandboxErrorCode? ErrorCode { get; init; }
 public SandboxErrorCode? FallbackReason { get; init; }
+public SandboxPolicy Restore() => new(PolicyId, AllowedEffects, Grants, ResourceLimits,
+public SandboxValue Restore() => Restore(0)
 public SandboxValue ToSandboxValue()
 public sealed class EventIndexKeyAttribute : Attribute
 public sealed class EventIndexMatcher<TEvent>
@@ -510,7 +529,9 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 public sealed class LiveContext<T> where T : class
 public sealed class LiveSettingStore
 public sealed class LiveValue<T> : ICoercibleLiveSetting
+public sealed class PluginCapabilityChanges
 public sealed class PluginEventAdapterRegistry
+public sealed class PluginTrustPolicy
 public sealed class RemoteHookRegistry
 public sealed class RemoteLocalHandlerRegistry
 public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
@@ -532,39 +553,62 @@ public sealed partial class RemoteHookPipeline<TEvent, TContext>
 public sealed partial class RemoteHookPipeline<TEvent>
 public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
 public sealed partial class RemoteHookStage<TEvent, TCurrent>
+public sealed record CapabilityExplanation(string Capability, bool Granted, string Explanation)
+public sealed record ExecutionExplanation(ExecutionMode SelectedMode, bool CompiledCandidate, string Reason)
+public sealed record ExecutionReplayResult(bool Matches, SandboxExecutionResult Execution, string? Difference)
+public sealed record ExecutionTrace( int FormatVersion, TraceRuntime Runtime, string ModuleJson, string ModuleHash, string PolicyHash, string BindingManifestHash, TracePolicy Policy, IReadOnlyList<BindingSignature> Bindings, string Entrypoint, TraceValue Input, ExecutionMode RequestedMode, ExecutionMode ActualMode, bool InitiallyCancelled, IReadOnlyList<RecordedBindingCall> Calls, TraceValue? Result, SandboxErrorCode? ErrorCode, bool IsRedacted = false)
 public sealed record HookSubscriptionManifest(string Event, string Kernel)
 public sealed record IndexedPredicate( string Path, IndexPredicateOperator Operator, object? Value, string ValueType)
 public sealed record KernelEntrypoints(string ShouldHandle, string Handle)
+public sealed record KernelInspection( string ModuleId, bool Valid, IReadOnlyList<SandboxDiagnostic> Diagnostics, IReadOnlyList<CapabilityExplanation> Capabilities, IReadOnlyList<BindingSignature> Bindings, ResourceLimits Limits, IReadOnlyList<LoweredOperation> Operations, string LoweredJson)
 public sealed record LiveSettingDefinition( string Name, string Type, object? DefaultValue, object? Min = null, object? Max = null)
+public sealed record LoweredOperation(string Function, string Operation, SourceSpan Span)
+public sealed record PluginArtifact( int SchemaVersion, string PluginId, string Version, string Publisher, string PackageJson, string ContentHash, string? KeyId, string? Signature)
 public sealed record PluginDiagnosticReference( string Code, PluginDiagnosticPhase Phase, PluginDiagnosticAudience Audience, string Meaning, string LikelyCause, string Remediation)
 public sealed record PluginExecutionObservation( string Entrypoint, ExecutionMode RequestedMode, ExecutionMode ActualMode, bool Succeeded, SandboxErrorCode? ErrorCode, SandboxErrorCode? FallbackReason, string CacheStatus, string? RuntimeForm, string? CacheKey, string? ArtifactHash, string? MaterializationStatus)
 public sealed record PluginManifest( string PluginId, string Contract, ExecutionMode Mode, IReadOnlyList<string> Effects, IReadOnlyList<LiveSettingDefinition> LiveSettings, IReadOnlyList<HookSubscriptionManifest> Subscriptions)
 public sealed record PluginPackage( PluginManifest Manifest, SandboxModule Module, KernelEntrypoints Entrypoints)
+public sealed record PluginPublisherKey(string Publisher, string SubjectPublicKeyInfo)
+public sealed record RecordedBindingCall( string BindingId, IReadOnlyList<TraceValue> Arguments, TraceValue? Result, SandboxError? Error, bool CancellationRequested)
 public sealed record ResultHookFault(Type EventType, Exception Exception)
 public sealed record SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
+public sealed record TracePolicy( string PolicyId, SandboxEffect AllowedEffects, IReadOnlyList<CapabilityGrant> Grants, ResourceLimits ResourceLimits, bool Deterministic, DateTimeOffset? LogicalNow, ulong? RandomSeed, IReadOnlyList<string> DeclaredOpaqueIdTypes)
+public sealed record TraceRuntime(string Framework, string Language, string Compiler, string Verifier, string TypeSystem)
+public sealed record TraceValue(SandboxType Type, string? Text, IReadOnlyList<TraceValue> Items)
+public sealed record VerifiedPluginArtifact(PluginArtifact Artifact, PluginPackage Package, bool IsSigned)
 public sealed record WireOptions
+public static async Task<ExecutionReplayResult> RunAsync( ExecutionTrace trace, ExecutionMode mode = ExecutionMode.Interpreted, CancellationToken cancellationToken = default)
+public static async Task<ExecutionTrace> CaptureAsync( SandboxModule module, SandboxPolicy policy, IEnumerable<BindingDescriptor> bindings, string entrypoint, SandboxValue input, ExecutionMode mode = ExecutionMode.Interpreted, CancellationToken cancellationToken = default)
 public static BindingDescriptor CreateSend(IPluginMessageSink sink)
 public static bool TryGetReference(string code, out PluginDiagnosticReference reference)
 public static byte[] EncodeArguments(IReadOnlyList<KernelRpcValue> arguments)
 public static byte[] EncodeValue(KernelRpcValue value)
 public static byte[] EncodeValue(SandboxValue value)
+public static byte[] GetSigningBytes(PluginArtifact artifact)
+public static class ExecutionRecording
+public static class ExecutionReplay
 public static class HostMessagePolicyBuilderExtensions
 public static class HostServiceBindingExtensions
 public static class IRBuilder
 public static class KernelPackageRegistry
 public static class KernelRpcValueConverter
+public static class PluginArtifactSigning
 public static class PluginDiagnosticCodes
+public static class PluginInspection
 public static class PluginMessageBindings
 public static class PluginPackageJsonSchemas
 public static class PluginPackageJsonSerializer
 public static class PluginServerJsonExtensions
 public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
+public static ExecutionExplanation ExplainExecution( ExecutionPlan plan, string entrypoint, SandboxExecutionOptions options, int runCount = 1, bool compilerConfigured = true)
+public static ExecutionTrace Deserialize(string json)
 public static IRBuilder<TInput> For<TInput>()
 public static IRBuilder<TInput> For<TInput>(SourceSpan span)
 public static IReadOnlyCollection<string> IndexKeyNames => (IReadOnlyCollection<string>)IndexKeys.Keys
 public static IReadOnlyList<PluginDiagnosticReference> All => References
 public static IRKernel FromPackage(PluginPackage package) => new(package, projectedPayloadDecoder: null)
 public static IRKernel FromPackage<TProjected>( PluginPackage package, Func<ReadOnlyMemory<byte>, TProjected> projectedPayloadDecoder)
+public static KernelInspection Explain(SandboxModule module, IBindingCatalog bindings, SandboxPolicy policy)
 public static KernelRpcValue Bool(bool value)
 public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
 public static KernelRpcValue Double(double value)
@@ -581,6 +625,10 @@ public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
 public static object? FromSandboxValue(SandboxValue value, Type type)
 public static partial class KernelRpcBinaryCodec
 public static partial class KernelRpcMarshaller
+public static PluginArtifact CreateUnsigned(PluginPackage package, string version, string publisher)
+public static PluginArtifact Deserialize(string json)
+public static PluginArtifact Sign(PluginPackage package, string version, string publisher, RSA privateKey)
+public static PluginCapabilityChanges Compare(PluginManifest previous, PluginManifest next)
 public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
 public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
@@ -597,8 +645,12 @@ public static SandboxType SandboxTypeOf(Type type)
 public static SandboxValue ToSandboxValue(KernelRpcValue value, SandboxType expectedType)
 public static SandboxValue ToSandboxValue(object? value, Type type)
 public static string Export(PluginPackage package, bool indented = false)
+public static string GetKeyId(RSA key)
 public static string PackageEnvelope => PackageEnvelopeResource.Value
 public static string SchemaVersion => JsonSchemas.SchemaVersion
+public static TracePolicy Capture(SandboxPolicy policy) => new(policy.PolicyId, policy.AllowedEffects,
+public static TraceRuntime Current => new(Environment.Version.ToString(), SandboxLanguage.CurrentVersionText,
+public static TraceValue Capture(SandboxValue value) => Capture(value, 0)
 public static TService Create<TService>(InstalledKernel kernel) where TService : class
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginServer server, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginSession session, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
@@ -617,6 +669,8 @@ public string Name => Definition.Name
 public string PluginId { get; }
 public string ReadString()
 public string Remediation { get; init; }
+public string Serialize()
+public string Serialize() => JsonSerializer.Serialize(this, Options)
 public string TextValue { get; }
 public string? ArtifactHash { get; init; }
 public string? CacheKey { get; init; }
@@ -681,6 +735,7 @@ public TSettings Value { get; }
 public Type EventType { get; init; }
 public TypedInstalledKernel<TSettings> As<TSettings>() where TSettings : class => new(this)
 public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
+public ValueTask DispatchAsync( string subscriptionId, ReadOnlyMemory<byte> projectedValue, HookContext context, CancellationToken cancellationToken = default)
 public ValueTask DisposeAsync()
 public ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public ValueTask ModifyAsync( Action<TSettings> modify, bool atomic = false, CancellationToken cancellationToken = default)
@@ -692,6 +747,7 @@ public ValueTask<TResult?> FireAsync<TContext, TResult>( TContext context, Cance
 public ValueTask<TResult?> FireAsync<TContext, TResult>( TContext context, ResultHookDispatchOptions<TResult> options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public ValueTask<TResult?> FireResultAsync<TResult>( TEvent e, ResultHookDispatchOptions<TResult> options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
+public VerifiedPluginArtifact Verify(PluginArtifact artifact)
 public void Clear()
 public void Dispose()
 public void EnsureConsumed()

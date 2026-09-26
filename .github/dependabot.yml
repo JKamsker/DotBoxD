@@ -25,6 +25,7 @@ updates:
       # Roslyn versions are hand-managed (generators pin 4.8 shipped / 4.14 host) — see
       # Directory.Packages.props. Bumps must be deliberate, not automated.
       - dependency-name: "Microsoft.CodeAnalysis.*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
       # Verify snapshot tooling: a major can change snapshot format/behaviour and churn every
       # generator baseline. Bump deliberately.
       - dependency-name: "Verify.*"

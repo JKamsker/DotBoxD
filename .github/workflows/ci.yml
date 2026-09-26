@@ -315,6 +315,13 @@ jobs:
       - name: Restore
         run: dotnet restore DotBoxD.slnx
 
+      - name: Audit all NuGet dependencies
+        shell: pwsh
+        run: ./eng/scripts/check-dependency-audit.ps1
+
+      - name: Supply-chain policy regression tests
+        run: python3 -m unittest discover -s eng/supply-chain -p 'test_*.py'
+
       # Enforce .editorconfig formatting. Whitespace-only so the gate stays decoupled
       # from the analyzer layer (style/analyzer rules are enforced by the build itself
       # via EnforceCodeStyleInBuild + warnings-as-errors).
@@ -689,16 +696,19 @@ jobs:
           Write-Host "Resolved package version: $version"
 
       - name: Restore
-        run: dotnet restore DotBoxD.Packages.slnx
+        run: dotnet restore DotBoxD.Packages.slnx -p:DotBoxDValidatePackages=true
 
       - name: Build
         run: dotnet build DotBoxD.Packages.slnx -c $CONFIGURATION --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Pack
         run: >-
-          dotnet pack DotBoxD.Packages.slnx -c $CONFIGURATION --no-build
+          dotnet pack DotBoxD.Packages.slnx -p:DotBoxDValidatePackages=true -c $CONFIGURATION --no-build
           -o artifacts/packages
           -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Check dependency licenses and generate SBOM
+        run: python3 eng/supply-chain/release_inventory.py
 
       - name: Check package metadata
         shell: pwsh
@@ -735,6 +745,7 @@ jobs:
           path: |
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
+            artifacts/packages/sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
 
@@ -750,6 +761,7 @@ jobs:
       github.ref == 'refs/heads/main'
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Setup .NET SDK
@@ -763,18 +775,15 @@ jobs:
           name: nuget-packages
           path: artifacts/packages
 
-      # NuGet API key is fetched from Bitwarden Secrets Manager. The BW_ACCESS_TOKEN
-      # secret only lives on the canonical JKamsker/DotBoxD repository, and the
-      # job condition above prevents untrusted refs from reaching this step.
-      - name: Fetch NuGet API key from Bitwarden
-        uses: bitwarden/sm-action@14f92f1d294ae3c2b6a3845d389cd2c318b0dfd8 # v2.2.0
+      - name: Obtain short-lived NuGet publishing key
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: nuget-login
         with:
-          access_token: ${{ secrets.BW_ACCESS_TOKEN }}
-          base_url: https://vault.bitwarden.eu
-          secrets: |
-            265b2fb6-2cf0-4859-9bc8-b24c00ab4378 > NUGET_API_KEY
+          user: Weirdo
 
       - name: Push to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >-
           dotnet nuget push "artifacts/packages/*.nupkg"
           --api-key "$NUGET_API_KEY"

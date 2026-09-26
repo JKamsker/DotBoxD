@@ -1,0 +1,8 @@
+<Project>
+  <Import Project="eng/package-compatibility.props" />
+  <PropertyGroup Condition="'$(DotBoxDValidatePackages)' == 'true' and '$(IsPackable)' != 'false' and '$(PackAsTool)' != 'true'">
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>$(DotBoxDPackageBaselineVersion)</PackageValidationBaselineVersion>
+    <EnableStrictModeForCompatibleTfms>true</EnableStrictModeForCompatibleTfms>
+  </PropertyGroup>
+</Project>
