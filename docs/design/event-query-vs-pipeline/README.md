@@ -72,6 +72,9 @@ rejected before translating its operand, because that method need not negate its
 Reference identity comparisons against non-null objects are rejected: a portable value cannot preserve
 the identity of a captured CLR object. Null reference checks and ordinary string value equality remain
 supported. Use primitive members or supported scalar value operators when authoring portable comparisons.
+Floating-point event values containing `NaN` do not satisfy ordered comparisons. Against finite values,
+NaN equality remains false and inequality remains true; infinities retain their numeric ordering.
+Non-finite captured literals remain unsupported by the portable value format.
 
 ## Collection membership
 

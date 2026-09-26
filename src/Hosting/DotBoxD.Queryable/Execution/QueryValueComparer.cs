@@ -96,7 +96,7 @@ public static partial class QueryValueComparer
             return dm.CompareTo(expected);
         }
 
-        return TryToDouble(actual, out var d) ? d.CompareTo(expectedAsDouble) : null;
+        return TryToDouble(actual, out var d) && !double.IsNaN(d) ? d.CompareTo(expectedAsDouble) : null;
     }
 
     private static bool StringMatch(object? actual, QueryValue expected, bool ignoreCase, MatchMode mode)

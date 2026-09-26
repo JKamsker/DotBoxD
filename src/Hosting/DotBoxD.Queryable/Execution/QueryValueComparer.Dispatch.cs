@@ -150,7 +150,7 @@ public static partial class QueryValueComparer
     }
 
     private static int? OrderNumber(object? actual, QueryValue expected, bool ignoreCase)
-        => TryToDouble(actual, out var number) ? number.CompareTo(expected.Number) : null;
+        => TryToDouble(actual, out var number) && !double.IsNaN(number) ? number.CompareTo(expected.Number) : null;
 
     private static int? OrderTimestamp(object? actual, QueryValue expected, bool ignoreCase)
         => TryToInstantTicks(actual, out var ticks) ? ticks.CompareTo(expected.Timestamp.UtcTicks) : null;
