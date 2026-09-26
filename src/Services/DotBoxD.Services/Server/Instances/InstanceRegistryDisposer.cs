@@ -51,7 +51,16 @@ internal static class InstanceRegistryDisposer
     {
         try
         {
-            Dispose(disposal.Instance);
+            try
+            {
+                Dispose(disposal.Instance);
+            }
+            finally
+            {
+                // Remove the registry's disposal marker before waking release waiters.
+                onCompleted(disposal.Instance);
+            }
+
             disposal.Completion.SetResult(true);
         }
         catch (Exception ex)
@@ -65,10 +74,6 @@ internal static class InstanceRegistryDisposer
             {
                 throw;
             }
-        }
-        finally
-        {
-            onCompleted(disposal.Instance);
         }
     }
 
@@ -79,7 +84,15 @@ internal static class InstanceRegistryDisposer
     {
         try
         {
-            await DisposeAsync(disposal.Instance).ConfigureAwait(false);
+            try
+            {
+                await DisposeAsync(disposal.Instance).ConfigureAwait(false);
+            }
+            finally
+            {
+                onCompleted(disposal.Instance);
+            }
+
             disposal.Completion.SetResult(true);
         }
         catch (Exception ex)
@@ -93,10 +106,6 @@ internal static class InstanceRegistryDisposer
             {
                 throw;
             }
-        }
-        finally
-        {
-            onCompleted(disposal.Instance);
         }
     }
 
