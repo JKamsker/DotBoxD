@@ -631,6 +631,7 @@ jobs:
               "GeneratedAssemblyCatalogLifetimeTests",
               "GeneratedAssemblyCatalogAllocationTests",
               "InstanceRegistryFailureObservationTests",
+              "InstanceRegistryLeaseLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `

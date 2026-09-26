@@ -318,6 +318,7 @@ $defaultMinimums = @{
     GeneratedAssemblyCatalogLifetimeTests = 12
     GeneratedAssemblyCatalogAllocationTests = 1
     InstanceRegistryFailureObservationTests = 12
+    InstanceRegistryLeaseLifetimeTests = 12
     QueryCollectionCaptureTests = 4
     QueryCollectionConversionTests = 12
     QuerySpanCollectionConversionTests = 8
