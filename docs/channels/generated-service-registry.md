@@ -186,6 +186,11 @@ IReadOnlyList<GeneratedService> services =
 This is useful for plugin hosts that load contract assemblies dynamically and want
 the service/proxy/dispatcher map without scanning all types in the assembly.
 
+Lookup cache entries alone do not prevent a collectible assembly from unloading. Catalogs and
+generated sink delegates remain cached while the assembly is in use. Generated factories that call
+`Register<TService>` create global registrations with their own lifetime; those registrations retain
+their service types and factories.
+
 For hosts that load several contract assemblies, pass the assembly set once:
 
 ```csharp

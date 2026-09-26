@@ -628,6 +628,8 @@ jobs:
               "StreamDedicatedReceiveOperationRetentionTests",
               "TcpDedicatedReceiveOperationRetentionTests",
               "ConstructorReplayGuardLifetimeTests",
+              "GeneratedAssemblyCatalogLifetimeTests",
+              "GeneratedAssemblyCatalogAllocationTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
