@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DotBoxD.Services.Transport;
 using Xunit;
@@ -12,7 +13,7 @@ public sealed class StreamDedicatedReceiveOperationRetentionTests
     {
         var probe = await CreateProbeAsync();
 
-        ForceGc();
+        await WaitForCollectionAsync(probe);
 
         Assert.False(probe.Connection.IsAlive);
         Assert.False(probe.Receiver.IsAlive);
@@ -39,6 +40,7 @@ public sealed class StreamDedicatedReceiveOperationRetentionTests
             Assert.True(pair.Connection.HasDedicatedReceiveCache);
             using var callerCancellation = new CancellationTokenSource();
             var pending = pair.Connection.ReceiveFrameValueAsync(callerCancellation.Token);
+            Assert.True(pair.Connection.HasDedicatedReceiveOperation);
             await pair.QueueBytesAsync(StreamReceiveTestPair.CreateFrame(messageId: 960));
             await WaitForCompletionAsync(pending);
 
@@ -75,11 +77,25 @@ public sealed class StreamDedicatedReceiveOperationRetentionTests
         }
     }
 
-    private static void ForceGc()
+    private static async Task WaitForCollectionAsync(RetentionProbe probe)
     {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        var elapsed = Stopwatch.StartNew();
+        do
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            if (!probe.Connection.IsAlive && !probe.Receiver.IsAlive &&
+                !probe.Stream.IsAlive && !probe.CallerCancellation.IsAlive)
+            {
+                return;
+            }
+
+            // Completion can resume this test before producer and disposal stacks unwind.
+            // Keep the result unconsumed so a persistent reference still fails the assertions.
+            await Task.Delay(10);
+        }
+        while (elapsed.Elapsed < TimeSpan.FromSeconds(5));
     }
 
     private sealed record RetentionProbe(
