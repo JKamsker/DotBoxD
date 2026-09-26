@@ -10,6 +10,7 @@ public sealed class TcpServerTransport : IServerTransport
     private readonly IPAddress _address;
     private readonly int _port;
     private readonly SemaphoreSlim _acceptLock = new(1, 1);
+    private readonly object _lifecycleLock = new();
     private TcpListener? _listener;
     private Task<TcpClient>? _pendingAccept;
     private int _disposed;
@@ -51,41 +52,39 @@ public sealed class TcpServerTransport : IServerTransport
     public Task StartAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        if (Volatile.Read(ref _disposed) != 0)
+        lock (_lifecycleLock)
         {
-            throw new ObjectDisposedException(nameof(TcpServerTransport));
-        }
-        if (Interlocked.Exchange(ref _started, 1) != 0)
-        {
-            throw new InvalidOperationException("Server already started.");
-        }
-        try
-        {
-            var listener = new TcpListener(_address, _port);
-            listener.Start();
-            // Fire the pre-publish seam (null/no-op in production) so a deterministic test can race a
-            // concurrent DisposeAsync into the window between starting the listener and publishing it.
-            _onListenerStartedBeforePublishForTest?.Invoke();
-            _listener = listener;
-            // Dekker-style fence + re-check: a DisposeAsync that raced in after the _disposed guard above
-            // but before this publish saw a still-null _listener (its Interlocked.Exchange was a no-op), so
-            // it never stopped the listener we just published. Detect that and stop it here instead of
-            // leaking the bound port. Mirrors the client-side TcpTransport.ConnectAsync fix.
-            Interlocked.MemoryBarrier();
             if (Volatile.Read(ref _disposed) != 0)
             {
-                Interlocked.Exchange(ref _listener, null);
-                listener.Stop();
-                Volatile.Write(ref _started, 0);
                 throw new ObjectDisposedException(nameof(TcpServerTransport));
             }
-        }
-        catch
-        {
-            // Bind/listen failed (e.g. port in use). Reset so the transport can be started again
-            // and a half-constructed listener is not left in the field.
-            Volatile.Write(ref _started, 0);
-            throw;
+            if (Interlocked.Exchange(ref _started, 1) != 0)
+            {
+                throw new InvalidOperationException("Server already started.");
+            }
+            TcpListener? listener = null;
+            try
+            {
+                listener = new TcpListener(_address, _port);
+                listener.Start();
+                _onListenerStartedBeforePublishForTest?.Invoke();
+                // The test seam can reenter shutdown while startup holds the lifecycle lock.
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    throw new ObjectDisposedException(nameof(TcpServerTransport));
+                }
+                if (Volatile.Read(ref _started) == 0)
+                {
+                    throw new OperationCanceledException("Server startup was stopped.", ct);
+                }
+                _listener = listener;
+            }
+            catch
+            {
+                Volatile.Write(ref _started, 0);
+                listener?.Stop();
+                throw;
+            }
         }
         return Task.CompletedTask;
     }
@@ -228,24 +227,28 @@ public sealed class TcpServerTransport : IServerTransport
     public Task StopAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        // Reset state so the transport can be restarted with StartAsync, and so a subsequent
-        // AcceptAsync surfaces "not started" instead of accepting on a stopped listener.
-        Volatile.Write(ref _started, 0);
-        var listener = Interlocked.Exchange(ref _listener, null);
-        listener?.Stop();
-        ObservePendingAccept();
+        lock (_lifecycleLock)
+        {
+            Volatile.Write(ref _started, 0);
+            var listener = Interlocked.Exchange(ref _listener, null);
+            listener?.Stop();
+            ObservePendingAccept();
+        }
         return Task.CompletedTask;
     }
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_lifecycleLock)
         {
-            return default;
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return default;
+            }
+            Volatile.Write(ref _started, 0);
+            var listener = Interlocked.Exchange(ref _listener, null);
+            listener?.Stop();
+            ObservePendingAccept();
         }
-        Volatile.Write(ref _started, 0);
-        var listener = Interlocked.Exchange(ref _listener, null);
-        listener?.Stop();
-        ObservePendingAccept();
         return default;
     }
     private void ObservePendingAccept()

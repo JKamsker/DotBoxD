@@ -563,6 +563,7 @@ jobs:
               "SingleConnectionServerTransportLifecycleRegressionTests",
               "NamedPipeServerTransportCancellationRegressionTests",
               "NamedPipeServerLifecycleRaceTests",
+              "TcpServerLifecycleRaceTests",
               "StreamDedicatedReceiveOperationRetentionTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
