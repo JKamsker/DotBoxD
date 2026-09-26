@@ -520,6 +520,7 @@ jobs:
               "QueryCollectionCaptureTests",
               "QueryConstantConversionTests",
               "QueryNumericComparisonAllocationTests",
+              "QueryFilterValidationAllocationTests",
               "MemberValueReaderContractTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
