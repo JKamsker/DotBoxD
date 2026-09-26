@@ -89,8 +89,9 @@ public sealed class RpcProtocolNegotiationTests
         await using var sender = new StreamConnection(client, ownsStream: false, maxMessageSize: handwritten.MaximumFrameSize);
         await using var receiver = new StreamConnection(server, ownsStream: false, maxMessageSize: handwritten.MaximumFrameSize);
         using var frame = MessageFramer.FrameToPayload(1, MessageType.Cancel, []);
+        var receiving = receiver.ReceiveAsync(deadline.Token);
         await sender.SendAsync(frame.Memory, deadline.Token);
-        using var received = await receiver.ReceiveAsync(deadline.Token);
+        using var received = await receiving;
         Assert.Equal(frame.Memory.ToArray(), received.Memory.ToArray());
     }
 

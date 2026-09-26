@@ -10,9 +10,11 @@ namespace DotBoxD.Kernels.Tests.Plugins.Replay;
 public sealed class ExecutionReplayTests
 {
     [Theory]
-    [InlineData(ExecutionMode.Interpreted)]
-    [InlineData(ExecutionMode.Compiled)]
-    public async Task Captured_real_binding_execution_roundtrips_and_replays_offline(ExecutionMode mode)
+    [InlineData(ExecutionMode.Interpreted, ExecutionMode.Interpreted)]
+    [InlineData(ExecutionMode.Interpreted, ExecutionMode.Compiled)]
+    [InlineData(ExecutionMode.Compiled, ExecutionMode.Interpreted)]
+    [InlineData(ExecutionMode.Compiled, ExecutionMode.Compiled)]
+    public async Task Captured_real_binding_execution_roundtrips_and_replays_offline(ExecutionMode captureMode, ExecutionMode mode)
     {
         var invoked = 0;
         var binding = Binding((_, args, _) =>
@@ -20,7 +22,8 @@ public sealed class ExecutionReplayTests
             invoked++;
             return ValueTask.FromResult(SandboxValue.FromInt32(((I32Value)args[0]).Value + 1));
         });
-        var trace = await ExecutionRecording.CaptureAsync(Module(), Policy(), [binding], "main", SandboxValue.FromInt32(41));
+        var trace = await ExecutionRecording.CaptureAsync(Module(), Policy(), [binding], "main", SandboxValue.FromInt32(41), captureMode);
+        Assert.Equal(captureMode, trace.ActualMode);
         Assert.Equal(1, invoked);
         Assert.Single(trace.Calls);
         var restored = ExecutionTrace.Deserialize(trace.Serialize());
@@ -57,6 +60,14 @@ public sealed class ExecutionReplayTests
         var trace = await ExecutionRecording.CaptureAsync(Module(), Policy(), [Binding((_, args, _) => ValueTask.FromResult(args[0]))],
             "main", SandboxValue.FromInt32(1));
         Assert.False((await ExecutionReplay.RunAsync(trace with { Calls = [] })).Matches);
+        await Assert.ThrowsAsync<InvalidDataException>(() => ExecutionReplay.RunAsync(trace with
+        {
+            Calls = [trace.Calls[0] with { Completed = false }]
+        }));
+        await Assert.ThrowsAsync<InvalidDataException>(() => ExecutionReplay.RunAsync(trace with
+        {
+            Calls = [trace.Calls[0] with { Result = null }]
+        }));
         var changed = trace.Calls[0] with { Arguments = [TraceValue.Capture(SandboxValue.FromInt32(99))] };
         Assert.False((await ExecutionReplay.RunAsync(trace with { Calls = [changed] })).Matches);
         await Assert.ThrowsAsync<InvalidDataException>(() => ExecutionReplay.RunAsync(trace with { ModuleHash = "tampered" }));

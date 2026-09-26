@@ -107,20 +107,32 @@ public static class RpcProtocolNegotiation
         }
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(duration);
-        await stream.WriteAsync(bytes, deadline.Token).ConfigureAwait(false);
-        await stream.FlushAsync(deadline.Token).ConfigureAwait(false);
         var remote = new byte[PreambleSize];
+        // Pipes may have no outbound buffering. Start reading before writing so two
+        // symmetric peers cannot wait forever for each other's first read.
+        await Task.WhenAll(ReadOfferAsync(stream, remote, deadline.Token),
+            WriteOfferAsync(stream, bytes, deadline.Token)).ConfigureAwait(false);
+        return Negotiate(offer, Decode(remote));
+    }
+
+    private static async Task WriteOfferAsync(Stream stream, byte[] bytes, CancellationToken cancellationToken)
+    {
+        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task ReadOfferAsync(Stream stream, byte[] remote, CancellationToken cancellationToken)
+    {
         var offset = 0;
         while (offset < remote.Length)
         {
-            var count = await stream.ReadAsync(remote.AsMemory(offset), deadline.Token).ConfigureAwait(false);
+            var count = await stream.ReadAsync(remote.AsMemory(offset), cancellationToken).ConfigureAwait(false);
             if (count == 0)
             {
                 throw new EndOfStreamException("Incomplete DotBoxD connection preamble.");
             }
             offset += count;
         }
-        return Negotiate(offer, Decode(remote));
     }
 
     private static void Validate(RpcProtocolOffer offer)
