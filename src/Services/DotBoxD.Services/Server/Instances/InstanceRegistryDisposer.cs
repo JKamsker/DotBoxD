@@ -56,7 +56,7 @@ internal static class InstanceRegistryDisposer
         }
         catch (Exception ex)
         {
-            disposal.Completion.SetException(ex);
+            CompleteWithFailure(disposal, ex);
             if (reportFailure)
             {
                 RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
@@ -84,7 +84,7 @@ internal static class InstanceRegistryDisposer
         }
         catch (Exception ex)
         {
-            disposal.Completion.SetException(ex);
+            CompleteWithFailure(disposal, ex);
             if (reportFailure)
             {
                 RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
@@ -98,6 +98,14 @@ internal static class InstanceRegistryDisposer
         {
             onCompleted(disposal.Instance);
         }
+    }
+
+    private static void CompleteWithFailure(InstanceRegistryDisposal disposal, Exception error)
+    {
+        disposal.Completion.SetException(error);
+        // The owner propagates or reports this failure even when no release is awaiting the private
+        // completion task. Observe it here while preserving the original fault for any waiters.
+        _ = disposal.Completion.Task.Exception;
     }
 
     internal static async Task DisposeAsyncBestEffort(object instance)

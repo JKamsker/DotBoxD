@@ -630,6 +630,7 @@ jobs:
               "ConstructorReplayGuardLifetimeTests",
               "GeneratedAssemblyCatalogLifetimeTests",
               "GeneratedAssemblyCatalogAllocationTests",
+              "InstanceRegistryFailureObservationTests",
               "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `

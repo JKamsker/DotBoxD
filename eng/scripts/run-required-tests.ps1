@@ -317,6 +317,7 @@ $defaultMinimums = @{
     ConstructorReplayGuardLifetimeTests = 9
     GeneratedAssemblyCatalogLifetimeTests = 12
     GeneratedAssemblyCatalogAllocationTests = 1
+    InstanceRegistryFailureObservationTests = 12
     QueryCollectionCaptureTests = 4
     QueryCollectionConversionTests = 12
     QuerySpanCollectionConversionTests = 8
