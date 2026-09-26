@@ -524,6 +524,7 @@ jobs:
               "QueryCollectionConversionTests",
               "QuerySpanCollectionConversionTests",
               "QueryConstantConversionTests",
+              "QueryBooleanConversionTests",
               "QueryNumericComparisonAllocationTests",
               "QueryFilterValidationAllocationTests",
               "QueryFieldPathAllocationTests",

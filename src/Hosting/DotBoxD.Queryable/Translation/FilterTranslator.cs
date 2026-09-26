@@ -18,7 +18,13 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
     /// <summary>Translates a predicate body into a filter AST.</summary>
     public QueryFilter Translate(Expression body)
     {
-        var expression = MemberPathReader.StripConvert(body);
+        if (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } &&
+            QueryValueFactory.TryEvaluateObject(body, parameter, out var raw) && raw is bool literal)
+        {
+            return literal ? QueryFilter.MatchAll : QueryFilter.Not(QueryFilter.MatchAll);
+        }
+
+        var expression = MemberPathReader.StripPathConvert(body, parameter);
         if (TryTranslateLogical(expression, out var logical))
         {
             return logical;

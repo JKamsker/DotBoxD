@@ -89,18 +89,6 @@ internal static class MemberPathReader
         return finder.Found;
     }
 
-    /// <summary>Removes transparent <see cref="ExpressionType.Convert"/>/<see cref="ExpressionType.ConvertChecked"/> wrappers.</summary>
-    public static Expression StripConvert(Expression? expression)
-    {
-        var current = expression;
-        while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
-        {
-            current = unary.Operand;
-        }
-
-        return current ?? throw new ArgumentNullException(nameof(expression));
-    }
-
     /// <summary>
     /// Removes conversions that are safe to ignore while reading a member path. Lossy/member-changing casts
     /// over the query parameter are rejected instead of silently lowering the wrong path semantics.
