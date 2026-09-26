@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DotBoxD.Queryable.Execution;
 
@@ -13,7 +14,8 @@ public sealed class MemberValueReader
 {
     private const BindingFlags MemberFlags = BindingFlags.Public | BindingFlags.Instance;
 
-    private readonly ConcurrentDictionary<(Type Type, string Path), MemberInfo[]> _chains = new();
+    // A shared reader must not keep transient event types alive after their instances are gone.
+    private readonly ConditionalWeakTable<Type, ConcurrentDictionary<string, MemberInfo[]>> _chains = new();
 
     /// <summary>Reads the value at <paramref name="path"/> from <paramref name="target"/>, or <see langword="null"/>.</summary>
     public object? Read(object target, string path)
@@ -21,7 +23,9 @@ public sealed class MemberValueReader
         ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        var chain = _chains.GetOrAdd((target.GetType(), path), static key => ResolveChain(key.Type, key.Path));
+        var type = target.GetType();
+        var chain = _chains.GetValue(type, static _ => new(StringComparer.Ordinal)).GetOrAdd(
+            path, static (currentPath, rootType) => ResolveChain(rootType, currentPath), type);
         object? current = target;
         foreach (var member in chain)
         {

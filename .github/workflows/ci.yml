@@ -556,6 +556,8 @@ jobs:
               "QueryFieldPathAllocationTests",
               "MemberValueReaderContractTests",
               "MemberValueReaderInterfaceTests",
+              "MemberValueReaderCacheLifetimeTests",
+              "MemberValueReaderCacheAllocationTests",
               "EventQueryNumericRoutingTests",
               "EventQueryNumericRoutingAllocationTests",
               "EventIndexNumericComparisonTests",
