@@ -47,7 +47,11 @@ internal static class ContainsMethodFilterTranslator
         }
 
         ValidateSupportedContainsMethod(call);
-        var unwrapped = UnwrapSpan(collection);
+        // Only span-based framework calls need an array operand unwrapped. Other collection
+        // conversions must run before comparer validation and value capture.
+        var unwrapped = call.Method.DeclaringType == typeof(MemoryExtensions)
+            ? UnwrapSpan(collection)
+            : collection;
         var capturedCollection = QueryValueFactory.EvaluateCollection(unwrapped, parameter);
         RejectUnsupportedContainsComparer(call, capturedCollection);
         filter = QueryFilter.In(path, QueryValueFactory.ToValues(capturedCollection, unwrapped));

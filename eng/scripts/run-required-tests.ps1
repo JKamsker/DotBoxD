@@ -261,6 +261,7 @@ $defaultMinimums = @{
     QueryNestedDictionaryComparerTests = 13
     StreamDedicatedReceiveOperationRetentionTests = 1
     QueryCollectionCaptureTests = 4
+    QueryCollectionConversionTests = 12
     QueryConstantConversionTests = 12
     QueryNumericComparisonAllocationTests = 12
     QueryFilterValidationAllocationTests = 6
