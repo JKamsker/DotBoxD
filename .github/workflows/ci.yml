@@ -392,6 +392,8 @@ jobs:
               "EventCapabilityCacheLifetimeTests",
               "ServerExtensionVoidProxyAllocationTests",
               "ServerExtensionVoidProxyTests",
+              "ServerExtensionValueTaskProxyAllocationTests",
+              "ServerExtensionValueTaskProxyTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",

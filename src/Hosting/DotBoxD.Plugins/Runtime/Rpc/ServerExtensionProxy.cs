@@ -16,6 +16,7 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 /// </summary>
 public class ServerExtensionProxy : DispatchProxy
 {
+    private static readonly object CompletedValueTask = ValueTask.CompletedTask;
     private static readonly ConcurrentDictionary<MethodInfo, ServerExtensionMethod> MethodCache = new();
     private static readonly MethodInfo BoxTaskAsyncMethod =
         typeof(ServerExtensionProxy).GetMethod(nameof(BoxTaskAsync), BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -86,7 +87,7 @@ public class ServerExtensionProxy : DispatchProxy
 
         if (returnType == typeof(ValueTask))
         {
-            return pending => InvokeValueTaskAsync(pending);
+            return MaterializeValueTask;
         }
 
         if (returnType.IsGenericType)
@@ -134,6 +135,19 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static async ValueTask InvokeValueTaskAsync(ValueTask<SandboxValue> pending)
         => ConsumeUnit(await pending.ConfigureAwait(false));
+
+    private static object MaterializeValueTask(ValueTask<SandboxValue> pending)
+    {
+        var completion = InvokeValueTaskAsync(pending);
+        if (!completion.IsCompletedSuccessfully)
+        {
+            return completion;
+        }
+
+        completion.GetAwaiter().GetResult();
+        // A successfully consumed, non-generic ValueTask has no per-call result state.
+        return CompletedValueTask;
+    }
 
     private static void ConsumeUnit(SandboxValue value)
     {
