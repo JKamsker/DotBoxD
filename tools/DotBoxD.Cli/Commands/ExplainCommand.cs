@@ -18,6 +18,10 @@ internal static class ExplainCommand
     {
         var text = await InputFile.ReadAsync(path, cancellationToken).ConfigureAwait(false);
         using var document = JsonDocument.Parse(text);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException("Expected a module, package or trace JSON object.");
+        }
         SandboxModule module;
         SandboxPolicy policy;
         BindingRegistry bindings;

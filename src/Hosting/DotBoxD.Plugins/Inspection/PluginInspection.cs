@@ -25,7 +25,7 @@ public static class PluginInspection
         ArgumentNullException.ThrowIfNull(bindings);
         ArgumentNullException.ThrowIfNull(policy);
         var validation = new ModuleValidator().Validate(module, bindings, policy);
-        var now = policy.LogicalNow ?? DateTimeOffset.UtcNow;
+        var now = policy.GrantClock;
         var capabilities = validation.RequiredCapabilities.Order(StringComparer.Ordinal).Select(id =>
         {
             var granted = policy.GrantsCapability(id, now);

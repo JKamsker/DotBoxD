@@ -32,6 +32,14 @@ public sealed class PluginInspectionTests
             ResourceLimits = new ResourceLimits(MaxWallTime: TimeSpan.FromSeconds(5))
         };
         Assert.True(Assert.Single(PluginInspection.Explain(module, registry, allowed).Capabilities).Granted);
+        var dated = allowed with
+        {
+            Deterministic = false,
+            LogicalNow = DateTimeOffset.UnixEpoch,
+            Grants = [new CapabilityGrant("time.now", new Dictionary<string, string>(), DateTimeOffset.UnixEpoch.AddDays(1))]
+        };
+        Assert.False(Assert.Single(PluginInspection.Explain(module, registry, dated).Capabilities).Granted);
+        Assert.True(Assert.Single(PluginInspection.Explain(module, registry, dated with { Deterministic = true }).Capabilities).Granted);
         var trace = await ExecutionRecording.CaptureAsync(module, allowed, [binding], "main", SandboxValue.Unit);
         Assert.Null(trace.ErrorCode);
         Assert.NotEmpty(Assert.Single(trace.Calls).AuditEvents);

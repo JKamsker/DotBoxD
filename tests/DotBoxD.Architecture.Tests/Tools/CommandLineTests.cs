@@ -32,6 +32,51 @@ public sealed class CommandLineTests
     }
 
     [Fact]
+    public async Task Human_output_escapes_terminal_control_characters()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(path, """
+                {"id":"\u001b[31m","version":"1.0.0","functions":[]}
+                """);
+            using var output = new StringWriter(CultureInfo.InvariantCulture);
+            using var error = new StringWriter(CultureInfo.InvariantCulture);
+            Assert.Equal(1, await CommandLine.RunAsync(["explain", path], output, error));
+            Assert.DoesNotContain("\u001b", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("Module: \\u001b[31m", output.ToString(), StringComparison.Ordinal);
+            Assert.Empty(error.ToString());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("null")]
+    [InlineData("42")]
+    public async Task Non_object_input_returns_a_machine_readable_error(string input)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(path, input);
+            using var output = new StringWriter(CultureInfo.InvariantCulture);
+            using var error = new StringWriter(CultureInfo.InvariantCulture);
+            Assert.Equal(2, await CommandLine.RunAsync(["explain", path, "--json"], output, error));
+            using var json = JsonDocument.Parse(output.ToString());
+            Assert.False(json.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Empty(error.ToString());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Explain_has_distinct_human_and_json_output()
     {
         var path = Path.GetTempFileName();

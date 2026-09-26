@@ -71,13 +71,13 @@ public static class CommandLine
                 data = result.Data,
                 error = result.Success ? null : new { kind = "execution", message = result.Text },
                 meta = new { schemaVersion = 1 }
-            }) : result.Text).ConfigureAwait(false);
+            }) : EscapeControls(result.Text)).ConfigureAwait(false);
             return result.Success ? 0 : 1;
         }
-        catch (Exception exception) when (exception is ArgumentException or IOException or JsonException or FormatException or SandboxValidationException)
+        catch (Exception exception) when (exception is ArgumentException or IOException or InvalidDataException or JsonException or FormatException or OverflowException or UnauthorizedAccessException or SandboxValidationException)
         {
             // Exception text may include hostile input; emit a single escaped line in human mode.
-            var message = exception.Message.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal);
+            var message = EscapeControls(exception.Message).Replace("\n", " ", StringComparison.Ordinal);
             if (json)
             {
                 await output.WriteLineAsync(JsonSerializer.Serialize(new
@@ -95,6 +95,10 @@ public static class CommandLine
             return 2;
         }
     }
+    private static string EscapeControls(string text) => string.Concat(text.Select(character =>
+        char.IsControl(character) && character is not '\n' and not '\t'
+            ? "\\u" + ((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture)
+            : character.ToString()));
 }
 
 internal sealed record CommandResult(bool Success, object Data, string Text);

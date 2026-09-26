@@ -100,7 +100,9 @@ pure IR instructions, or an exact elapsed wall-clock deadline. Such recordings c
 there is no silent live-call fallback. Resource policy remains enforced, and replay rejects traces
 exceeding local fuel, allocation, call-depth, file-size and wall-time safety ceilings. Runtime metadata
 is informational so controlled cross-version replay remains possible; module/policy/binding hashes
-must still match exactly.
+must still match exactly. Expiring grants follow the policy’s grant clock: use an explicit
+`LogicalNow` with a deterministic policy when grant expiry must be reproducible. A wall-clock grant
+can expire between capture and replay, causing validation failure or divergence.
 
 ## Local commands
 
