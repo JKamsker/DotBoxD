@@ -83,6 +83,7 @@ $defaultMinimums = @{
     PendingLiveUpdateQueueTests = 5
     LiveSettingExactRangeTests = 19
     LiveContextInheritanceTests = 10
+    LivePropertyCacheLifetimeTests = 3
     HookChainInterceptorRuntimeSurpriseTests = 2
     HookChainRuntimeTests = 11
     SubscriptionRuntimeTests = 9
