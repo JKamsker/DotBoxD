@@ -151,8 +151,8 @@ internal static class MemberPathReader
             return false;
         }
 
-        var sourceValue = nullableSource ?? source;
-        var targetValue = nullableTarget ?? target;
+        var sourceValue = NumericValueType(nullableSource ?? source);
+        var targetValue = NumericValueType(nullableTarget ?? target);
         if (sourceValue == targetValue)
         {
             return true;
@@ -160,6 +160,15 @@ internal static class MemberPathReader
 
         return IsExactNumericWidening(sourceValue, targetValue);
     }
+
+    private static Type NumericValueType(Type type)
+        // C# enum comparisons include conversions to their backing integer type. These preserve values,
+        // as do casts between enums with the same backing type; the existing widening rules still apply.
+        => type.IsEnum && Type.GetTypeCode(type) is
+            TypeCode.SByte or TypeCode.Byte or TypeCode.Int16 or TypeCode.UInt16 or
+            TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64
+            ? Enum.GetUnderlyingType(type)
+            : type;
 
     private static bool IsExactNumericWidening(Type source, Type target)
         => ExactNumericWidenings.Contains((Type.GetTypeCode(source), Type.GetTypeCode(target)));

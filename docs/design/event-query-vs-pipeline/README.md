@@ -77,6 +77,8 @@ rejected before translating its operand, because that method need not negate its
 Member-path conversions also validate the actual method: value-preserving intrinsic conversions and framework
 decimal widening remain supported, including nullable forms. Custom conversion methods on event
 members require an explicit primitive member instead; conversions on captured constants still run once.
+Enums with standard integer backing types support their exact underlying conversions, including nullable
+forms and compiler-generated equality conversions. Lossy casts and nullable unwrapping remain unsupported.
 Reference identity comparisons against non-null objects are rejected: a portable value cannot preserve
 the identity of a captured CLR object. Null reference checks and ordinary string value equality remain
 supported. Use primitive members or supported scalar value operators when authoring portable comparisons.
