@@ -66,8 +66,8 @@ internal static class ParameterReader
         return accessors.ToArray();
     }
 
-    // Compile the getter once and preserve invariant conversion. A typed decimal formatter avoids
-    // the boxing allocation that survives the object-based Convert.ToString path.
+    // Compile the getter once and preserve invariant conversion. Typed value formatters avoid
+    // boxing allocations that survive the object-based Convert.ToString path.
     private static Func<object, string?> CompileReader(PropertyInfo property)
     {
         var instance = LinqExpression.Parameter(typeof(object), "instance");
@@ -86,6 +86,16 @@ internal static class ParameterReader
             return LinqExpression.Call(formatter, LinqExpression.Convert(value, typeof(decimal?)));
         }
 
+        var valueType = Nullable.GetUnderlyingType(value.Type) ?? value.Type;
+        if (valueType.IsValueType && typeof(IFormattable).IsAssignableFrom(valueType)
+            && !typeof(IConvertible).IsAssignableFrom(valueType))
+        {
+            // Convert.ToString gives IConvertible precedence over IFormattable.
+            var formatter = typeof(ParameterReader).GetMethod(
+                nameof(FormatFormattable), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(valueType);
+            return LinqExpression.Call(formatter, LinqExpression.Convert(value, typeof(Nullable<>).MakeGenericType(valueType)));
+        }
+
         var boxedValue = LinqExpression.Convert(value, typeof(object));
         var convertToString = typeof(Convert).GetMethod(
             nameof(Convert.ToString),
@@ -95,6 +105,9 @@ internal static class ParameterReader
     }
 
     private static string? FormatDecimal(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
+
+    private static string? FormatFormattable<T>(T? value) where T : struct, IFormattable
+        => value?.ToString(null, CultureInfo.InvariantCulture);
 
     private readonly record struct PropertyAccessor(string Name, Func<object, string?> Read);
 }
