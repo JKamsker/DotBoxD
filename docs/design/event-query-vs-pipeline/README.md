@@ -60,6 +60,14 @@ The declared-type constructor is an additive public API so this behavior remains
 authoring helpers. Existing constructor and method signatures are retained; this addition requires no
 breaking-version bump and keeps the current package-versioning scheme.
 
+## Comparison operators
+
+Comparison translation checks the actual operator method as well as the expression's comparison kind.
+Standard scalar operators, nullable comparisons, and equivalent framework static equality methods remain
+supported. Custom operators and methods attached to a different comparison kind are rejected before
+capturing that comparison's constants. Compare public primitive members directly, or construct the
+portable comparison explicitly with `QueryFilter.Compare`, when custom value types are involved.
+
 ## Collection membership
 
 `Contains` captures collection values into a portable membership filter. Custom implementations reached
