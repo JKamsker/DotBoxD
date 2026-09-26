@@ -142,6 +142,7 @@ public static partial class QueryValueComparer
             case null:
             case bool:
             case string:
+            case not IConvertible:
                 result = 0;
                 return false;
             case Enum e:

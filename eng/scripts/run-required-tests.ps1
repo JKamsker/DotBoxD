@@ -267,6 +267,7 @@ $defaultMinimums = @{
     QueryConstantConversionTests = 12
     QueryBooleanConversionTests = 9
     QueryNumericComparisonAllocationTests = 12
+    QueryIncomparableNumericAllocationTests = 12
     QueryFilterValidationAllocationTests = 6
     QueryFieldPathAllocationTests = 15
     MemberValueReaderContractTests = 10
