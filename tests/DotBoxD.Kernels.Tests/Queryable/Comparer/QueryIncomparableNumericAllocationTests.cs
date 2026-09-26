@@ -20,7 +20,25 @@ public sealed class QueryIncomparableNumericAllocationTests(ITestOutputHelper ou
     [InlineData("object", false, QueryComparisonOperator.GreaterThan)]
     [InlineData("object", true, QueryComparisonOperator.Equal)]
     [InlineData("object", true, QueryComparisonOperator.GreaterThan)]
-    public void Nonconvertible_values_are_incomparable_without_allocations(
+    [InlineData("timestamp", false, QueryComparisonOperator.Equal)]
+    [InlineData("timestamp", false, QueryComparisonOperator.NotEqual)]
+    [InlineData("timestamp", false, QueryComparisonOperator.GreaterThan)]
+    [InlineData("timestamp", true, QueryComparisonOperator.Equal)]
+    [InlineData("timestamp", true, QueryComparisonOperator.NotEqual)]
+    [InlineData("timestamp", true, QueryComparisonOperator.GreaterThan)]
+    [InlineData("char", false, QueryComparisonOperator.Equal)]
+    [InlineData("char", false, QueryComparisonOperator.NotEqual)]
+    [InlineData("char", false, QueryComparisonOperator.GreaterThan)]
+    [InlineData("char", true, QueryComparisonOperator.Equal)]
+    [InlineData("char", true, QueryComparisonOperator.NotEqual)]
+    [InlineData("char", true, QueryComparisonOperator.GreaterThan)]
+    [InlineData("dbnull", false, QueryComparisonOperator.Equal)]
+    [InlineData("dbnull", false, QueryComparisonOperator.NotEqual)]
+    [InlineData("dbnull", false, QueryComparisonOperator.GreaterThan)]
+    [InlineData("dbnull", true, QueryComparisonOperator.Equal)]
+    [InlineData("dbnull", true, QueryComparisonOperator.NotEqual)]
+    [InlineData("dbnull", true, QueryComparisonOperator.GreaterThan)]
+    public void Incomparable_values_are_rejected_without_allocations(
         string actualKind, bool exactExpected, QueryComparisonOperator comparison)
     {
         object actual = actualKind switch
@@ -28,6 +46,9 @@ public sealed class QueryIncomparableNumericAllocationTests(ITestOutputHelper ou
             "guid" => Guid.Empty,
             "date" => new DateOnly(2026, 1, 1),
             "object" => new object(),
+            "timestamp" => new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            "char" => 'a',
+            "dbnull" => DBNull.Value,
             _ => throw new ArgumentOutOfRangeException(nameof(actualKind))
         };
         var expected = exactExpected ? QueryValue.FromDecimal(1.5m) : QueryValue.FromNumber(1.5);

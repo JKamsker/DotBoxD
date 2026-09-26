@@ -142,6 +142,9 @@ public static partial class QueryValueComparer
             case null:
             case bool:
             case string:
+            case DateTime:
+            case char:
+            case DBNull:
             case not IConvertible:
                 result = 0;
                 return false;
