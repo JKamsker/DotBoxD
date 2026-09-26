@@ -387,6 +387,7 @@ jobs:
               "LiveSettingExactRangeTests",
               "LiveContextInheritanceTests",
               "LivePropertyCacheLifetimeTests",
+              "HostServiceReturnReaderLifetimeTests",
               "HookChainInterceptorRuntimeSurpriseTests",
               "HookChainRuntimeTests",
               "SubscriptionRuntimeTests",
