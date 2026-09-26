@@ -1,0 +1,11 @@
+{
+  "allowedExpressions": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "0BSD"],
+  "exceptions": {
+    "Microsoft.NETCore.Platforms/1.1.0": {"license": "MIT", "reason": "Legacy Microsoft .NET package; upstream dotnet/corefx LICENSE.TXT is MIT."},
+    "NETStandard.Library/2.0.3": {"license": "MIT", "reason": "Legacy .NET Standard reference package; dotnet/standard LICENSE.TXT is MIT."},
+    "System.Buffers/4.5.1": {"license": "MIT", "reason": "Legacy corefx package; nuspec links dotnet/corefx LICENSE.TXT (MIT)."},
+    "System.Memory/4.5.5": {"license": "MIT", "reason": "Legacy corefx package; nuspec links dotnet/corefx LICENSE.TXT (MIT)."},
+    "System.Numerics.Vectors/4.4.0": {"license": "MIT", "reason": "Legacy corefx package; nuspec links dotnet/corefx LICENSE.TXT (MIT)."},
+    "System.Numerics.Vectors/4.5.0": {"license": "MIT", "reason": "Legacy corefx package; nuspec links dotnet/corefx LICENSE.TXT (MIT)."}
+  }
+}

@@ -11,7 +11,7 @@ need TCP or custom transports do not take a named-pipe dependency.
 dotnet add package DotBoxD.Transports.NamedPipes
 ```
 
-The package depends on `DotBoxD` and reuses `StreamConnection` for framing. That means
+The package depends on `DotBoxD.Services` and reuses `StreamConnection` for framing. That means
 named-pipe traffic uses the same length validation, serialized sends, pooled receive
 buffers, and clean EOF behavior as every other stream-backed DotBoxD connection.
 
@@ -99,3 +99,8 @@ default `1` for bounded-concurrent dispatch instead of strict serial-per-connect
 surfaces read-loop failures with endpoint and error details. On a host, subscribe per peer inside
 `ForEachPeer` (for example `peer.ReadError += ...`) or watch `host.PeerDisconnected` for the
 aggregate signal.
+
+## OS identity boundary
+
+The shipped server always uses `PipeOptions.CurrentUserOnly`. See [transport security](/security/transport/)
+for Windows/Unix behavior and host-owned ACL composition. Same-user processes still require application authorization.

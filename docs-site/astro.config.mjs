@@ -13,7 +13,12 @@ const apiSidebar = existsSync(apiSidebarPath)
   ? JSON.parse(readFileSync(apiSidebarPath, 'utf8'))
   : [];
 
+const productProps = readFileSync(new URL('../Directory.Build.props', import.meta.url), 'utf8');
+const productVersion = productProps.match(/<VersionPrefix>([^<]+)<\/VersionPrefix>/)?.[1];
+if (!productVersion) throw new Error('Directory.Build.props must declare VersionPrefix');
+
 export default defineConfig({
+  vite: { define: { 'import.meta.env.PUBLIC_DOTBOXD_VERSION': JSON.stringify(productVersion) } },
   site: 'https://dotboxd.kamsker.at',
   integrations: [
     // Renders ```mermaid code fences client-side; must come before starlight().
@@ -40,6 +45,7 @@ export default defineConfig({
             { label: 'What is DotBoxD?', slug: 'overview' },
             { label: 'Why DotBoxD?', slug: 'why-dotboxd' },
             { label: 'Getting started', slug: 'getting-started' },
+            { label: 'Operate plugins', slug: 'reference/plugin-platform' },
           ],
         },
         {
@@ -108,6 +114,7 @@ export default defineConfig({
           label: 'Security',
           items: [
             { label: 'Sandbox caveats', slug: 'security/sandbox-caveats' },
+            { label: 'Transport security', slug: 'security/transport' },
             {
               label: 'Security policy',
               link: 'https://github.com/JKamsker/DotBoxD/blob/main/SECURITY.md',
@@ -118,6 +125,8 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Glossary', slug: 'reference/glossary' },
+            { label: 'Compatibility and support', slug: 'reference/compatibility' },
+            { label: 'Changelog', link: 'https://github.com/JKamsker/DotBoxD/blob/main/CHANGELOG.md' },
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
             { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },

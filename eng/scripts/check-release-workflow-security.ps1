@@ -213,4 +213,17 @@ if ($lineGuard -match "(?im)^\s*&?\s*dotnet\s+(tool\s+(install|restore|run)|new\
     throw "Release line guard must not install, restore, or execute dotnet local tools."
 }
 
+# Both publishers must use narrowly scoped OIDC, with no standing publishing key retrieval.
+foreach ($publisher in @($publishJob, $ciPublishJob)) {
+    if ($publisher -notmatch 'NuGet/login@[0-9a-fA-F]{40}' -or $publisher -notmatch 'id-token:\s+write') {
+        throw 'Every NuGet publishing job must use SHA-pinned NuGet/login and job-scoped id-token: write.'
+    }
+    if ($publisher -match 'bitwarden/sm-action@' -or $publisher -match 'secrets\.NUGET_API_KEY') {
+        throw 'Publishing must not depend on a standing NuGet API key.'
+    }
+}
+if ($attestJob -notmatch 'actions/attest-sbom@[0-9a-fA-F]{40}' -or $workflow -notmatch 'release_inventory.py') {
+    throw 'Release packages require a license-checked SBOM and its attestation.'
+}
+
 Write-Host "Release workflow security check passed."
