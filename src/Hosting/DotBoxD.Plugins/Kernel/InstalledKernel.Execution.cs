@@ -60,8 +60,19 @@ public sealed partial class InstalledKernel
 
     private async ValueTask<bool> AwaitRevocationCompletionAsync()
     {
-        await _revocationCompleted.Task.ConfigureAwait(false);
-        return Volatile.Read(ref _revocationCancellationCallbackFailed) != 0;
+        try
+        {
+            await _revocationCancellationCallbacksCompleted.Task
+                .WaitAsync(CancellationCallbackObservationTimeout)
+                .ConfigureAwait(false);
+            return Volatile.Read(ref _revocationCancellationCallbackFailed) != 0;
+        }
+        catch (TimeoutException)
+        {
+            // A cancellation callback can synchronously join this execution. Do not let that callback
+            // indefinitely prevent the execution from observing the already-recorded revocation.
+            return false;
+        }
     }
 
     private static PreparedExecutionResult WithRevokedError(PreparedExecutionResult result)
