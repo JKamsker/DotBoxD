@@ -112,7 +112,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
             Console.WriteLine($"[server] installed server extension '{kernel.Manifest.PluginId}'.");
             return kernel.Manifest.PluginId;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             Console.Error.WriteLine($"[server] server extension install failed: {ex}");
             throw;
@@ -140,7 +140,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         {
             return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             Console.Error.WriteLine($"[server] server extension invoke failed: {ex}");
             throw;
