@@ -15,12 +15,12 @@ public sealed class CompiledAwaitPumpScopeTests
         var inner = new CompiledAwaitPumpScopeFixture.Pump(2);
         var expected = new InvalidOperationException("ordinary scoped failure");
         CompiledAwaitPumpScopeFixture.AssertNoPump(context);
-        using (CompiledBindingDispatcher.InstallAwaitPump(outer))
+        using (CompiledBindingDispatcher.EnterAwaitPump(outer))
         {
             Assert.Same(outer.Value, CompiledAwaitPumpScopeFixture.Dispatch(context));
             try
             {
-                using var scope = CompiledBindingDispatcher.InstallAwaitPump(inner);
+                using var scope = CompiledBindingDispatcher.EnterAwaitPump(inner);
                 Assert.Same(inner.Value, CompiledAwaitPumpScopeFixture.Dispatch(context));
                 if (fail)
                 {
@@ -44,7 +44,7 @@ public sealed class CompiledAwaitPumpScopeTests
     {
         using var context = CompiledAwaitPumpScopeFixture.Context();
         var outer = new CompiledAwaitPumpScopeFixture.Pump(1);
-        using var scope = CompiledBindingDispatcher.InstallAwaitPump(outer);
+        using var scope = CompiledBindingDispatcher.EnterAwaitPump(outer);
         Exception? failure = null;
         var thread = new Thread(() =>
         {
@@ -53,7 +53,7 @@ public sealed class CompiledAwaitPumpScopeTests
                 using var otherContext = CompiledAwaitPumpScopeFixture.Context();
                 CompiledAwaitPumpScopeFixture.AssertNoPump(otherContext);
                 var inner = new CompiledAwaitPumpScopeFixture.Pump(2);
-                using (CompiledBindingDispatcher.InstallAwaitPump(inner))
+                using (CompiledBindingDispatcher.EnterAwaitPump(inner))
                 {
                     Assert.Same(inner.Value, CompiledAwaitPumpScopeFixture.Dispatch(otherContext));
                 }
@@ -77,7 +77,7 @@ public sealed class CompiledAwaitPumpScopeTests
     {
         using var context = CompiledAwaitPumpScopeFixture.Context();
         var pump = new CompiledAwaitPumpScopeFixture.Pump();
-        using (CompiledBindingDispatcher.InstallAwaitPump(pump))
+        using (CompiledBindingDispatcher.EnterAwaitPump(pump))
         {
             Assert.Same(pump.Value, CompiledAwaitPumpScopeFixture.Dispatch(context));
         }
@@ -92,7 +92,7 @@ public sealed class CompiledAwaitPumpScopeTests
         using var context = CompiledAwaitPumpScopeFixture.Context();
         using var cancellation = new CancellationTokenSource();
         var pump = new CompiledAwaitPumpScopeFixture.Pump();
-        using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
+        using var scope = CompiledBindingDispatcher.EnterAwaitPump(pump);
         Assert.Same(pump.Value, CompiledAwaitPumpScopeFixture.Dispatch(context, cancellation.Token));
         Assert.Equal(cancellation.Token, pump.LastToken);
     }
@@ -102,7 +102,7 @@ public sealed class CompiledAwaitPumpScopeTests
     {
         using var context = CompiledAwaitPumpScopeFixture.Context();
         var pump = new CompiledAwaitPumpScopeFixture.Pump();
-        using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
+        using var scope = CompiledBindingDispatcher.EnterAwaitPump(pump);
         var result = CompiledBindingDispatcher.AwaitBinding(
             context, ValueTask.FromResult(SandboxValue.Unit), CancellationToken.None);
         Assert.Same(SandboxValue.Unit, result);

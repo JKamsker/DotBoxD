@@ -344,6 +344,7 @@ jobs:
               "CompiledAwaitPumpLifecycleTests",
               "CompiledAwaitPumpScopeAllocationTests",
               "CompiledAwaitPumpScopeTests",
+              "CompiledAwaitPumpLegacyScopeTests",
               "CompiledRuntimeQuotaTests",
               "CompiledCacheAuditTests",
               "CompiledCacheConcurrencyTests",

@@ -31,7 +31,7 @@ public sealed class CompiledAwaitPumpScopeAllocationTests(ITestOutputHelper outp
     {
         for (var index = 0; index < count; index++)
         {
-            using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
+            using var scope = CompiledBindingDispatcher.EnterAwaitPump(pump);
         }
     }
 }

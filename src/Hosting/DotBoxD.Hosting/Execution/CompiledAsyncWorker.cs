@@ -21,7 +21,7 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         using var pump = new CompiledAwaitPump();
         var previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(pump);
-        using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
+        using var scope = CompiledBindingDispatcher.EnterAwaitPump(pump);
         try
         {
             return execute();
