@@ -72,15 +72,17 @@ public sealed record SandboxExecutionResult
             return owned;
         }
 
-        ValidateExternalAuditEvents(value);
-        return ModelCopy.List(value);
+        // Validate the stored copy without reading the external collection again.
+        var snapshot = ModelCopy.List(value);
+        ValidateAuditSnapshot(snapshot);
+        return snapshot;
     }
 
-    private static void ValidateExternalAuditEvents(IReadOnlyList<SandboxAuditEvent> value)
+    private static void ValidateAuditSnapshot(IReadOnlyList<SandboxAuditEvent> snapshot)
     {
-        foreach (var auditEvent in value)
+        for (var index = 0; index < snapshot.Count; index++)
         {
-            if (auditEvent is null)
+            if (snapshot[index] is null)
             {
                 throw new ArgumentException("Audit events cannot contain null entries.", nameof(AuditEvents));
             }
