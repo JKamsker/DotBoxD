@@ -350,6 +350,8 @@ jobs:
               "AuditObserverPublicationAllocationTests",
               "ExecutionAuditSnapshotTests",
               "ExecutionAuditSnapshotAllocationTests",
+              "AuditFieldSnapshotTests",
+              "AuditFieldSnapshotAllocationTests",
               "CompiledRuntimeQuotaTests",
               "CompiledCacheAuditTests",
               "CompiledCacheConcurrencyTests",

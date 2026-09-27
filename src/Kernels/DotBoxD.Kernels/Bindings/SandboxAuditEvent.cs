@@ -1,4 +1,4 @@
-using DotBoxD.Kernels.Model;
+using System.Collections.ObjectModel;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Bindings;
@@ -108,7 +108,9 @@ public sealed record SandboxAuditEvent(
             return null;
         }
 
-        foreach (var field in fields)
+        // Validate the owned dictionary rather than enumerating the external source again.
+        var snapshot = new Dictionary<string, string>(fields, StringComparer.Ordinal);
+        foreach (var field in snapshot)
         {
             if (field.Value is null)
             {
@@ -116,6 +118,6 @@ public sealed record SandboxAuditEvent(
             }
         }
 
-        return ModelCopy.StringDictionary(fields);
+        return new ReadOnlyDictionary<string, string>(snapshot);
     }
 }
