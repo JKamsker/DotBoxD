@@ -10,9 +10,13 @@ namespace DotBoxD.Services.Streaming.Frames;
 /// <summary>
 /// A local source that will be streamed over an RPC request or response.
 /// </summary>
+/// <remarks>
+/// Each attachment supports one outbound registration at a time. Cancellation keeps that claim
+/// until the active source operation and stream pump cleanup finish.
+/// </remarks>
 public abstract class RpcStreamAttachment
 {
-    private int _outboundRegistrationClaimed;
+    private int _outboundRegistrationReferences;
     private int _sourceDisposed;
 
     private protected RpcStreamAttachment(RpcStreamHandle handle) => Handle = handle;
@@ -73,10 +77,13 @@ public abstract class RpcStreamAttachment
         CancellationToken ct);
 
     internal bool TryClaimOutboundRegistration() =>
-        Interlocked.CompareExchange(ref _outboundRegistrationClaimed, 1, 0) == 0;
+        Interlocked.CompareExchange(ref _outboundRegistrationReferences, 1, 0) == 0;
+
+    internal void RetainOutboundRegistration() =>
+        Interlocked.Increment(ref _outboundRegistrationReferences);
 
     internal void ReleaseOutboundRegistration() =>
-        Volatile.Write(ref _outboundRegistrationClaimed, 0);
+        Interlocked.Decrement(ref _outboundRegistrationReferences);
 
     // Releases the owned source exactly once, whether the call comes from the pump's own finally or
     // from a sibling stream's best-effort cleanup while this pump has already completed. The set owns
