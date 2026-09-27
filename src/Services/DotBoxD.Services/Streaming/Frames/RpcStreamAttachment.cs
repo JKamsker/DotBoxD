@@ -34,8 +34,10 @@ public abstract class RpcStreamAttachment
     }
 
     /// <summary>
-    /// Streams from a pipe. When <paramref name="completeReader"/> is false, canceling a pending
-    /// read leaves the reader open and its buffered bytes available to the caller.
+    /// Streams from a pipe. When <paramref name="completeReader"/> is false, cancellation or a
+    /// failed send leaves the reader open and unsent segments available to the caller. Only
+    /// segments whose send completed successfully are consumed. Writer backpressure remains
+    /// until the caller consumes or discards retained bytes.
     /// </summary>
     public static RpcStreamAttachment FromPipe(
         RpcStreamHandle handle,

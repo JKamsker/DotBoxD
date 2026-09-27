@@ -34,7 +34,7 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
             while (true)
             {
                 var result = await pipe.Reader.ReadAsync(ct).ConfigureAwait(false);
-                var buffer = result.Buffer;
+                var remaining = result.Buffer;
                 try
                 {
                     if (result.IsCanceled)
@@ -42,18 +42,21 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
                         return;
                     }
 
-                    foreach (var segment in buffer)
+                    var segments = remaining.GetEnumerator();
+                    while (segments.MoveNext())
                     {
-                        if (!segment.IsEmpty)
+                        if (!segments.Current.IsEmpty)
                         {
-                            await streams.SendStreamItemAsync(Handle.StreamId, segment, ct).ConfigureAwait(false);
+                            await streams.SendStreamItemAsync(Handle.StreamId, segments.Current, ct).ConfigureAwait(false);
                         }
+
+                        remaining = remaining.Slice(segments.Current.Length);
                     }
                 }
                 finally
                 {
-                    // A canceled read has not handed any of its buffered bytes to the sender.
-                    pipe.Reader.AdvanceTo(result.IsCanceled ? buffer.Start : buffer.End);
+                    // Leave unsent segments available when a borrowed pipe's read or send fails.
+                    pipe.Reader.AdvanceTo(remaining.Start);
                 }
 
                 if (result.IsCompleted)

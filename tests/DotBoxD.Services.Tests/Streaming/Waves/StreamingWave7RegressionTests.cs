@@ -13,7 +13,7 @@ public sealed class StreamingWave7RegressionTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task PipeOutbound_WhenItemSendFails_AdvancesReadBuffer()
+    public async Task PipeOutbound_WhenItemSendFails_ReleasesReadAndPreservesBytes()
     {
         var serializer = new MessagePackRpcSerializer();
         var itemSendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -43,13 +43,30 @@ public sealed class StreamingWave7RegressionTests
         pipe.Writer.Write(new byte[] { 1 });
         var flush = pipe.Writer.FlushAsync().AsTask();
 
-        await itemSendStarted.Task.WaitAsync(TestTimeout);
-        await flush.WaitAsync(TestTimeout);
-        await outbound.WaitAsync().WaitAsync(TestTimeout);
+        try
+        {
+            await itemSendStarted.Task.WaitAsync(TestTimeout);
+            await outbound.WaitAsync().WaitAsync(TestTimeout);
 
-        Assert.Equal(0, streams.OutboundSenderCount);
-        await pipe.Reader.CompleteAsync();
-        await pipe.Writer.CompleteAsync();
+            Assert.Equal(0, streams.OutboundSenderCount);
+            Assert.False(flush.IsCompleted);
+            var retained = await pipe.Reader.ReadAsync().AsTask().WaitAsync(TestTimeout);
+            try
+            {
+                Assert.Equal(new byte[] { 1 }, retained.Buffer.ToArray());
+            }
+            finally
+            {
+                pipe.Reader.AdvanceTo(retained.Buffer.End);
+            }
+
+            await flush.WaitAsync(TestTimeout);
+        }
+        finally
+        {
+            await pipe.Reader.CompleteAsync();
+            await pipe.Writer.CompleteAsync();
+        }
     }
 
     [Fact]
