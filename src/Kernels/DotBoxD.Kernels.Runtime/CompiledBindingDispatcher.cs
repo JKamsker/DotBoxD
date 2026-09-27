@@ -10,7 +10,7 @@ internal static partial class CompiledBindingDispatcher
 {
     [ThreadStatic] private static ICompiledAwaitPump? _pump;
 
-    internal static IDisposable InstallAwaitPump(ICompiledAwaitPump pump)
+    internal static AwaitPumpScope InstallAwaitPump(ICompiledAwaitPump pump)
     {
         var previous = _pump;
         _pump = pump;
@@ -274,7 +274,7 @@ internal static partial class CompiledBindingDispatcher
         return pump.RunToCompletion(pending, timeoutToken);
     }
 
-    private sealed class AwaitPumpScope(ICompiledAwaitPump? previous) : IDisposable
+    internal readonly struct AwaitPumpScope(ICompiledAwaitPump? previous) : IDisposable
     {
         public void Dispose()
         {

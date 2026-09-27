@@ -8,8 +8,8 @@ namespace DotBoxD.Kernels.Tests.Compiled.Core;
 public sealed class CompiledAwaitPumpAllocationTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(false, 168)]
-    [InlineData(true, 336)]
+    [InlineData(false, 144)]
+    [InlineData(true, 312)]
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public void Inline_cleanup_keeps_only_necessary_snapshot_allocations(bool queued, int bytesPerCall)
     {

@@ -342,6 +342,8 @@ jobs:
               "CompiledAsyncSynchronizationContextParityTests",
               "CompiledAwaitPumpAllocationTests",
               "CompiledAwaitPumpLifecycleTests",
+              "CompiledAwaitPumpScopeAllocationTests",
+              "CompiledAwaitPumpScopeTests",
               "CompiledRuntimeQuotaTests",
               "CompiledCacheAuditTests",
               "CompiledCacheConcurrencyTests",
