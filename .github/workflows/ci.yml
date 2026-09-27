@@ -370,6 +370,8 @@ jobs:
               "WorkerPlanCacheAllocationTests",
               "WorkerHostLifetimeTests",
               "WorkerHostCreationDisposalTests",
+              "ConfiguredWorkerLifetimeTests",
+              "ConfiguredWorkerPendingCallTests",
               "CompiledCacheEntrypointTests",
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",

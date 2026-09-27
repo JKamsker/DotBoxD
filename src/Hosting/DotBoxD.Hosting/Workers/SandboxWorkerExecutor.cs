@@ -5,9 +5,24 @@ namespace DotBoxD.Hosting;
 
 using DotBoxD.Kernels;
 
-internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
+internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : IDisposable
 {
-    public async ValueTask<SandboxExecutionResult> ExecuteAsync(
+    private ConfiguredSandboxWorker? _worker = worker;
+
+    public ValueTask<SandboxExecutionResult> ExecuteAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => ExecuteCoreAsync(Volatile.Read(ref _worker), plan, entrypoint, input, options, cancellationToken);
+
+    public void Dispose()
+        => Volatile.Write(ref _worker, null);
+
+    // An admitted call keeps its own worker reference until its asynchronous work completes.
+    private static async ValueTask<SandboxExecutionResult> ExecuteCoreAsync(
+        ConfiguredSandboxWorker? worker,
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,

@@ -235,8 +235,7 @@ public sealed partial class SandboxHost : IDisposable
         SandboxAuditEvent auditEvent,
         Action<SandboxAuditEvent>[] observers)
     {
-        // Keep this publication's snapshot so disposal from a callback does not
-        // interrupt later observers or events in the same result.
+        // Retain this publication's observers through callbacks that dispose the host.
         foreach (var observer in observers)
         {
             try
@@ -289,6 +288,7 @@ public sealed partial class SandboxHost : IDisposable
         Volatile.Write(ref _auditObservers, []);
         if (TryDisposeCompiledNoAuditStatePool())
         {
+            _workerExecutor.Dispose();
             _compiled.Dispose();
         }
     }
