@@ -295,6 +295,6 @@ public static class SafeHttpClient
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
-    private sealed record SafeHttpRequest(
+    private readonly record struct SafeHttpRequest(
         SafeHttpGrantOptions Grant, Uri Uri, long MaxRequestBytes, long MaxResponseBytes, TimeSpan Timeout);
 }

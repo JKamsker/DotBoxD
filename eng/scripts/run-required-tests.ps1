@@ -353,6 +353,7 @@ $defaultMinimums = @{
     QueryConstantConversionTests = 12
     QueryBooleanConversionTests = 9
     SafeHttpCompletedDnsAllocationTests = 2
+    SafeHttpRequestAllocationTests = 2
     SafeHttpCompletedDnsTests = 11
     QueryNumericComparisonAllocationTests = 12
     QueryIncomparableNumericAllocationTests = 30
