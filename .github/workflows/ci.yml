@@ -654,6 +654,8 @@ jobs:
               "RpcAttachmentPendingClaimPeerTests",
               "RpcAttachmentSetupOwnershipTests",
               "RpcPipeSetupOwnershipTests",
+              "RpcStreamIdWrapTests",
+              "RpcStreamIdAllocationTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"

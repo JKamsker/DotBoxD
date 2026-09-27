@@ -12,8 +12,8 @@ internal sealed partial class RpcStreamManager
         RpcStreamValidation.ValidateKind(kind);
         while (true)
         {
-            var streamId = Interlocked.Increment(ref _outboundStreamIdCounter);
-            if (streamId <= 0 || _senders.ContainsKey(streamId))
+            var streamId = RpcStreamIdSequence.Next(ref _outboundStreamIdCounter);
+            if (_senders.ContainsKey(streamId))
             {
                 continue;
             }
