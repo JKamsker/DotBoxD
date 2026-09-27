@@ -104,6 +104,23 @@ public abstract class RpcStreamAttachment
 
     private protected virtual bool OwnsSource => false;
 
+    internal async ValueTask DisposeUnregisteredSourceBestEffortAsync(string operation)
+    {
+        if (!TryClaimOutboundRegistration())
+        {
+            return;
+        }
+
+        try
+        {
+            await DisposeSourceBestEffortAsync(operation).ConfigureAwait(false);
+        }
+        finally
+        {
+            ReleaseOutboundRegistration();
+        }
+    }
+
     internal async ValueTask DisposeSourceBestEffortAsync(string operation)
     {
         try

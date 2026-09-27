@@ -652,6 +652,8 @@ jobs:
               "RpcOutboundRegistrationOwnershipTests",
               "RpcAttachmentPendingClaimTests",
               "RpcAttachmentPendingClaimPeerTests",
+              "RpcAttachmentSetupOwnershipTests",
+              "RpcPipeSetupOwnershipTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"

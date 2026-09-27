@@ -21,7 +21,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 continue;
             }
 
-            await stream.DisposeSourceBestEffortAsync("Outbound stream source cleanup failed")
+            await stream.DisposeUnregisteredSourceBestEffortAsync("Outbound stream source cleanup failed")
                 .ConfigureAwait(false);
         }
     }

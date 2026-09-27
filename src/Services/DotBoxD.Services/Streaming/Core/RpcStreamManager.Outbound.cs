@@ -90,6 +90,7 @@ internal sealed partial class RpcStreamManager
                     throw new ServiceProtocolException("Outbound stream attachment is already registered.");
                 }
                 claimed[claimedCount++] = attachments[i];
+                attachments[i].ThrowIfOwnedSourceDisposed();
                 var state = new RpcStreamSendState(attachments[i].Handle.StreamId, ct);
                 if (!_senders.TryAdd(state.StreamId, state))
                 {
@@ -141,6 +142,7 @@ internal sealed partial class RpcStreamManager
                 throw new ServiceProtocolException("Outbound stream attachment is already registered.");
             }
             claimed = true;
+            attachment.ThrowIfOwnedSourceDisposed();
             state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
             if (!_senders.TryAdd(state.StreamId, state))
             {
