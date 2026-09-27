@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -231,7 +233,10 @@ public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
     }
 
     public bool Equals(ExecutionPlanSeal? other)
-        => other is not null && StringComparer.Ordinal.Equals(_value, other._value);
+        => other is not null && (ReferenceEquals(this, other) ||
+            CryptographicOperations.FixedTimeEquals(
+                MemoryMarshal.AsBytes(_value.AsSpan()),
+                MemoryMarshal.AsBytes(other._value.AsSpan())));
 
     public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal);
 

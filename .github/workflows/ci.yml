@@ -349,6 +349,8 @@ jobs:
               "CompiledProviderDisposalAdmissionTests",
               "CompiledArtifactDisposalTests",
               "PreparedPlanMetadataValidationTests",
+              "ExecutionPlanSealEqualityTests",
+              "ExecutionPlanSealAllocationTests",
               "PreparedPlanCacheLifetimeTests",
               "PreparedPlanCacheAllocationTests",
               "WorkerPlanCacheLifetimeTests",
