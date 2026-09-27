@@ -143,7 +143,7 @@ public sealed partial class InstalledKernel
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             var parameters = ValidateFor(adapter);
-            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle, parameters);
+            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle, parameters, cancellationToken);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             return AsShouldHandleResult(result);
@@ -164,7 +164,7 @@ public sealed partial class InstalledKernel
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             var parameters = ValidateFor(adapter);
-            var input = BuildInput(adapter, e, _entrypoints.Handle, parameters);
+            var input = BuildInput(adapter, e, _entrypoints.Handle, parameters, cancellationToken);
             _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
         }
@@ -197,7 +197,7 @@ public sealed partial class InstalledKernel
             }
 
             var parameters = ValidateFor(adapter);
-            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle, parameters);
+            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle, parameters, cancellationToken);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             if (AsShouldHandleResult(result))
             {
