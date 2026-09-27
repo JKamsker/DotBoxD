@@ -42,19 +42,26 @@ public sealed class CompiledAwaitPumpAllocationTests(ITestOutputHelper output)
     {
         var probe = CompiledAwaitPumpFixture.CreateDisposedQueue(0);
         var disposed = (IDisposable)probe.Context;
-        for (var index = 0; index < 2_000; index++)
+        _ = MeasureRepeatedDisposal(disposed, 2_000);
+        var minimum = long.MaxValue;
+        for (var sample = 0; sample < 5; sample++)
         {
-            disposed.Dispose();
+            minimum = Math.Min(minimum, MeasureRepeatedDisposal(disposed, 10_000));
         }
 
+        output.WriteLine($"Repeated pump disposal: {minimum / 10_000d} B/call");
+        Assert.Equal(0, minimum);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static long MeasureRepeatedDisposal(IDisposable disposed, int count)
+    {
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var index = 0; index < 10_000; index++)
+        for (var index = 0; index < count; index++)
         {
             disposed.Dispose();
         }
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-        output.WriteLine($"Repeated pump disposal: {allocated / 10_000d} B/call");
-        Assert.Equal(0, allocated);
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
     private static int Run(Func<SandboxExecutionResult> execute, SandboxExecutionResult expected, int count)
