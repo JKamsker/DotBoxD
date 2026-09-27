@@ -38,6 +38,20 @@ internal class PendingUnaryResponse<TResponse> :
 
     public void DisposeResultWhenAvailable()
     {
+        if (Task.IsCompleted)
+        {
+            _ = Task.Exception;
+            return;
+        }
+
+        // A failed send can abandon a response already taken by a concurrent completion.
+        // Observing that completion must not retain the abandoned caller's ambient context.
+        using var flow = ExecutionContext.SuppressFlow();
+        _ = Task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public void SetError(Exception error) =>

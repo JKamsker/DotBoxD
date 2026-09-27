@@ -72,6 +72,10 @@ internal sealed class ReceivedResponse : IDisposable
             {
                 task.Result.Dispose();
             }
+            else
+            {
+                _ = task.Exception;
+            }
 
             return;
         }
@@ -82,6 +86,10 @@ internal sealed class ReceivedResponse : IDisposable
                 if (t.Status == TaskStatus.RanToCompletion)
                 {
                     t.Result.Dispose();
+                }
+                else
+                {
+                    _ = t.Exception;
                 }
             },
             CancellationToken.None,
