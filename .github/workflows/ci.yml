@@ -576,6 +576,8 @@ jobs:
               "QuerySpanCollectionConversionTests",
               "QueryConstantConversionTests",
               "QueryBooleanConversionTests",
+              "SafeHttpCompletedDnsAllocationTests",
+              "SafeHttpCompletedDnsTests",
               "QueryNumericComparisonAllocationTests",
               "QueryIncomparableNumericAllocationTests",
               "QueryFilterValidationAllocationTests",
