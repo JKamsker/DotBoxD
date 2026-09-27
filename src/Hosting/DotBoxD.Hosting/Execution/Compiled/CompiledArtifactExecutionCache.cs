@@ -65,6 +65,7 @@ internal sealed class CompiledArtifactExecutionCache
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            CompiledWorkFailureObserver.Observe(lazy);
             throw;
         }
         catch

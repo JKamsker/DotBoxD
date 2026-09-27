@@ -1,3 +1,4 @@
+using DotBoxD.Hosting.Execution.Compiled;
 using DotBoxD.Kernels.Compiler;
 
 namespace DotBoxD.Hosting.Execution;
@@ -80,6 +81,7 @@ internal sealed class CompiledExecutableCache : IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            CompiledWorkFailureObserver.Observe(lazy);
             throw;
         }
         catch

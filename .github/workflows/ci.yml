@@ -343,6 +343,8 @@ jobs:
               "CompiledRuntimeQuotaTests",
               "CompiledCacheAuditTests",
               "CompiledCacheConcurrencyTests",
+              "CompiledCacheFailureObservationTests",
+              "CompiledCacheCancellationRecoveryTests",
               "CompiledCacheEntrypointTests",
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",

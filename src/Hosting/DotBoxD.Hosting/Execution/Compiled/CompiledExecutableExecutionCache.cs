@@ -147,6 +147,7 @@ internal sealed class CompiledExecutableExecutionCache : IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            CompiledWorkFailureObserver.Observe(lazy);
             throw;
         }
         catch
