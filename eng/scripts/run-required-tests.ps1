@@ -68,6 +68,7 @@ $defaultMinimums = @{
     InterpreterInterruptedAuditEvidenceTests = 9
     WorkerIsolationTests = 11
     WorkerQuotaResultValidationTests = 2
+    WorkerAuditValidationTests = 11
     WorkerResultHardeningTests = 11
     JsonApiSurfaceTests = 1
     PublicModelImmutabilityTests = 5

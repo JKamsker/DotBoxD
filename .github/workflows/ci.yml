@@ -371,6 +371,7 @@ jobs:
               "InterpreterInterruptedAuditEvidenceTests",
               "WorkerIsolationTests",
               "WorkerQuotaResultValidationTests",
+              "WorkerAuditValidationTests",
               "WorkerResultHardeningTests",
               "JsonApiSurfaceTests",
               "PublicModelImmutabilityTests",
