@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -39,17 +40,40 @@ internal static class SafeHttpDnsResolution
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (addresses.Count == 0)
+        var snapshot = SnapshotAddresses(addresses);
+        if (snapshot.Length == 0)
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: DNS resolution returned no addresses");
         }
 
-        if (!grant.AllowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal))
+        if (!grant.AllowPrivateNetwork && snapshot.Any(SafeIpAddressClassifier.IsNonGlobal))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
         }
 
-        return addresses;
+        return snapshot;
+    }
+
+    private static IPAddress[] SnapshotAddresses(IReadOnlyList<IPAddress> addresses)
+    {
+        ArgumentNullException.ThrowIfNull(addresses);
+        var snapshot = addresses.ToArray();
+        Span<byte> bytes = stackalloc byte[16];
+        for (var index = 0; index < snapshot.Length; index++)
+        {
+            var address = snapshot[index];
+            ArgumentNullException.ThrowIfNull(address);
+            if (!address.TryWriteBytes(bytes, out var length))
+            {
+                throw new InvalidOperationException("DNS address could not be copied");
+            }
+
+            // IPAddress values are mutable too; pin only the values that this request validates.
+            snapshot[index] = address.AddressFamily == AddressFamily.InterNetworkV6
+                ? new IPAddress(bytes[..length], address.ScopeId)
+                : new IPAddress(bytes[..length]);
+        }
+        return snapshot;
     }
 
     private static void ObserveLateFailure(Task pending)
