@@ -38,6 +38,8 @@ internal sealed class RpcStreamHandleFormatter : IMessagePackFormatter<RpcStream
             var count = reader.ReadMapHeader();
             var streamId = 0;
             var kind = default(RpcStreamKind);
+            var seenStreamId = false;
+            var seenKind = false;
 
             for (var i = 0; i < count; i++)
             {
@@ -45,22 +47,46 @@ internal sealed class RpcStreamHandleFormatter : IMessagePackFormatter<RpcStream
                 switch (name)
                 {
                     case "StreamId":
+                        ThrowIfDuplicate(seenStreamId, nameof(RpcStreamHandle.StreamId));
+                        seenStreamId = true;
                         streamId = reader.ReadInt32();
                         break;
                     case "Kind":
+                        ThrowIfDuplicate(seenKind, nameof(RpcStreamHandle.Kind));
+                        seenKind = true;
                         kind = (RpcStreamKind)reader.ReadByte();
                         break;
                     default:
-                        reader.Skip();
+                        MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC stream handle");
                         break;
                 }
             }
 
+            ThrowIfMissing(seenStreamId, nameof(RpcStreamHandle.StreamId));
+            ThrowIfMissing(seenKind, nameof(RpcStreamHandle.Kind));
             return new RpcStreamHandle(streamId, kind);
         }
         finally
         {
             reader.Depth--;
+        }
+    }
+
+    private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
+    {
+        if (alreadySeen)
+        {
+            throw new RpcEnvelopeValidationException(
+                $"RPC stream handle contains duplicate {fieldName}.");
+        }
+    }
+
+    private static void ThrowIfMissing(bool seen, string fieldName)
+    {
+        if (!seen)
+        {
+            throw new RpcEnvelopeValidationException(
+                $"RPC stream handle is missing required {fieldName}.");
         }
     }
 }

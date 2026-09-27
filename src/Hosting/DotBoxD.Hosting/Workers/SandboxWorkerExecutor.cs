@@ -5,9 +5,24 @@ namespace DotBoxD.Hosting;
 
 using DotBoxD.Kernels;
 
-internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
+internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : IDisposable
 {
-    public async ValueTask<SandboxExecutionResult> ExecuteAsync(
+    private ConfiguredSandboxWorker? _worker = worker;
+
+    public ValueTask<SandboxExecutionResult> ExecuteAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => ExecuteCoreAsync(Volatile.Read(ref _worker), plan, entrypoint, input, options, cancellationToken);
+
+    public void Dispose()
+        => Volatile.Write(ref _worker, null);
+
+    // An admitted call keeps its own worker reference while awaiting its result.
+    private static async ValueTask<SandboxExecutionResult> ExecuteCoreAsync(
+        ConfiguredSandboxWorker? worker,
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,
@@ -38,9 +53,10 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             SuppressSuccessfulRunSummaryAudit = false
         };
         using var timeout = CreateWorkerTimeoutSource(cancellationToken, plan.Budget.EffectiveWallTime);
+        Task<SandboxExecutionResult>? pending = null;
         try
         {
-            var pending = worker.Client.ExecuteInWorkerAsync(
+            pending = worker.Client.ExecuteInWorkerAsync(
                     plan,
                     entrypoint,
                     input,
@@ -71,6 +87,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            ObserveLateFailure(pending);
             return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
@@ -78,6 +95,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
+            ObserveLateFailure(pending);
             return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
@@ -90,6 +108,28 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                 options,
                 new SandboxError(SandboxErrorCode.HostFailure, "worker process execution failed"));
         }
+    }
+
+    private static void ObserveLateFailure(Task? pending)
+    {
+        if (pending is null)
+        {
+            return;
+        }
+        if (pending.IsCompleted)
+        {
+            _ = pending.Exception;
+            return;
+        }
+
+        // Cancellation stops the wait, but a worker can still complete with a failure later.
+        // Fault observation must not retain the canceled waiter's ambient state.
+        using var flow = ExecutionContext.SuppressFlow();
+        _ = pending.ContinueWith(
+            static completed => { _ = completed.Exception; },
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private static SandboxError WorkerCancellationOrTimeoutError(CancellationToken callerToken)

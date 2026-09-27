@@ -230,7 +230,7 @@ public sealed class StreamingProtocolRegressionTests
         await using var outbound = streams.RegisterOutbound(new[] { response }, CancellationToken.None);
         Assert.Equal(1, streams.OutboundSenderCount);
 
-        streams.RemoveOutbound(existing.StreamId);
+        streams.ReleaseOutboundReservation(existing.StreamId);
     }
 
     private static Payload FrameErrorResponseWithStream(MessagePackRpcSerializer serializer, int messageId)

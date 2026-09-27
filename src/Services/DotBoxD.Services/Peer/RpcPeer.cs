@@ -133,13 +133,22 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     /// <summary>Provides a local implementation of <typeparamref name="TService"/> for the other
     /// side to call.</summary>
     /// <remarks>Provided services are callable by any peer on this channel; enforce access
-    /// control at the transport or application layer.</remarks>
+    /// control at the transport or application layer. Concrete implementations of
+    /// <see cref="IServiceDispatcher"/> are provided directly; interface contracts use
+    /// their registered dispatcher factories.</remarks>
     public RpcPeer Provide<TService>(TService implementation)
         where TService : class
     {
         if (implementation is null)
         {
             throw new ArgumentNullException(nameof(implementation));
+        }
+
+        // Type inference selects this overload for concrete dispatchers. Interface contracts
+        // still use their factories, including implementations that also act as dispatchers.
+        if (!typeof(TService).IsInterface && implementation is IServiceDispatcher dispatcher)
+        {
+            return Provide(dispatcher);
         }
 
         return Provide(GeneratedServiceRegistry.CreateDispatcher<TService>(implementation));

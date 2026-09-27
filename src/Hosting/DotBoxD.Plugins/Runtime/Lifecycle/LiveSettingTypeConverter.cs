@@ -230,8 +230,7 @@ internal static class LiveSettingTypeConverter
         return (long)value;
     }
 
-    // Compares two numeric live-setting operands using exact integer arithmetic when both
-    // are integral so 64-bit boundaries near and above 2^53 are not collapsed through double.
+    // Preserve exact integer and decimal bounds instead of collapsing them through double.
     private static int CompareNumeric(object? left, object? right)
     {
         if (TryAsExactInt64(left, out var leftLong) && TryAsExactInt64(right, out var rightLong))
@@ -239,8 +238,17 @@ internal static class LiveSettingTypeConverter
             return leftLong.CompareTo(rightLong);
         }
 
+        if (IsExactNumber(left) && IsExactNumber(right))
+        {
+            return Convert.ToDecimal(left, CultureInfo.InvariantCulture)
+                .CompareTo(Convert.ToDecimal(right, CultureInfo.InvariantCulture));
+        }
+
         return FiniteDouble(left).CompareTo(FiniteDouble(right));
     }
+
+    private static bool IsExactNumber(object? value)
+        => value is sbyte or byte or short or ushort or int or uint or long or ulong or decimal;
 
     private static bool TryAsExactInt64(object? value, out long result)
     {

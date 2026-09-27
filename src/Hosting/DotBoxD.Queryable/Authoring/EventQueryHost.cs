@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using DotBoxD.Queryable.Analysis;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
@@ -16,12 +17,12 @@ namespace DotBoxD.Queryable.Authoring;
 /// </summary>
 public sealed class EventQueryHost : IEventQuerySource
 {
-    private readonly MemberValueReader _reader = new();
     private readonly object _gate;
     private readonly Func<bool>? _isDisposed;
-    // Read lock-free on the hot PublishAsync/HasSubscriptions path; the dispatcher set only mutates on
-    // Register, which still serializes through _gate so each event type creates exactly one dispatcher.
+    // Active subscriptions strongly own their event types. Publishing still reads this map lock-free.
     private readonly ConcurrentDictionary<Type, object> _dispatchers = new();
+    // Preserve counters across idle periods without pinning unused collectible event types.
+    private readonly ConditionalWeakTable<Type, object> _dispatcherCache = new();
 
     /// <summary>Creates an independent in-process event-query host.</summary>
     public EventQueryHost()
@@ -71,7 +72,10 @@ public sealed class EventQueryHost : IEventQuerySource
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_isDisposed?.Invoke() == true, this);
-            return GetOrAddDispatcher<TEvent>().Register(document, plan, project, Dispatch);
+            var dispatcher = GetOrAddDispatcher<TEvent>();
+            var handle = dispatcher.Register(document, plan, project, Dispatch);
+            _dispatchers.TryAdd(typeof(TEvent), dispatcher);
+            return handle;
         }
     }
 
@@ -106,19 +110,30 @@ public sealed class EventQueryHost : IEventQuerySource
 
     private EventQueryDispatcher<TEvent> GetOrAddDispatcher<TEvent>()
     {
-        // Double-checked under _gate (not ConcurrentDictionary.GetOrAdd): the value factory can run on
-        // racing threads and discard a built dispatcher, which would silently drop a concurrent Register's
-        // subscription. The lock guarantees one dispatcher instance per type and that the caller registers
-        // onto the instance that is actually stored.
+        // Serialize creation and registration so every subscription for a type uses the same dispatcher,
+        // including when the last existing subscription is concurrently removed from the active map.
         lock (_gate)
         {
-            if (!_dispatchers.TryGetValue(typeof(TEvent), out var existing))
+            if (!_dispatcherCache.TryGetValue(typeof(TEvent), out var existing))
             {
-                existing = new EventQueryDispatcher<TEvent>(_reader, _isDisposed);
-                _dispatchers[typeof(TEvent)] = existing;
+                existing = new EventQueryDispatcher<TEvent>(
+                    new MemberValueReader(typeof(TEvent)), _isDisposed, RemoveIdleDispatcher);
+                _dispatcherCache.Add(typeof(TEvent), existing);
             }
 
             return (EventQueryDispatcher<TEvent>)existing;
+        }
+    }
+
+    private void RemoveIdleDispatcher<TEvent>(EventQueryDispatcher<TEvent> dispatcher)
+    {
+        lock (_gate)
+        {
+            if (!dispatcher.HasSubscriptions &&
+                _dispatchers.TryGetValue(typeof(TEvent), out var current) && ReferenceEquals(current, dispatcher))
+            {
+                _dispatchers.TryRemove(typeof(TEvent), out _);
+            }
         }
     }
 

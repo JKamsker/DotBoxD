@@ -38,7 +38,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         catch (Exception ex)
         {
-            _pending.Remove(pending.MessageId, pending, consumed: true);
+            _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
             return ToFaultedTask<TResponse>(ex);
         }
@@ -82,7 +82,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         catch (Exception ex)
         {
-            _pending.Remove(pending.MessageId, pending, consumed: true);
+            _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
             return ToFaultedTask<TResponse>(ex);
         }
@@ -111,7 +111,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         catch (Exception ex)
         {
-            _pending.Remove(messageId, pending, consumed: true);
+            _pending.Remove(messageId, pending, consumed: false);
             ReleasePendingSlot();
             return ToFaultedTask<TResponse>(ex);
         }
@@ -124,7 +124,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             }
             catch (Exception ex)
             {
-                _pending.Remove(messageId, pending, consumed: true);
+                _pending.Remove(messageId, pending, consumed: false);
                 ReleasePendingSlot();
                 return ToFaultedTask<TResponse>(ex);
             }

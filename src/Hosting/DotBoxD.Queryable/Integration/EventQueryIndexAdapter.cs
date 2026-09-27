@@ -20,16 +20,15 @@ namespace DotBoxD.Queryable.Integration;
 /// only when the index fully covers the filter (which the registry additionally re-checks).
 /// </para>
 /// <para>
-/// <b>Type fidelity.</b> A portable <see cref="QueryValue"/> erases CLR identity: every integral type
-/// collapses to <see cref="QueryValueKind.Integer"/> (a <see cref="long"/>) and
-/// <see cref="float"/>/<see cref="double"/>/<see cref="decimal"/>/<see cref="ulong"/> to
-/// <see cref="QueryValueKind.Number"/> (a <see cref="double"/>). The emitted
+/// <b>Type fidelity.</b> A portable <see cref="QueryValue"/> erases some CLR identity: signed integral types
+/// collapse to <see cref="QueryValueKind.Integer"/> (a <see cref="long"/>) and
+/// <see cref="float"/>/<see cref="double"/> to <see cref="QueryValueKind.Number"/> (a <see cref="double"/>).
+/// Exact decimal and unsigned value kinds are not mapped to host index predicates. The emitted
 /// <see cref="HostIndexedPredicate.ValueType"/> therefore reflects the portable value kind
 /// (<c>bool</c>/<c>long</c>/<c>double</c>/<c>string</c>), not the event's declared property type. The host's
-/// <c>EventIndexMatcher</c> reconciles the boxed value to the real property CLR type when it compiles the
-/// index, so an integral bound still matches an <c>int</c>/<c>short</c>/… field. The same widening means the
-/// registry's double-typed carve-out (which keeps the verified IR authoritative for <c>double</c> keys)
-/// triggers exactly when the captured literal is floating-point.
+/// <c>EventIndexMatcher</c> compares mixed numeric types in a shared numeric domain, preserving fractional
+/// bounds and floating-point promotion without rounding the bound to the property's CLR type. The
+/// registry still evaluates the verified IR after any surviving index check.
 /// </para>
 /// </summary>
 public static class EventQueryIndexAdapter

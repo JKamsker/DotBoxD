@@ -209,8 +209,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
         lock (_gate)
         {
             InstanceRegistryPolicy.RemoveReference(_activeInstances, instance);
-            if (!InstanceRegistryPolicy.ContainsReference(_activeInstances, instance) &&
-                !InstanceRegistryPolicy.ContainsReference(_entries.Values, instance))
+            // Pending disposal is recorded only after the last registration is removed, and
+            // Register rejects pending instances. No registry-wide values snapshot is needed.
+            if (_pendingDisposals.Count != 0 &&
+                !InstanceRegistryPolicy.ContainsReference(_activeInstances, instance))
             {
                 disposal = TakePendingDisposal(instance);
             }

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace DotBoxD.Queryable.Translation;
 
@@ -89,18 +90,6 @@ internal static class MemberPathReader
         return finder.Found;
     }
 
-    /// <summary>Removes transparent <see cref="ExpressionType.Convert"/>/<see cref="ExpressionType.ConvertChecked"/> wrappers.</summary>
-    public static Expression StripConvert(Expression? expression)
-    {
-        var current = expression;
-        while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
-        {
-            current = unary.Operand;
-        }
-
-        return current ?? throw new ArgumentNullException(nameof(expression));
-    }
-
     /// <summary>
     /// Removes conversions that are safe to ignore while reading a member path. Lossy/member-changing casts
     /// over the query parameter are rejected instead of silently lowering the wrong path semantics.
@@ -110,7 +99,7 @@ internal static class MemberPathReader
         var current = expression ?? throw new ArgumentNullException(nameof(expression));
         while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
         {
-            if (!IsTransparentPathConversion(unary.Operand.Type, unary.Type))
+            if (!IsTransparentPathConversion(unary.Operand.Type, unary.Type) || !IsTransparentConversionMethod(unary))
             {
                 if (ReferencesParameter(unary.Operand, parameter))
                 {
@@ -133,6 +122,20 @@ internal static class MemberPathReader
         Nullable.GetUnderlyingType(declaringType) is not null &&
         (member.Member.Name == "HasValue" || member.Member.Name == "Value");
 
+    private static bool IsTransparentConversionMethod(UnaryExpression conversion)
+    {
+        if (conversion.Method is not { } method)
+        {
+            return true;
+        }
+
+        // Integral-to-decimal widening uses a framework operator, including lifted nullable forms.
+        // Matching only operand types would also discard arbitrary user-supplied conversion methods.
+        var source = Nullable.GetUnderlyingType(conversion.Operand.Type) ?? conversion.Operand.Type;
+        return method == typeof(decimal).GetMethod(
+            "op_Implicit", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly, [source]);
+    }
+
     private static bool IsTransparentPathConversion(Type source, Type target)
     {
         if (source == target)
@@ -148,8 +151,8 @@ internal static class MemberPathReader
             return false;
         }
 
-        var sourceValue = nullableSource ?? source;
-        var targetValue = nullableTarget ?? target;
+        var sourceValue = NumericValueType(nullableSource ?? source);
+        var targetValue = NumericValueType(nullableTarget ?? target);
         if (sourceValue == targetValue)
         {
             return true;
@@ -157,6 +160,15 @@ internal static class MemberPathReader
 
         return IsExactNumericWidening(sourceValue, targetValue);
     }
+
+    private static Type NumericValueType(Type type)
+        // C# enum comparisons include conversions to their backing integer type. These preserve values,
+        // as do casts between enums with the same backing type; the existing widening rules still apply.
+        => type.IsEnum && Type.GetTypeCode(type) is
+            TypeCode.SByte or TypeCode.Byte or TypeCode.Int16 or TypeCode.UInt16 or
+            TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64
+            ? Enum.GetUnderlyingType(type)
+            : type;
 
     private static bool IsExactNumericWidening(Type source, Type target)
         => ExactNumericWidenings.Contains((Type.GetTypeCode(source), Type.GetTypeCode(target)));

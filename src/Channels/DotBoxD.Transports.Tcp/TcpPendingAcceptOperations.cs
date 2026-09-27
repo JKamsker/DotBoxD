@@ -2,8 +2,21 @@ using System.Net.Sockets;
 
 namespace DotBoxD.Transports.Tcp;
 
-internal static class TcpPendingAcceptObserver
+internal static class TcpPendingAcceptOperations
 {
+    public static Task<TcpClient> Start(TcpListener listener)
+    {
+        try
+        {
+            return listener.AcceptTcpClientAsync();
+        }
+        catch (Exception error)
+        {
+            // A stopped listener can fail synchronously; use the same lifecycle mapping as async failures.
+            return Task.FromException<TcpClient>(error);
+        }
+    }
+
     public static void Observe(Task<TcpClient>? pending)
     {
         // Reclaim an in-flight accept stashed on cancellation. Stopping the listener usually faults it,

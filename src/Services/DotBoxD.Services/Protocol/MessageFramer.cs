@@ -242,10 +242,10 @@ public static class MessageFramer
 
     /// <summary>
     /// Validates that <paramref name="frame"/> is a well-formed outgoing wire frame: at least a full
-    /// header, a length prefix that exactly matches the buffer length, and within
-    /// <paramref name="maxMessageSize"/>. Shared by every transport's send path so a malformed frame
-    /// is rejected locally instead of being shipped to the peer (where behaviour would otherwise
-    /// differ by transport). Throws <see cref="InvalidDataException"/> on a bad frame.
+    /// header, a matching length prefix, a valid message type, and a length within the configured limit.
+    /// <paramref name="maxMessageSize"/> must be between <see cref="HeaderSize"/> and
+    /// <see cref="MaxMessageSize"/> bytes, inclusive. Invalid limits throw
+    /// <see cref="ArgumentOutOfRangeException"/>; malformed frames throw <see cref="InvalidDataException"/>.
     /// </summary>
     public static void ValidateOutgoingFrame(ReadOnlySpan<byte> frame, int maxMessageSize = MaxMessageSize)
         => MessageFrameReader.ValidateOutgoingFrame(frame, maxMessageSize);

@@ -11,7 +11,8 @@ namespace DotBoxD.Queryable.Authoring;
 /// to compiled when hot) and, on a match, the projection is materialized and dispatched. Subscriptions with
 /// no equality predicate are evaluated against every event (an explicit broad fallback).
 /// </summary>
-internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Func<bool>? isDisposed)
+internal sealed class EventQueryDispatcher<TEvent>(
+    MemberValueReader reader, Func<bool>? isDisposed, Action<EventQueryDispatcher<TEvent>> onEmpty)
 {
     private readonly object _gate = new();
     private long _eventsObserved;
@@ -28,8 +29,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
         var fingerprint = QueryFingerprint.Compute(document);
         var routingKeys = RoutingKeysFor(plan);
         EventQuerySubscriptionEntry<TEvent> entry = null!;
+        // A method group keeps the diagnostic reader out of the unsubscribe closure that captures entry.
         var handle = new EventQuerySubscriptionHandle(
-            document, plan, fingerprint, () => EventsObserved, () => entry.IsCompiled, () => Remove(entry));
+            document, plan, fingerprint, ReadEventsObserved, () => Remove(entry));
         entry = new EventQuerySubscriptionEntry<TEvent>(document.Filter, routingKeys, project, dispatch, handle);
         lock (_gate)
         {
@@ -163,11 +165,21 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
     private bool IsDisposed(EventQuerySubscriptionEntry<TEvent> entry)
         => entry.Handle.IsDisposed || isDisposed?.Invoke() == true;
 
+    private long ReadEventsObserved() => EventsObserved;
+
     private void Remove(EventQuerySubscriptionEntry<TEvent> entry)
     {
+        bool empty;
         lock (_gate)
         {
             _snapshot = _snapshot.Without(entry);
+            empty = _snapshot.IsEmpty;
+        }
+
+        if (empty)
+        {
+            // Registration takes the host lock first; release our lock before notifying the host.
+            onEmpty(this);
         }
     }
 
@@ -184,7 +196,12 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader, Fun
         {
             if (seenPaths.Add(predicate.Path))
             {
-                keys.Add(EventQueryRoutingKey.FromValue(predicate.Path, predicate.Value));
+                var numericRouting = EventQueryNumericRoutingResolver.Resolve(
+                    typeof(TEvent), predicate.Path, predicate.Value.Kind);
+                if (numericRouting != EventQueryNumericRouting.Unresolved)
+                {
+                    keys.Add(EventQueryRoutingKey.FromValue(predicate.Path, predicate.Value, numericRouting));
+                }
             }
         }
 

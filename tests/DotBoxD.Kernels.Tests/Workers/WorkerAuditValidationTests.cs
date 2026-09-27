@@ -180,6 +180,7 @@ public sealed class WorkerAuditValidationTests
         var policy = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .WithFuel(1_000)
+            .WithWallTime(ValidationWallTime)
             .WithMaxLogEvents(1)
             .Build();
         var plan = await host.PrepareAsync(module, policy);

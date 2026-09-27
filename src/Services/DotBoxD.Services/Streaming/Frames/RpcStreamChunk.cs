@@ -4,7 +4,7 @@ namespace DotBoxD.Services.Streaming.Frames;
 
 internal sealed class RpcStreamChunk : IDisposable
 {
-    private readonly RpcStreamReceiver _owner;
+    private RpcStreamReceiver? _owner;
     private DotBoxD.Services.Buffers.Payload? _frame;
 
     public RpcStreamChunk(
@@ -19,15 +19,22 @@ internal sealed class RpcStreamChunk : IDisposable
 
     public ReadOnlyMemory<byte> Payload { get; }
 
-    public void Dispose()
+    public void Dispose() => DisposeCore(releaseCredit: true);
+
+    public void DisposeWithoutCredit() => DisposeCore(releaseCredit: false);
+
+    private void DisposeCore(bool releaseCredit)
     {
         if (Interlocked.Exchange(ref _frame, null) is { } frame)
         {
+            // The frame claimant owns cleanup and the sole right to return credit.
+            var owner = _owner!;
+            _owner = null;
             frame.Dispose();
-            _owner.ReleaseCredit();
+            if (releaseCredit)
+            {
+                owner.ReleaseCredit();
+            }
         }
     }
-
-    public void DisposeWithoutCredit() =>
-        Interlocked.Exchange(ref _frame, null)?.Dispose();
 }

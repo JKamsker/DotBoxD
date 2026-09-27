@@ -219,7 +219,8 @@ var builder = SandboxPolicyBuilder.Create()
     .GrantLogging()
     .GrantHostMessageWrite()
     .WithFuel(100_000)
-    .WithMaxHostCalls(1_000);
+    .WithMaxHostCalls(1_000)
+    .WithWallTime(TimeSpan.FromSeconds(10));
 
 if (RequiresPrefix(requiredCapabilities, MonsterReadPrefix))
 {
@@ -228,6 +229,10 @@ if (RequiresPrefix(requiredCapabilities, MonsterReadPrefix))
 ```
 
 The control service feeds this with `_server.GetRequiredCapabilities(pkg)` at install time, so a kernel that never declares a monster-write binding (the retaliation kernel) is never over-granted, and a kernel missing even the `host.message.write` grant fails closed during package preparation.
+
+The demo explicitly allows ten seconds per kernel invocation to accommodate cold JIT and scheduling delays
+on shared runners. Fuel and host-call quotas still bound its work. The library default remains 100 ms;
+hosts should choose a wall-time ceiling appropriate to their workload.
 
 ## The server extension (pushdown)
 

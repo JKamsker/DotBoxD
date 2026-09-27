@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using MessagePack;
@@ -9,7 +8,8 @@ namespace DotBoxD.Codecs.MessagePack;
 internal sealed class ConstructorReplayGuard
 {
     private const int SerializedReplayState = -1;
-    private static readonly ConcurrentDictionary<Type, ConstructorReplayGuard> Guards = new();
+    // Share validation across declared types without keeping unloaded plugin payload types alive.
+    private static readonly ConditionalWeakTable<Type, ConstructorReplayGuard> Guards = new();
     private static readonly ConstructorReplayGuard None = new(null, [], [], [], useSerializedReplay: false);
 
     private readonly ConstructorInfo? _constructor;
@@ -58,7 +58,7 @@ internal sealed class ConstructorReplayGuard
 
         var guard = runtimeType == declaredType
             ? GetOrAddDeclaredTypeGuard<T>(declaredType)
-            : Guards.GetOrAdd(runtimeType, Create);
+            : Guards.GetValue(runtimeType, Create);
         if (ReferenceEquals(guard, None))
         {
             return false;
@@ -115,7 +115,7 @@ internal sealed class ConstructorReplayGuard
             return cached;
         }
 
-        var resolved = Guards.GetOrAdd(declaredType, Create);
+        var resolved = Guards.GetValue(declaredType, Create);
         return Interlocked.CompareExchange(
             ref DeclaredTypeGuardCache<T>.Guard,
             resolved,

@@ -1,6 +1,6 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DotBoxD.Codecs.MessagePack;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack.ConstructorReplay;
@@ -43,9 +43,11 @@ internal static class ConstructorReplayTestSupport
         var guardsField = typeof(ConstructorReplayGuard).GetField(
             "Guards",
             BindingFlags.NonPublic | BindingFlags.Static);
-        var guards = (ConcurrentDictionary<Type, ConstructorReplayGuard>?)guardsField?.GetValue(null)
+        var guards = (ConditionalWeakTable<Type, ConstructorReplayGuard>?)guardsField?.GetValue(null)
             ?? throw new InvalidOperationException("Constructor replay guard storage was not found.");
-        return guards[runtimeType];
+        return guards.TryGetValue(runtimeType, out var guard)
+            ? guard
+            : throw new InvalidOperationException("The payload type has no cached constructor replay guard.");
     }
 
     public static Func<object, bool>? GetValidator(Type runtimeType)

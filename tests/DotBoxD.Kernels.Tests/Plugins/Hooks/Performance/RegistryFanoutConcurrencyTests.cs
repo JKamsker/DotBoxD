@@ -80,20 +80,23 @@ public sealed class RegistryFanoutConcurrencyTests
                 () => server.Subscriptions.Publish(Event),
                 "subscription miss lookup");
 
-            server.Subscriptions.On<ProbeEvent, FirstContext>(Adapter, CreateFirst)
+            var first = server.Subscriptions.On<ProbeEvent, FirstContext>(Adapter, CreateFirst)
                 .RunLocal(static (_, _) => { });
             RunOnWorker(
                 () => server.Subscriptions.Publish(Event),
                 "subscription single-pipeline lookup");
+            WaitForCompletion(first.LastQueuedDelivery, "subscription single-pipeline delivery");
 
             Assert.Equal(1, Volatile.Read(ref firstFactoryCalls));
             Assert.Equal(0, Volatile.Read(ref secondFactoryCalls));
 
-            server.Subscriptions.On<ProbeEvent, SecondContext>(Adapter, CreateSecond)
+            var second = server.Subscriptions.On<ProbeEvent, SecondContext>(Adapter, CreateSecond)
                 .RunLocal(static (_, _) => { });
             RunOnWorker(
                 () => server.Subscriptions.Publish(Event),
                 "subscription multi-pipeline lookup");
+            WaitForCompletion(first.LastQueuedDelivery, "subscription first-pipeline delivery");
+            WaitForCompletion(second.LastQueuedDelivery, "subscription second-pipeline delivery");
 
             Assert.Equal(2, Volatile.Read(ref firstFactoryCalls));
             Assert.Equal(1, Volatile.Read(ref secondFactoryCalls));
@@ -227,11 +230,14 @@ public sealed class RegistryFanoutConcurrencyTests
             ?? throw new InvalidOperationException($"{registry.GetType().Name} does not expose its fanout snapshot.");
 
     private static void RunOnWorker(Action action, string operation)
+        => WaitForCompletion(Task.Run(action), operation);
+
+    private static void WaitForCompletion(Task? task, string operation)
     {
-        var task = Task.Run(action);
+        Assert.NotNull(task);
         Assert.True(
             SpinWait.SpinUntil(() => task.IsCompleted, TimeSpan.FromSeconds(10)),
-            $"The {operation} waited for the registry mutation gate instead of reading published state.");
+            $"The {operation} did not complete while the registry mutation gate was held.");
         task.GetAwaiter().GetResult();
     }
 

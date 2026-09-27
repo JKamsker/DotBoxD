@@ -1,3 +1,4 @@
+using DotBoxD.Hosting.Execution.Compiled;
 using DotBoxD.Kernels.Compiler;
 
 namespace DotBoxD.Hosting.Execution;
@@ -80,6 +81,7 @@ internal sealed class CompiledExecutableCache : IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            CompiledWorkFailureObserver.Observe(lazy);
             throw;
         }
         catch
@@ -98,6 +100,9 @@ internal sealed class CompiledExecutableCache : IDisposable
 
         CompleteDispose();
     }
+
+    internal void ThrowIfDisposed()
+        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
     internal bool TryBeginDispose() => Interlocked.Exchange(ref _disposed, 1) == 0;
 

@@ -6,52 +6,65 @@ public sealed class Fix_CI_0001_Tests
 {
     private static readonly TimeSpan ScanTimeout = TimeSpan.FromMinutes(1);
 
-    [Fact]
-    public async Task Csharp_file_line_gate_scans_repo_sources_not_only_eng()
+    [Theory]
+    [InlineData(350, true)]
+    [InlineData(351, false)]
+    public async Task Csharp_file_line_gate_scans_repo_sources_not_only_eng(int lineCount, bool shouldPass)
     {
-        var probePath = Path.Combine(RepositoryRoot(), "src", "CodeEnforcerOverLimitProbe.cs");
+        var fixture = Directory.CreateTempSubdirectory("dotboxd-line-guard-");
         try
         {
+            var scriptDirectory = Directory.CreateDirectory(Path.Combine(fixture.FullName, "eng", "scripts"));
+            var sourceDirectory = Directory.CreateDirectory(Path.Combine(fixture.FullName, "src"));
+            foreach (var script in new[] { "check-csharp-file-lines.ps1", "code-enforcer-csharp-scan.ps1" })
+            {
+                File.Copy(Path.Combine(RepositoryRoot(), "eng", "scripts", script), Path.Combine(scriptDirectory.FullName, script));
+            }
+
+            var probePath = Path.Combine(sourceDirectory.FullName, "CodeEnforcerOverLimitProbe.cs");
             await File.WriteAllLinesAsync(
                 probePath,
-                Enumerable.Range(0, 351).Select(i => $"// probe {i}"));
+                Enumerable.Range(0, lineCount).Select(i => $"// probe {i}"));
 
-            using var process = StartLineGuard();
+            using var process = StartLineGuard(fixture.FullName);
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
             var exitTask = process.WaitForExitAsync();
             if (await Task.WhenAny(exitTask, Task.Delay(ScanTimeout)) != exitTask)
             {
                 KillProcess(process);
-                Assert.Fail($"CodeEnforcer did not finish within {ScanTimeout} while scanning an over-limit probe file.");
+                await exitTask;
+                Assert.Fail($"CodeEnforcer did not finish within {ScanTimeout} while scanning a probe file.");
             }
 
             await exitTask;
             var output = await outputTask;
             var error = await errorTask;
 
-            Assert.NotEqual(
-                0,
-                process.ExitCode);
-            Assert.Contains("CodeEnforcerOverLimitProbe.cs", output + error, StringComparison.Ordinal);
+            Assert.True((process.ExitCode == 0) == shouldPass, output + error);
+            if (shouldPass)
+            {
+                Assert.Contains("CodeEnforcer passed.", output, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Contains("CE0001 src/CodeEnforcerOverLimitProbe.cs", output + error, StringComparison.Ordinal);
+            }
         }
         finally
         {
-            if (File.Exists(probePath))
-            {
-                File.Delete(probePath);
-            }
+            fixture.Delete(recursive: true);
         }
     }
 
-    private static Process StartLineGuard()
+    private static Process StartLineGuard(string fixtureRoot)
     {
         var startInfo = new ProcessStartInfo("pwsh")
         {
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
-            WorkingDirectory = RepositoryRoot()
+            WorkingDirectory = fixtureRoot
         };
         startInfo.ArgumentList.Add("-NoProfile");
         startInfo.ArgumentList.Add("-File");

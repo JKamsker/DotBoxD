@@ -7,15 +7,15 @@ using DotBoxD.Kernels;
 
 internal struct SandboxWorkerBindingEvidenceSequence
 {
-    private readonly bool _resultIsQuotaFailure;
+    private readonly SandboxErrorCode? _terminalFailureCode;
     private readonly long _terminalBindingSequenceNumber;
     private SandboxAuditEvent? _previousBindingAudit;
 
     private SandboxWorkerBindingEvidenceSequence(
-        bool resultIsQuotaFailure,
+        SandboxErrorCode? terminalFailureCode,
         long terminalBindingSequenceNumber)
     {
-        _resultIsQuotaFailure = resultIsQuotaFailure;
+        _terminalFailureCode = terminalFailureCode;
         _terminalBindingSequenceNumber = terminalBindingSequenceNumber;
         _previousBindingAudit = null;
     }
@@ -32,7 +32,7 @@ internal struct SandboxWorkerBindingEvidenceSequence
         }
 
         return new SandboxWorkerBindingEvidenceSequence(
-            !result.Succeeded && result.Error?.Code == SandboxErrorCode.QuotaExceeded,
+            !result.Succeeded ? result.Error?.Code : null,
             terminalBindingSequenceNumber);
     }
 
@@ -46,24 +46,36 @@ internal struct SandboxWorkerBindingEvidenceSequence
     private SandboxWorkerBindingEvidenceRelationship RelationshipToPrevious(
         SandboxAuditEvent auditEvent)
     {
-        if (!_resultIsQuotaFailure ||
-            auditEvent.Success ||
-            auditEvent.ErrorCode != SandboxErrorCode.QuotaExceeded ||
-            auditEvent.SequenceNumber != _terminalBindingSequenceNumber)
+        if (!MatchesTerminalFailure(auditEvent))
         {
             return SandboxWorkerBindingEvidenceRelationship.Ordinary;
         }
 
-        return _previousBindingAudit is
-        {
-            Success: true,
-            BindingId: { } previousBindingId
-        } previous &&
+        // A binding can emit success before the runtime checks its return value,
+        // deadline, or cancellation. The adjacent terminal failure then describes
+        // that same charged call, while retaining both audit records.
+        if (_previousBindingAudit is
+            {
+                Success: true,
+                BindingId: { } previousBindingId
+            } previous &&
             string.Equals(previousBindingId, auditEvent.BindingId, StringComparison.Ordinal) &&
-            previous.SequenceNumber == auditEvent.SequenceNumber - 1
-                ? SandboxWorkerBindingEvidenceRelationship.TerminalQuotaFailureAfterSuccess
-                : SandboxWorkerBindingEvidenceRelationship.TerminalQuotaFailure;
+            previous.SequenceNumber == auditEvent.SequenceNumber - 1)
+        {
+            return SandboxWorkerBindingEvidenceRelationship.TerminalFailureAfterSuccess;
+        }
+
+        return _terminalFailureCode == SandboxErrorCode.QuotaExceeded
+            ? SandboxWorkerBindingEvidenceRelationship.TerminalQuotaFailure
+            : SandboxWorkerBindingEvidenceRelationship.Ordinary;
     }
+
+    private bool MatchesTerminalFailure(SandboxAuditEvent auditEvent)
+        => _terminalFailureCode is SandboxErrorCode.QuotaExceeded or
+                SandboxErrorCode.Timeout or SandboxErrorCode.Cancelled &&
+           !auditEvent.Success &&
+           auditEvent.ErrorCode == _terminalFailureCode &&
+           auditEvent.SequenceNumber == _terminalBindingSequenceNumber;
 
     private static bool IsBindingAudit(string kind)
         => kind is BindingAuditKinds.BindingCall or
@@ -75,5 +87,5 @@ internal enum SandboxWorkerBindingEvidenceRelationship
 {
     Ordinary,
     TerminalQuotaFailure,
-    TerminalQuotaFailureAfterSuccess
+    TerminalFailureAfterSuccess
 }

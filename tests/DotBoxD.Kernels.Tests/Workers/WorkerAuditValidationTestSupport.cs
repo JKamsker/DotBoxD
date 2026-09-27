@@ -11,6 +11,9 @@ namespace DotBoxD.Kernels.Tests.Workers;
 
 internal static class WorkerAuditValidationTestSupport
 {
+    // Allow cold validation and coverage instrumentation to finish before the fixture deadline.
+    internal static readonly TimeSpan ValidationWallTime = TimeSpan.FromSeconds(10);
+
     public static SandboxHost Host(ISandboxWorkerClient worker)
         => SandboxHost.Create(builder =>
         {
@@ -35,7 +38,10 @@ internal static class WorkerAuditValidationTestSupport
     }
 
     public static ValueTask<ExecutionPlan> PrepareAsync(SandboxHost host, SandboxModule module)
-        => host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        => host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .WithFuel(1_000)
+            .WithWallTime(ValidationWallTime)
+            .Build());
 
     public static ValueTask<SandboxExecutionResult> ExecuteAsync(SandboxHost host, ExecutionPlan plan)
         => host.ExecuteAsync(

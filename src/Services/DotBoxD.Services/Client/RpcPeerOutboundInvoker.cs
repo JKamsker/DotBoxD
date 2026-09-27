@@ -217,7 +217,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
             // Registration or frame construction threw before SendFrameAndAwaitAsync took
             // ownership of the reserved slot, so release it here; otherwise the admission gate
             // leaks one slot per local setup failure and eventually rejects every call.
-            _pending.Remove(pending.MessageId, pending, consumed: true);
+            _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
             return CleanupOutboundSetupFailureAsync(outboundStreams, streams, registeredStreams, ex);
         }
@@ -263,7 +263,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
             // Frame construction (serialization) threw before SendFrameAndAwaitAsync took
             // ownership of the reserved slot, so release it here; otherwise the admission gate
             // leaks one slot per serialization failure and eventually rejects every call.
-            _pending.Remove(pending.MessageId, pending, consumed: true);
+            _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
             throw;
         }

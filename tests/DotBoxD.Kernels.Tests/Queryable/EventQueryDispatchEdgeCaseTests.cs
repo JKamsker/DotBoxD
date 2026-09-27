@@ -122,8 +122,10 @@ public sealed class EventQueryDispatchEdgeCaseTests
         Assert.Equal(1, idHits);
     }
 
-    [Fact]
-    public async Task Unreadable_routing_member_does_not_abort_dispatch_for_other_subscriptions()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Explicit_routing_members_preserve_dispatch_and_getter_failure_isolation(bool throwGetter)
     {
         var host = new EventQueryHost();
         var hiddenHits = 0;
@@ -145,9 +147,11 @@ public sealed class EventQueryDispatchEdgeCaseTests
             });
 
         var context = NewContext();
-        await host.PublishAsync<IExplicitRoutingEvent>(new ExplicitRoutingEvent("x"), context);
+        var value = new ExplicitRoutingEvent("x", throwGetter);
+        await host.PublishAsync<IExplicitRoutingEvent>(value, context);
 
-        Assert.Equal(0, hiddenHits);
+        Assert.True(value.HiddenWasRead);
+        Assert.Equal(throwGetter ? 0 : 1, hiddenHits);
         Assert.Equal(1, idHits);
     }
 
@@ -207,10 +211,18 @@ public sealed class EventQueryDispatchEdgeCaseTests
         string Hidden { get; }
     }
 
-    private sealed class ExplicitRoutingEvent(string id) : IExplicitRoutingEvent
+    private sealed class ExplicitRoutingEvent(string id, bool throwGetter) : IExplicitRoutingEvent
     {
         public string Id { get; } = id;
+        public bool HiddenWasRead { get; private set; }
 
-        string IExplicitRoutingEvent.Hidden => "never";
+        string IExplicitRoutingEvent.Hidden
+        {
+            get
+            {
+                HiddenWasRead = true;
+                return throwGetter ? throw new InvalidOperationException("Getter failed.") : "never";
+            }
+        }
     }
 }

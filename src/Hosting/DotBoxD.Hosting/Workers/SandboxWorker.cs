@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -37,16 +36,16 @@ public interface ISandboxWorkerClient
 /// </summary>
 /// <remarks>
 /// The supplied factory is invoked lazily once per client instance so worker-side plan, compiled,
-/// and hotness caches can survive across requests. The worker host's bindings must match the
-/// requesting host's bindings; otherwise the re-prepared identity hashes diverge and the requesting
-/// host fails the result closed. Re-preparation or execution failures are surfaced as a closed,
-/// fail-safe error result.
+/// and hotness caches can survive across requests. Prepared plans retain only the 128 most recently
+/// used request identities; an evicted identity is re-prepared on its next request. The worker host's
+/// bindings must match the requesting host's bindings; otherwise the re-prepared identity hashes
+/// diverge and the requesting host fails the result closed. Re-preparation or execution failures
+/// are surfaced as a closed, fail-safe error result.
 /// </remarks>
 public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 {
-    private readonly ConcurrentDictionary<WorkerPlanCacheKey, ExecutionPlan> _preparedPlans = new();
-    private readonly Lazy<SandboxHost> _workerHost;
-    private int _disposed;
+    private readonly WorkerPreparedPlanCache _preparedPlans = new();
+    private Lazy<SandboxHost>? _workerHost;
 
     public SandboxHostWorkerClient(Func<SandboxHost> hostFactory)
     {
@@ -92,13 +91,18 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0 ||
-            !_workerHost.IsValueCreated)
+        // Detach the factory, created host, or cached factory failure as one ownership unit.
+        var workerHost = Interlocked.Exchange(ref _workerHost, null);
+        if (workerHost is null)
         {
             return;
         }
 
-        _workerHost.Value.Dispose();
+        _preparedPlans.Dispose();
+        if (workerHost.IsValueCreated)
+        {
+            workerHost.Value.Dispose();
+        }
     }
 
     private async ValueTask<ExecutionPlan> PrepareWorkerPlanAsync(
@@ -106,8 +110,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ExecutionPlan plan,
         CancellationToken cancellationToken)
     {
-        var cacheKey = WorkerPlanCacheKey.Create(plan);
-        if (_preparedPlans.TryGetValue(cacheKey, out var cached))
+        if (_preparedPlans.TryGet(plan, out var cached))
         {
             return cached;
         }
@@ -115,15 +118,16 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         var prepared = await workerHost
             .PrepareAsync(plan.Module, plan.Policy, cancellationToken)
             .ConfigureAwait(false);
-        _preparedPlans.TryAdd(cacheKey, prepared);
+        _preparedPlans.TryAdd(plan, prepared);
         return prepared;
     }
 
     private SandboxHost WorkerHost()
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        var workerHost = _workerHost.Value;
-        if (Volatile.Read(ref _disposed) == 0)
+        var lazyHost = Volatile.Read(ref _workerHost);
+        ObjectDisposedException.ThrowIf(lazyHost is null, this);
+        var workerHost = lazyHost.Value;
+        if (Volatile.Read(ref _workerHost) is not null)
         {
             return workerHost;
         }
@@ -140,22 +144,6 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
                 "SandboxHostWorkerClient accepts only in-process execution options.",
                 nameof(options));
         }
-    }
-
-    private sealed record WorkerPlanCacheKey(
-        ExecutionPlanSeal PlanSeal,
-        string ModuleHash,
-        string PlanHash,
-        string PolicyHash,
-        string BindingManifestHash)
-    {
-        public static WorkerPlanCacheKey Create(ExecutionPlan plan)
-            => new(
-                plan.PlanSeal,
-                plan.ModuleHash,
-                plan.PlanHash,
-                plan.PolicyHash,
-                plan.BindingManifestHash);
     }
 }
 

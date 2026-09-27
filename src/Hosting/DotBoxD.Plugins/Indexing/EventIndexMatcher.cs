@@ -46,7 +46,7 @@ public sealed class EventIndexMatcher<TEvent>
     /// <summary>
     /// Compiles <paramref name="predicates"/> into cheap index checks, keeping only those whose path is an
     /// <see cref="EventIndexKeyAttribute"/> property of <typeparamref name="TEvent"/> <i>and</i> whose value
-    /// can be reconciled to that property's CLR type. A predicate whose value type cannot be reconciled is
+    /// can be compared with that property's CLR type. A predicate whose value type cannot be reconciled is
     /// dropped (left to the verified IR) rather than turned into an unsound or throwing check.
     /// </summary>
     public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
@@ -62,9 +62,9 @@ public sealed class EventIndexMatcher<TEvent>
             }
 
             if (IndexKeys.TryGetValue(predicate.Path, out var key) &&
-                TryReconcile(predicate.Value, key.Type, out var value))
+                TryReconcile(predicate.Value, key.Type, out var value, out var promoteNumeric))
             {
-                checks.Add(new IndexCheck(key.Getter, predicate.Operator, value));
+                checks.Add(new IndexCheck(key.Getter, predicate.Operator, value, promoteNumeric));
                 honored.Add(predicate);
             }
         }
@@ -79,9 +79,9 @@ public sealed class EventIndexMatcher<TEvent>
     /// </summary>
     public bool CouldMatch(TEvent value)
     {
-        foreach (var check in _checks)
+        for (var i = 0; i < _checks.Count; i++)
         {
-            if (!check.Evaluate(value))
+            if (!_checks[i].Evaluate(value))
             {
                 return false;
             }
@@ -101,12 +101,13 @@ public sealed class EventIndexMatcher<TEvent>
         return keys;
     }
 
-    // Coerces a manifest value to the indexed property's CLR type so every check compares like-typed boxed
-    // operands. Exact-typed values pass through; numeric values are converted between int/long/double; any
-    // other mismatch (e.g. a string value for an int property) fails so the leaf is dropped, not mis-served.
-    private static bool TryReconcile(object? value, Type propertyType, out object? result)
+    // Keep matching CLR types on their existing path. Mixed numeric operands use a common comparison
+    // domain instead of rounding the bound to the member's type: exact numbers use decimal; a floating
+    // operand promotes both sides to double, matching portable query and sandbox scalar semantics.
+    private static bool TryReconcile(object? value, Type propertyType, out object? result, out bool promoteNumeric)
     {
         result = value;
+        promoteNumeric = false;
         if (value is null)
         {
             return false;
@@ -119,15 +120,11 @@ public sealed class EventIndexMatcher<TEvent>
 
         if (IsNumeric(propertyType) && IsNumeric(value.GetType()))
         {
-            try
-            {
-                result = Convert.ChangeType(value, propertyType, CultureInfo.InvariantCulture);
-                return true;
-            }
-            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
-            {
-                return false;
-            }
+            promoteNumeric = true;
+            result = IsFloating(propertyType) || IsFloating(value.GetType())
+                ? (object)Convert.ToDouble(value, CultureInfo.InvariantCulture)
+                : Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+            return true;
         }
 
         return false;
@@ -137,13 +134,20 @@ public sealed class EventIndexMatcher<TEvent>
         => type == typeof(int) || type == typeof(long) || type == typeof(double) ||
            type == typeof(short) || type == typeof(byte) || type == typeof(float) || type == typeof(decimal);
 
+    private static bool IsFloating(Type type) => type == typeof(float) || type == typeof(double);
+
     private readonly record struct IndexKey(Func<TEvent, object?> Getter, Type Type);
 
-    private sealed class IndexCheck(Func<TEvent, object?> getter, IndexPredicateOperator op, object? value)
+    private sealed class IndexCheck(Func<TEvent, object?> getter, IndexPredicateOperator op, object? value, bool promoteNumeric)
     {
         public bool Evaluate(TEvent target)
         {
             var actual = getter(target);
+            if (promoteNumeric && actual is not null)
+            {
+                return CompareMatches(op, CompareNumeric(actual, value!));
+            }
+
             if (op == IndexPredicateOperator.Equals)
             {
                 return Equals(actual, value);
@@ -159,9 +163,15 @@ public sealed class EventIndexMatcher<TEvent>
                 : true;
         }
 
+        private static int CompareNumeric(object actual, object expected) => expected is double floating
+            ? Convert.ToDouble(actual, CultureInfo.InvariantCulture).CompareTo(floating)
+            : Convert.ToDecimal(actual, CultureInfo.InvariantCulture).CompareTo((decimal)expected);
+
         private static bool CompareMatches(IndexPredicateOperator op, int comparison)
             => op switch
             {
+                IndexPredicateOperator.Equals => comparison == 0,
+                IndexPredicateOperator.NotEquals => comparison != 0,
                 IndexPredicateOperator.GreaterThan => comparison > 0,
                 IndexPredicateOperator.GreaterThanOrEqual => comparison >= 0,
                 IndexPredicateOperator.LessThan => comparison < 0,
@@ -170,8 +180,8 @@ public sealed class EventIndexMatcher<TEvent>
                 _ => true,
             };
 
-        // Decidable only when both operands are non-null and the same CLR type (guaranteed by Create's
-        // reconciliation for honored predicates). Anything else is left undecided so CouldMatch passes it
+        // Mixed numeric operands have already been handled in their common domain. Remaining ordering
+        // checks require non-null operands of the same CLR type. Anything else is left undecided so CouldMatch passes it
         // through to the verified IR rather than wrongly rejecting it.
         private static bool TryCompare(object? actual, object? expected, out int comparison)
         {

@@ -45,6 +45,75 @@ So this is a category difference, not a missing annotation. The shared *vocabula
 - **Building a dynamic, host-side subscription** whose predicate is only known at runtime (built from user
   input, config, or captured state): use `EventQuery<TEvent>`.
 
+## Declared event types and public execution primitives
+
+An authored `EventQuery<TEvent>` resolves filter paths from `TEvent`. Explicit interface implementations
+and base members hidden by a runtime event class therefore keep the member identity used by the authored
+predicate and projection. Virtual getters still dispatch to runtime overrides.
+
+Handwritten query ASTs can use the same behavior with `new MemberValueReader(typeof(TEvent))`, passed to
+`QueryFilterEvaluator.Evaluate` or `QueryFilterCompiler.Compile`. The reader requires a closed, boxable
+root type and rejects targets that are not instances of that type. The parameterless constructor retains
+runtime-type lookup for callers that intentionally read arbitrary event shapes.
+
+Active query subscriptions strongly retain their event types. After the last subscription is disposed,
+an empty dispatcher can release an otherwise unused collectible type. Dispatchers remain reusable while
+their type is alive, preserving event counters across idle periods. Retained diagnostic handles and other
+registries keep their independent ownership of the types they still use.
+
+The declared-type constructor is an additive public API so this behavior remains available without the
+authoring helpers. Existing constructor and method signatures are retained; this addition requires no
+breaking-version bump and keeps the current package-versioning scheme.
+
+## Comparison and logical operators
+
+Comparison translation checks the actual operator method as well as the expression's comparison kind.
+Standard scalar operators, nullable comparisons, and equivalent framework static equality methods remain
+supported. Custom operators and methods attached to a different comparison kind are rejected before
+capturing that comparison's constants. Compare public primitive members directly, or construct the
+portable comparison explicitly with `QueryFilter.Compare`, when custom value types are involved.
+Boolean negation also requires the intrinsic `!` operation. A `Not` expression with a custom method is
+rejected before translating its operand, because that method need not negate its input.
+Member-path conversions also validate the actual method: value-preserving intrinsic conversions and framework
+decimal widening remain supported, including nullable forms. Custom conversion methods on event
+members require an explicit primitive member instead; conversions on captured constants still run once.
+Enums with standard integer backing types support their exact underlying conversions, including nullable
+forms and compiler-generated equality conversions. Lossy casts and nullable unwrapping remain unsupported.
+Reference identity comparisons against non-null objects are rejected: a portable value cannot preserve
+the identity of a captured CLR object. Null reference checks and ordinary string value equality remain
+supported. Use primitive members or supported scalar value operators when authoring portable comparisons.
+Floating-point event values containing `NaN` do not satisfy ordered comparisons. Against finite values,
+NaN equality remains false and inequality remains true; infinities retain their numeric ordering.
+Non-finite captured literals remain unsupported by the portable value format.
+
+## Collection membership
+
+`Contains` captures collection values into a portable membership filter. Custom implementations reached
+through collection interfaces, virtual methods, or framework wrappers are rejected: their executable
+membership rules cannot be represented by that list of values. Default/ordinal framework collections
+remain supported. When enumeration membership is intended, capture `collection.ToArray()` and query that
+snapshot; handwritten queries can also use the public `QueryFilter.In` primitive directly.
+Comparer checks read the framework collection's declaration and backing collections; unrelated
+`Comparer` properties added or hidden by subclasses are not evaluated.
+Subclasses that customize enumeration retain the membership of the `Contains` method being called.
+Inherited framework membership is captured through the framework's public enumerator; `Enumerable.Contains`
+over queues, stacks, or enumerable-only sources still follows their generic enumeration.
+Capture preserves the element type accepted by the membership method, including signed/unsigned
+primitive-array views used through collection interfaces or spans.
+Null arrays converted to spans are captured as empty membership, matching the framework conversion;
+null collection operands remain invalid.
+The framework span overload with a comparer also supports enum and nullable arrays. Its comparer must
+be a captured null, the element type's default equality comparer, or `StringComparer.Ordinal` for strings.
+Both arguments run once in order before the span is copied. Custom or event-dependent comparers and broad
+reference element types (such as `object`, which can mix distinct CLR equality domains) are rejected.
+
+LINQ operators can preserve those membership rules: for example, `set.Distinct().Contains(value)`
+can still use the set's comparer. Translation follows the running framework's iterator dispatch and
+validates delegated collections, including sources selected by `SelectMany`. Each selector runs once
+per captured element. Operators that use enumeration with default equality remain supported even if
+their underlying collections have custom membership rules. Unrecognized framework iterator layouts
+produce a translation diagnostic with the same explicit `ToArray()` escape hatch.
+
 ## A possible future bridge (not built)
 
 `EventQuery`'s portable `QueryFilter` / `QueryProjection` AST and the pipeline's `LoweredPipelineStep` are both

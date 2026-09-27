@@ -25,6 +25,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     /// <summary>
     /// Creates a framed connection over <paramref name="stream"/>. A null timeout uses the finite
     /// default; <see cref="Timeout.InfiniteTimeSpan"/> disables it for trusted streams.
+    /// The message size limit must be between <see cref="MessageFramer.HeaderSize"/> and
+    /// <see cref="MessageFramer.MaxMessageSize"/> bytes, inclusive.
     /// </summary>
     public StreamConnection(
         Stream stream,
@@ -33,12 +35,12 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         int maxMessageSize = MessageFramer.MaxMessageSize,
         TimeSpan? frameReadIdleTimeout = null)
     {
-        if (maxMessageSize < MessageFramer.HeaderSize)
+        if (maxMessageSize < MessageFramer.HeaderSize || maxMessageSize > MessageFramer.MaxMessageSize)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxMessageSize),
                 maxMessageSize,
-                "Maximum message size must be at least the DotBoxD header size.");
+                $"Maximum message size must be between {MessageFramer.HeaderSize} and {MessageFramer.MaxMessageSize} bytes.");
         }
 
         var timeout = FrameReadTimeoutSource.Resolve(frameReadIdleTimeout, nameof(frameReadIdleTimeout));

@@ -112,9 +112,9 @@ internal sealed class GamePluginControlService : IGamePluginControlService
             Console.WriteLine($"[server] installed server extension '{kernel.Manifest.PluginId}'.");
             return kernel.Manifest.PluginId;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"[server] server extension install failed: {ex}");
+            ReportServerExtensionFailure("install", ex);
             throw;
         }
     }
@@ -136,7 +136,27 @@ internal sealed class GamePluginControlService : IGamePluginControlService
                 $"Server extension '{pluginId}' is not owned by this plugin session.");
         }
 
-        return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+        try
+        {
+            return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            ReportServerExtensionFailure("invoke", ex);
+            throw;
+        }
+    }
+
+    private static void ReportServerExtensionFailure(string operation, Exception error)
+    {
+        try
+        {
+            Console.Error.WriteLine($"[server] server extension {operation} failed: {error}");
+        }
+        catch
+        {
+            // A closed or faulting diagnostic writer must not replace the operation's exception.
+        }
     }
 
     public ValueTask UpdateSettingsAsync(

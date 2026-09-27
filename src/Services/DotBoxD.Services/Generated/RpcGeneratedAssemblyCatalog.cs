@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -8,18 +7,21 @@ internal static class RpcGeneratedAssemblyCatalog
 {
     private const string GeneratedFactoryTypeName = "DotBoxD.Services.Generated.DotBoxDGenerated";
 
-    private static readonly ConcurrentDictionary<Assembly, IReadOnlyList<GeneratedService>> s_serviceCatalogs = new();
-    private static readonly ConcurrentDictionary<Assembly, Lazy<bool>> s_registrationAttempts = new();
-    private static readonly ConcurrentDictionary<Assembly, SinkRegistrar<IRpcServiceRegistrationSink>> s_serviceSinks = new();
-    private static readonly ConcurrentDictionary<Assembly, SinkRegistrar<IRpcGeneratedServiceRegistrationSink>> s_generatedSinks = new();
+    // Discovery caches follow assembly lifetime. Explicit global service registrations retain their
+    // own factories through GeneratedServiceRegistry, independently of these lookup results.
+    private static readonly ConditionalWeakTable<Assembly, AssemblyCache> s_caches = new();
 
     public static bool EnsureRegistered(Assembly assembly)
     {
-        var registration = s_registrationAttempts.GetOrAdd(
-            assembly,
-            static assembly => new Lazy<bool>(
+        var cache = GetCache(assembly);
+        var registration = Volatile.Read(ref cache.Registration);
+        if (registration is null)
+        {
+            var created = new Lazy<bool>(
                 () => RegisterGeneratedFactory(assembly),
-                LazyThreadSafetyMode.ExecutionAndPublication));
+                LazyThreadSafetyMode.ExecutionAndPublication);
+            registration = Interlocked.CompareExchange(ref cache.Registration, created, null) ?? created;
+        }
 
         try
         {
@@ -33,22 +35,24 @@ internal static class RpcGeneratedAssemblyCatalog
     }
 
     /// <summary>
-    /// Removes only the faulted attempt this caller actually holds. A key-only TryRemove could evict a
-    /// fresh successor <see cref="Lazy{T}"/> that another thread installed after our attempt faulted,
-    /// discarding that successor's registration; the value-comparing <see cref="ICollection{T}.Remove"/>
-    /// is a no-op unless the stored Lazy is still ours (reference equality, since Lazy does not override
-    /// Equals). Internal so a deterministic test can exercise the successor-preservation behaviour.
+    /// Removes only the faulted attempt this caller actually holds. Compare-exchange preserves a
+    /// successor another thread installed after our attempt faulted. Internal so a deterministic test
+    /// can exercise the successor-preservation behaviour.
     /// </summary>
-    internal static void EvictFaultedAttempt(Assembly assembly, Lazy<bool> faultedRegistration) =>
-        ((ICollection<KeyValuePair<Assembly, Lazy<bool>>>)s_registrationAttempts)
-            .Remove(new KeyValuePair<Assembly, Lazy<bool>>(assembly, faultedRegistration));
+    internal static void EvictFaultedAttempt(Assembly assembly, Lazy<bool> faultedRegistration)
+    {
+        if (s_caches.TryGetValue(assembly, out var cache))
+        {
+            Interlocked.CompareExchange(ref cache.Registration, null, faultedRegistration);
+        }
+    }
 
     // --- Test accessors (for the deterministic fault-recovery successor-preservation test) ---
     internal static void SetRegistrationAttemptForTest(Assembly assembly, Lazy<bool> attempt) =>
-        s_registrationAttempts[assembly] = attempt;
+        Volatile.Write(ref GetCache(assembly).Registration, attempt);
 
     internal static Lazy<bool>? GetRegistrationAttemptForTest(Assembly assembly) =>
-        s_registrationAttempts.TryGetValue(assembly, out var attempt) ? attempt : null;
+        s_caches.TryGetValue(assembly, out var cache) ? Volatile.Read(ref cache.Registration) : null;
 
     private static bool RegisterGeneratedFactory(Assembly assembly)
     {
@@ -71,27 +75,50 @@ internal static class RpcGeneratedAssemblyCatalog
         }
     }
 
-    public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly) =>
-        s_serviceCatalogs.GetOrAdd(assembly, static assembly => LoadGeneratedServices(assembly));
+    public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly)
+    {
+        var cache = GetCache(assembly);
+        if (Volatile.Read(ref cache.Services) is { } services)
+        {
+            return services;
+        }
+
+        // Loading can publish a catalog reentrantly, or race an explicit replacement. Preserve that
+        // publication instead of overwriting it with the snapshot discovered by this call.
+        var loaded = LoadGeneratedServices(assembly, cache);
+        return Interlocked.CompareExchange(ref cache.Services, loaded, null) ?? loaded;
+    }
 
     public static void PublishServices(Assembly assembly, IReadOnlyList<GeneratedService> services) =>
-        s_serviceCatalogs[assembly] = GeneratedServiceCatalogSnapshot.Snapshot(services);
+        Volatile.Write(ref GetCache(assembly).Services, GeneratedServiceCatalogSnapshot.Snapshot(services));
 
-    public static void RegisterServices(Assembly assembly, IRpcServiceRegistrationSink sink) =>
-        s_serviceSinks
-            .GetOrAdd(assembly, static assembly => CreateSinkRegistrar<IRpcServiceRegistrationSink>(
-                assembly,
-                "RegisterServices"))
-            .Invoke(sink);
+    public static void RegisterServices(Assembly assembly, IRpcServiceRegistrationSink sink)
+    {
+        var cache = GetCache(assembly);
+        var registrar = Volatile.Read(ref cache.ServiceSink);
+        if (registrar is null)
+        {
+            var created = CreateSinkRegistrar<IRpcServiceRegistrationSink>(assembly, "RegisterServices");
+            registrar = Interlocked.CompareExchange(ref cache.ServiceSink, created, null) ?? created;
+        }
 
-    public static void RegisterGeneratedServices(Assembly assembly, IRpcGeneratedServiceRegistrationSink sink) =>
-        s_generatedSinks
-            .GetOrAdd(assembly, static assembly => CreateSinkRegistrar<IRpcGeneratedServiceRegistrationSink>(
-                assembly,
-                "RegisterGeneratedServices"))
-            .Invoke(sink);
+        registrar.Invoke(sink);
+    }
 
-    private static IReadOnlyList<GeneratedService> LoadGeneratedServices(Assembly assembly)
+    public static void RegisterGeneratedServices(Assembly assembly, IRpcGeneratedServiceRegistrationSink sink)
+    {
+        var cache = GetCache(assembly);
+        var registrar = Volatile.Read(ref cache.GeneratedSink);
+        if (registrar is null)
+        {
+            var created = CreateSinkRegistrar<IRpcGeneratedServiceRegistrationSink>(assembly, "RegisterGeneratedServices");
+            registrar = Interlocked.CompareExchange(ref cache.GeneratedSink, created, null) ?? created;
+        }
+
+        registrar.Invoke(sink);
+    }
+
+    private static IReadOnlyList<GeneratedService> LoadGeneratedServices(Assembly assembly, AssemblyCache cache)
     {
         var generatedType = FindGeneratedType(assembly);
         if (generatedType is null)
@@ -100,7 +127,7 @@ internal static class RpcGeneratedAssemblyCatalog
         }
 
         EnsureRegistered(assembly);
-        if (s_serviceCatalogs.TryGetValue(assembly, out var services))
+        if (Volatile.Read(ref cache.Services) is { } services)
         {
             return services;
         }
@@ -109,8 +136,7 @@ internal static class RpcGeneratedAssemblyCatalog
         if (property is not null &&
             ReadLegacyServicesProperty(assembly, generatedType, property) is IReadOnlyList<GeneratedService> legacyServices)
         {
-            var snapshot = GeneratedServiceCatalogSnapshot.Snapshot(legacyServices, validateImplementationTypes: false);
-            return s_serviceCatalogs.GetOrAdd(assembly, snapshot);
+            return GeneratedServiceCatalogSnapshot.Snapshot(legacyServices, validateImplementationTypes: false);
         }
 
         throw new InvalidOperationException(
@@ -139,7 +165,7 @@ internal static class RpcGeneratedAssemblyCatalog
         var generatedType = FindGeneratedType(assembly);
         if (generatedType is null)
         {
-            return default;
+            return new SinkRegistrar<TSink>(register: null);
         }
 
         EnsureRegistered(assembly);
@@ -186,12 +212,22 @@ internal static class RpcGeneratedAssemblyCatalog
             $"published an incompatible {methodName} method.",
             innerException);
 
-    private readonly struct SinkRegistrar<TSink>
+    private static AssemblyCache GetCache(Assembly assembly) => s_caches.GetValue(assembly, static _ => new AssemblyCache());
+
+    private sealed class AssemblyCache
+    {
+        public IReadOnlyList<GeneratedService>? Services;
+        public Lazy<bool>? Registration;
+        public SinkRegistrar<IRpcServiceRegistrationSink>? ServiceSink;
+        public SinkRegistrar<IRpcGeneratedServiceRegistrationSink>? GeneratedSink;
+    }
+
+    private sealed class SinkRegistrar<TSink>
         where TSink : class
     {
         private readonly Action<TSink>? _register;
 
-        public SinkRegistrar(Action<TSink> register) => _register = register;
+        public SinkRegistrar(Action<TSink>? register) => _register = register;
 
         public void Invoke(TSink sink) => _register?.Invoke(sink);
     }

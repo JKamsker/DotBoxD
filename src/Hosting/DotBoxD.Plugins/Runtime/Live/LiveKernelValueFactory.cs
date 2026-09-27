@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime.Lifecycle;
 
@@ -8,11 +8,12 @@ namespace DotBoxD.Plugins.Runtime;
 internal static class LiveKernelValueFactory
 {
     // The live-property shape of a state type is derived purely from immutable
-    // type metadata, so it is stable for the lifetime of the process. Cache the
+    // type metadata, so it is stable while the type is alive. Cache the
     // discovered PropertyInfo[] per type so the hot synchronization paths
     // (draft, extract, copy, pull, push) skip repeated GetProperties and
-    // Attribute.IsDefined work without changing observable behavior.
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<PropertyInfo>> LivePropertyCache = new();
+    // Attribute.IsDefined work without changing observable behavior. Weak keys
+    // let collectible setting types unload when their instances are released.
+    private static readonly ConditionalWeakTable<Type, IReadOnlyList<PropertyInfo>> LivePropertyCache = new();
 
     public static T Create<T>(InstalledKernel kernel) where T : class
     {
@@ -95,7 +96,7 @@ internal static class LiveKernelValueFactory
             $"Live setting view type '{type.FullName ?? type.Name}' must be non-abstract and expose a parameterless constructor.");
 
     private static IReadOnlyList<PropertyInfo> LiveProperties(Type type)
-        => LivePropertyCache.GetOrAdd(type, DiscoverLiveProperties);
+        => LivePropertyCache.GetValue(type, DiscoverLiveProperties);
 
     private static IReadOnlyList<PropertyInfo> DiscoverLiveProperties(Type type)
     {

@@ -69,6 +69,8 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             for (var i = 0; i < _streams.Length; i++)
             {
                 var pair = _streams[i];
+                // The pump keeps its claim even if disposal stops waiting for a canceled source.
+                pair.Attachment.RetainOutboundRegistration();
                 tasks[i] = Task.Run(() => PumpAsync(pair.Attachment, pair.State));
             }
 
@@ -132,7 +134,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         {
             foreach (var pair in _streams)
             {
-                _manager.RemoveOutbound(pair.State.StreamId);
+                _manager.RemoveOutbound(pair.State);
                 pair.Attachment.ReleaseOutboundRegistration();
             }
 
@@ -187,7 +189,8 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
         finally
         {
-            _manager.RemoveCompletedOutbound(state.StreamId);
+            _manager.RemoveOutbound(state, completed: true);
+            attachment.ReleaseOutboundRegistration();
         }
     }
 

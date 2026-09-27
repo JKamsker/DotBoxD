@@ -143,9 +143,7 @@ public static partial class KernelRpcMarshaller
         RejectUnsupportedMapKeyType(mapTypes.Key);
         return CompleteDictionary(
             type,
-            mapTypes.Key,
-            mapTypes.Value,
-            ToDictionary(value.ItemSpan, mapTypes.Key, mapTypes.Value));
+            ToDictionary(value.ItemSpan, type, mapTypes.Key, mapTypes.Value));
     }
 
     private static bool TryScalarFromKernel(KernelRpcValue value, Type type, out object? result)
@@ -182,14 +180,14 @@ public static partial class KernelRpcMarshaller
         return result;
     }
 
-    private static IDictionary ToDictionary(ReadOnlySpan<KernelRpcValue> values, Type keyType, Type valueType)
+    private static IDictionary ToDictionary(ReadOnlySpan<KernelRpcValue> values, Type targetType, Type keyType, Type valueType)
     {
         if ((values.Length & 1) != 0)
         {
             throw new FormatException("Server extension map payload has an odd key/value entry count.");
         }
 
-        var result = CreateDictionary(keyType, valueType, values.Length / 2);
+        var result = CreateDictionary(targetType, values.Length / 2);
         for (var i = 0; i < values.Length; i += 2)
         {
             var key = FromKernelRpcValue(values[i], keyType)

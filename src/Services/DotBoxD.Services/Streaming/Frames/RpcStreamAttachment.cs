@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
@@ -11,9 +10,13 @@ namespace DotBoxD.Services.Streaming.Frames;
 /// <summary>
 /// A local source that will be streamed over an RPC request or response.
 /// </summary>
+/// <remarks>
+/// Each attachment supports one outbound registration at a time. Cancellation keeps that claim
+/// until the active source operation and stream pump cleanup finish.
+/// </remarks>
 public abstract class RpcStreamAttachment
 {
-    private int _outboundRegistrationClaimed;
+    private int _outboundRegistrationReferences;
     private int _sourceDisposed;
 
     private protected RpcStreamAttachment(RpcStreamHandle handle) => Handle = handle;
@@ -31,9 +34,16 @@ public abstract class RpcStreamAttachment
         }
 
         RequireHandle(handle, RpcStreamKind.Binary);
-        return new StreamAttachment(handle, stream, leaveOpen);
+        return new RpcBinaryStreamAttachment(handle, stream, leaveOpen);
     }
 
+    /// <summary>
+    /// Streams from a pipe, splitting large segments into bounded chunks. When
+    /// <paramref name="completeReader"/> is false, cancellation or a failed send leaves the
+    /// reader open and unsent bytes available to the caller. Only chunks whose send completed
+    /// successfully are consumed. Writer backpressure remains
+    /// until the caller consumes or discards retained bytes.
+    /// </summary>
     public static RpcStreamAttachment FromPipe(
         RpcStreamHandle handle,
         Pipe pipe,
@@ -45,7 +55,7 @@ public abstract class RpcStreamAttachment
         }
 
         RequireHandle(handle, RpcStreamKind.Binary);
-        return new PipeAttachment(handle, pipe, completeReader);
+        return new RpcPipeAttachment(handle, pipe, completeReader);
     }
 
     public static RpcStreamAttachment FromAsyncEnumerable<T>(
@@ -67,10 +77,13 @@ public abstract class RpcStreamAttachment
         CancellationToken ct);
 
     internal bool TryClaimOutboundRegistration() =>
-        Interlocked.CompareExchange(ref _outboundRegistrationClaimed, 1, 0) == 0;
+        Interlocked.CompareExchange(ref _outboundRegistrationReferences, 1, 0) == 0;
+
+    internal void RetainOutboundRegistration() =>
+        Interlocked.Increment(ref _outboundRegistrationReferences);
 
     internal void ReleaseOutboundRegistration() =>
-        Volatile.Write(ref _outboundRegistrationClaimed, 0);
+        Interlocked.Decrement(ref _outboundRegistrationReferences);
 
     // Releases the owned source exactly once, whether the call comes from the pump's own finally or
     // from a sibling stream's best-effort cleanup while this pump has already completed. The set owns
@@ -90,6 +103,23 @@ public abstract class RpcStreamAttachment
     private protected virtual ValueTask DisposeSourceCoreAsync() => default;
 
     private protected virtual bool OwnsSource => false;
+
+    internal async ValueTask DisposeUnregisteredSourceBestEffortAsync(string operation)
+    {
+        if (!TryClaimOutboundRegistration())
+        {
+            return;
+        }
+
+        try
+        {
+            await DisposeSourceBestEffortAsync(operation).ConfigureAwait(false);
+        }
+        finally
+        {
+            ReleaseOutboundRegistration();
+        }
+    }
 
     internal async ValueTask DisposeSourceBestEffortAsync(string operation)
     {
@@ -126,136 +156,5 @@ public abstract class RpcStreamAttachment
         {
             throw new ArgumentException($"Stream handle kind must be {expected}.", nameof(handle));
         }
-    }
-
-    private sealed class StreamAttachment : RpcStreamAttachment
-    {
-        private const int ChunkSize = 64 * 1024;
-        private readonly Stream _stream;
-        private readonly bool _leaveOpen;
-
-        public StreamAttachment(RpcStreamHandle handle, Stream stream, bool leaveOpen)
-            : base(handle)
-        {
-            _stream = stream;
-            _leaveOpen = leaveOpen;
-        }
-
-        internal override async Task PumpCoreAsync(
-            RpcStreamManager streams,
-            ISerializer serializer,
-            CancellationToken ct)
-        {
-            var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
-            Exception? pumpFailure = null;
-            try
-            {
-                while (true)
-                {
-                    var read = await _stream.ReadAsync(buffer.AsMemory(0, ChunkSize), ct).ConfigureAwait(false);
-                    if (read == 0)
-                    {
-                        return;
-                    }
-
-                    await streams.SendStreamItemAsync(Handle.StreamId, buffer.AsMemory(0, read), ct)
-                        .ConfigureAwait(false);
-                }
-            }
-            catch (Exception ex)
-            {
-                pumpFailure = ex;
-                throw;
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
-            }
-        }
-
-        private protected override ValueTask DisposeSourceCoreAsync() =>
-            _leaveOpen ? default : DisposeStreamAsync(_stream);
-
-        private protected override bool OwnsSource => !_leaveOpen;
-    }
-
-    private sealed class PipeAttachment : RpcStreamAttachment
-    {
-        private readonly Pipe _pipe;
-        private readonly bool _completeReader;
-
-        public PipeAttachment(RpcStreamHandle handle, Pipe pipe, bool completeReader)
-            : base(handle)
-        {
-            _pipe = pipe;
-            _completeReader = completeReader;
-        }
-
-        internal override async Task PumpCoreAsync(
-            RpcStreamManager streams,
-            ISerializer serializer,
-            CancellationToken ct)
-        {
-            Exception? pumpFailure = null;
-            try
-            {
-                while (true)
-                {
-                    var result = await _pipe.Reader.ReadAsync(ct).ConfigureAwait(false);
-                    var buffer = result.Buffer;
-                    try
-                    {
-                        if (result.IsCanceled)
-                        {
-                            return;
-                        }
-
-                        foreach (var segment in buffer)
-                        {
-                            if (!segment.IsEmpty)
-                            {
-                                await streams.SendStreamItemAsync(Handle.StreamId, segment, ct).ConfigureAwait(false);
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        _pipe.Reader.AdvanceTo(buffer.End);
-                    }
-
-                    if (result.IsCompleted)
-                    {
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                pumpFailure = ex;
-                throw;
-            }
-            finally
-            {
-                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
-            }
-        }
-
-        private protected override ValueTask DisposeSourceCoreAsync() =>
-            _completeReader ? _pipe.Reader.CompleteAsync() : default;
-
-        private protected override bool OwnsSource => _completeReader;
-    }
-
-
-    private static async ValueTask DisposeStreamAsync(Stream stream)
-    {
-        if (stream is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-            return;
-        }
-
-        stream.Dispose();
     }
 }
