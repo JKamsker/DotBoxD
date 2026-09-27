@@ -4,32 +4,46 @@ using DotBoxD.Kernels.Compiler.Emitters;
 
 namespace DotBoxD.Hosting.Execution.Compiled;
 
-internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : IDisposable
+internal sealed class CompiledExecutionProvider : IDisposable
 {
+    private ISandboxCompiler? _compiler;
     private readonly CompiledArtifactExecutionCache _artifacts = new();
     private readonly CompiledExecutableExecutionCache _executables = new();
     private readonly CompiledExecutableCache _materialized = new();
 
-    public bool IsAvailable => compiler is not null &&
-        (compiler is not ReflectionEmitSandboxCompiler || RuntimeFeature.IsDynamicCodeSupported);
+    public CompiledExecutionProvider(ISandboxCompiler? compiler) => _compiler = compiler;
+
+    public bool IsAvailable
+    {
+        get
+        {
+            var compiler = Volatile.Read(ref _compiler);
+            return compiler is not null &&
+                (compiler is not ReflectionEmitSandboxCompiler || RuntimeFeature.IsDynamicCodeSupported);
+        }
+    }
 
     public ValueTask<CompiledExecutable> GetAsync(
         ExecutionPlan plan,
         string entrypoint,
         CancellationToken cancellationToken)
-        => compiler is ReflectionEmitSandboxCompiler { UsesPersistentCache: false }
+    {
+        var compiler = ReadCompiler();
+        return compiler is ReflectionEmitSandboxCompiler { UsesPersistentCache: false }
             ? GetCachedReflectionExecutableAsync(plan, entrypoint, cancellationToken)
             : GetCompilerExecutableAsync(plan, entrypoint, cancellationToken);
+    }
 
     internal ValueTask<CompiledExecutable> GetAndPublishCompletedExecutableAsync(
         ExecutionPlan plan,
         string entrypoint,
         CancellationToken cancellationToken)
     {
+        var compiler = ReadCompiler();
         if (compiler is not
             ReflectionEmitSandboxCompiler { UsesPersistentCache: false } reflectionCompiler)
         {
-            return GetAsync(plan, entrypoint, cancellationToken);
+            return GetCompilerExecutableAsync(plan, entrypoint, cancellationToken);
         }
 
         var hotState = _executables.GetOrCreateHotEntry();
@@ -46,7 +60,7 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
         string entrypoint,
         out CompiledExecutable executable)
     {
-        if (compiler is not ReflectionEmitSandboxCompiler { UsesPersistentCache: false })
+        if (Volatile.Read(ref _compiler) is not ReflectionEmitSandboxCompiler { UsesPersistentCache: false })
         {
             executable = default;
             return false;
@@ -60,7 +74,7 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
         string entrypoint,
         out CompiledExecutable executable)
     {
-        if (compiler is not ReflectionEmitSandboxCompiler { UsesPersistentCache: false } ||
+        if (Volatile.Read(ref _compiler) is not ReflectionEmitSandboxCompiler { UsesPersistentCache: false } ||
             _executables.HasHotCapacity)
         {
             executable = default;
@@ -79,8 +93,10 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
             return;
         }
 
+        var compiler = Interlocked.Exchange(ref _compiler, null);
         try
         {
+            _artifacts.Dispose();
             if (compiler is ReflectionEmitSandboxCompiler { UsesPersistentCache: false })
             {
                 _executables.Dispose();
@@ -96,14 +112,23 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
         => _executables.HasHot(plan, entrypoint);
 
     internal bool CanPublishCompletedExecutable
-        => compiler is ReflectionEmitSandboxCompiler { UsesPersistentCache: false } &&
+        => Volatile.Read(ref _compiler) is ReflectionEmitSandboxCompiler { UsesPersistentCache: false } &&
            _executables.HasHotCapacity;
+
+    private ISandboxCompiler? ReadCompiler()
+    {
+        // Snapshot before checking disposal so an admitted invocation cannot read a cleared field.
+        var compiler = Volatile.Read(ref _compiler);
+        _materialized.ThrowIfDisposed();
+        return compiler;
+    }
 
     private async ValueTask<CompiledExecutable> GetCompilerExecutableAsync(
         ExecutionPlan plan,
         string entrypoint,
         CancellationToken cancellationToken)
     {
+        var compiler = ReadCompiler();
         var artifact = await compiler!.CompileAsync(plan, new CompileOptions(entrypoint), cancellationToken)
             .ConfigureAwait(false);
         return await _materialized.GetAsync(artifact, plan, entrypoint, cancellationToken)
@@ -115,6 +140,7 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
         string entrypoint,
         CancellationToken cancellationToken)
     {
+        var compiler = ReadCompiler();
         var artifact = await _artifacts.GetAsync(
                 plan,
                 entrypoint,

@@ -11,10 +11,7 @@ public sealed class CompiledCacheFailureObservationTests
         foreach (var kind in new[] { "ArtifactDelegate", "ArtifactCompiler", "ExecutableDelegate", "ExecutableCache", "Materialized" })
         {
             yield return [kind, false];
-            if (kind is not ("ArtifactDelegate" or "ArtifactCompiler"))
-            {
-                yield return [kind, true];
-            }
+            yield return [kind, true];
         }
     }
 

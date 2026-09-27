@@ -2,13 +2,13 @@ using DotBoxD.Kernels.Compiler;
 
 namespace DotBoxD.Hosting.Execution.Compiled;
 
-internal sealed class CompiledArtifactExecutionCache
+internal sealed class CompiledArtifactExecutionCache : IDisposable
 {
     private const int Capacity = 64;
 
     private readonly Dictionary<CacheKey, LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recency = new();
-    private readonly object _gate = new();
+    private readonly CacheState _gate = new();
 
     public async ValueTask<CompiledArtifact> GetAsync(
         ExecutionPlan plan,
@@ -21,6 +21,7 @@ internal sealed class CompiledArtifactExecutionCache
         CacheLookup lookup;
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_gate.IsDisposed, this);
             lookup = TouchOrAdd(key, compile);
         }
 
@@ -38,10 +39,21 @@ internal sealed class CompiledArtifactExecutionCache
         CacheLookup lookup;
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_gate.IsDisposed, this);
             lookup = TouchOrAdd(key, compiler, plan, entrypoint);
         }
 
         return await CompleteAsync(key, lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            _gate.IsDisposed = true;
+            _entries.Clear();
+            _recency.Clear();
+        }
     }
 
     private ValueTask<CompiledArtifact> CompleteAsync(
@@ -178,6 +190,12 @@ internal sealed class CompiledArtifactExecutionCache
                 _entries.Remove(key);
             }
         }
+    }
+
+    // Carry lifecycle state on the existing monitor without another per-cache allocation.
+    private sealed class CacheState
+    {
+        public bool IsDisposed { get; set; }
     }
 
     private readonly record struct CacheLookup(CompiledArtifact? Completed, Lazy<Task<CompiledArtifact>>? Lazy);

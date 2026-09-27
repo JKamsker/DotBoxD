@@ -23,6 +23,7 @@ internal sealed class CompiledCacheCancellationFixture : IDisposable
                 var artifacts = new CompiledArtifactExecutionCache();
                 var compiler = new ControlledCompiler(compilation);
                 _work = compilation;
+                _dispose = artifacts.Dispose;
                 _request = kind == "ArtifactDelegate"
                     ? ct => artifacts.GetAsync(plan, "main", compilation.Start, ct).AsTask()
                     : ct => artifacts.GetAsync(plan, "main", compiler, ct).AsTask();

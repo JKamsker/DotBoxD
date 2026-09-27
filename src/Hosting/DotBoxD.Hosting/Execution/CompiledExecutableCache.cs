@@ -101,6 +101,9 @@ internal sealed class CompiledExecutableCache : IDisposable
         CompleteDispose();
     }
 
+    internal void ThrowIfDisposed()
+        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
     internal bool TryBeginDispose() => Interlocked.Exchange(ref _disposed, 1) == 0;
 
     internal void CompleteDispose()
