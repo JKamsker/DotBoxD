@@ -12,12 +12,13 @@ public sealed class RpcStreamAttachmentAllocationTests
     [Theory]
     [InlineData(false, false, 192)]
     [InlineData(false, true, 192)]
-    [InlineData(true, false, 328)]
-    [InlineData(true, true, 328)]
+    [InlineData(true, false, 280)]
+    [InlineData(true, true, 280)]
     public async Task Pending_pump_stays_within_source_ownership_budget(bool usePipe, bool owned, long budget)
     {
         // One additional reference keeps the source alive if disposal finishes during a read.
         // The pre-cleanup budgets were 184 B for streams and 320 B for pipes.
+        // Bounded pipe chunking removes the enumerator from the async state, reducing 328 B to 280 B.
         var serializer = new MessagePackRpcSerializer();
         var manager = AttachmentLifetimeFixture.NewManager();
         var minimum = long.MaxValue;

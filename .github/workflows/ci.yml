@@ -646,6 +646,9 @@ jobs:
               "RpcStreamAttachmentAllocationTests",
               "RpcPipeSendProgressTests",
               "RpcPipeSendProgressPeerTests",
+              "RpcPipeChunkingTests",
+              "RpcPipeChunkProgressTests",
+              "RpcPipeChunkingPeerTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
