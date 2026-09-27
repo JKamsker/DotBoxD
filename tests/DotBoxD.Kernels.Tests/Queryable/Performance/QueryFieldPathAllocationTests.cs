@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using Xunit.Abstractions;
 
 namespace DotBoxD.Kernels.Tests.Queryable;
 
+[Collection(AllocationMeasurementCollection.Name)]
 public sealed class QueryFieldPathAllocationTests(ITestOutputHelper output)
 {
     [Theory]
@@ -14,6 +16,7 @@ public sealed class QueryFieldPathAllocationTests(ITestOutputHelper output)
     [InlineData("Source.Owner.Id")]
     [InlineData("Δelta")]
     [InlineData("源.識別")]
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public void Repeated_field_path_validation_does_not_allocate(string path)
     {
         var filter = CreateFilter(path);
@@ -22,14 +25,19 @@ public sealed class QueryFieldPathAllocationTests(ITestOutputHelper output)
             QueryFilterEvaluator.EnsureWithinLimits(filter);
         }
 
+        // Keep measurement-loop optimization and one-time runtime work outside the steady-state budget.
         const int iterations = 1_000;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < iterations; i++)
+        var allocated = long.MaxValue;
+        for (var sample = 0; sample < 5; sample++)
         {
-            QueryFilterEvaluator.EnsureWithinLimits(filter);
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < iterations; i++)
+            {
+                QueryFilterEvaluator.EnsureWithinLimits(filter);
+            }
+            allocated = Math.Min(allocated, GC.GetAllocatedBytesForCurrentThread() - before);
         }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         output.WriteLine($"{path}: {allocated / iterations} bytes per validation.");
         Assert.Equal(0, allocated);
     }
