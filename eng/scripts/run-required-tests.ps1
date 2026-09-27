@@ -44,6 +44,7 @@ $defaultMinimums = @{
     CompiledAwaitPumpLegacyScopeTests = 2
     AuditObserverLifetimeTests = 9
     AuditObserverPublicationTests = 5
+    AuditObserverPublicationAllocationTests = 9
     CompiledRuntimeQuotaTests = 1
     CompiledCacheAuditTests = 1
     CompiledCacheConcurrencyTests = 4

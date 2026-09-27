@@ -222,9 +222,10 @@ public sealed partial class SandboxHost : IDisposable
             return result;
         }
 
-        foreach (var auditEvent in result.AuditEvents)
+        var events = result.AuditEvents;
+        for (var index = 0; index < events.Count; index++)
         {
-            PublishToAuditObservers(auditEvent, observers);
+            PublishToAuditObservers(events[index], observers);
         }
 
         return result;
