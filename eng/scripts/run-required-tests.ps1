@@ -70,6 +70,7 @@ $defaultMinimums = @{
     WorkerQuotaResultValidationTests = 2
     WorkerAuditValidationTests = 11
     WorkerResultHardeningTests = 11
+    Fix_CI_0001_Tests = 2
     JsonApiSurfaceTests = 1
     PublicModelImmutabilityTests = 5
     PluginPackageJsonTests = 23

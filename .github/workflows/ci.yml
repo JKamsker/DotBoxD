@@ -373,6 +373,7 @@ jobs:
               "WorkerQuotaResultValidationTests",
               "WorkerAuditValidationTests",
               "WorkerResultHardeningTests",
+              "Fix_CI_0001_Tests",
               "JsonApiSurfaceTests",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
