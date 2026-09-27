@@ -346,6 +346,8 @@ jobs:
               "CompiledCacheFailureObservationTests",
               "CompiledCacheCancellationRecoveryTests",
               "PreparedPlanMetadataValidationTests",
+              "PreparedPlanCacheLifetimeTests",
+              "PreparedPlanCacheAllocationTests",
               "CompiledCacheEntrypointTests",
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",

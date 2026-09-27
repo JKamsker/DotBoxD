@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 namespace DotBoxD.Hosting.Execution;
@@ -9,19 +8,18 @@ namespace DotBoxD.Hosting.Execution;
 /// re-canonical-hashing, and re-sealing the whole module on every dispatch (ALG-0013).
 /// </summary>
 /// <remarks>
-/// A plan is keyed by its seal, which is an HMAC over the validated module/policy/binding identity
-/// using the host signing key. Only plans this host produced via <c>PrepareAsync</c> are registered,
-/// so a cache hit proves the seal is authentic; the cached entry is then the trusted reference the
-/// incoming plan's fields are compared against (see <see cref="ExecutionPlanGuard"/>). A miss
-/// (tampered seal, or a plan from another host) falls back to the full rebuild-and-compare path,
-/// preserving every existing rejection.
+/// Trusted plans are weakly keyed by their seal objects. A live original or copy keeps its seal
+/// and trusted identity available; unused seals and plans can be collected together. Only plans
+/// this host produced via <c>PrepareAsync</c> are registered, and incoming fields are compared
+/// against that trusted identity (see <see cref="ExecutionPlanGuard"/>). A missing entry falls
+/// back to the full rebuild-and-compare path, preserving validation independently of cache lifetime.
 /// </remarks>
 internal sealed class PreparedPlanIntegrityCache
 {
     private static readonly TrustedReferenceMarker Marker = new();
 
     private readonly ConditionalWeakTable<ExecutionPlan, TrustedReferenceMarker> _trustedReferences = new();
-    private ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan>? _trusted;
+    private ConditionalWeakTable<ExecutionPlanSeal, ExecutionPlan>? _trusted;
 
     public void Register(ExecutionPlan plan)
     {
@@ -29,7 +27,7 @@ internal sealed class PreparedPlanIntegrityCache
         _trustedReferences.Remove(plan);
         _trustedReferences.Add(plan, Marker);
         var trusted = LazyInitializer.EnsureInitialized(ref _trusted, static () => new());
-        trusted[plan.PlanSeal] = plan;
+        trusted.AddOrUpdate(plan.PlanSeal, plan);
     }
 
     public bool ContainsTrustedReference(ExecutionPlan plan)
