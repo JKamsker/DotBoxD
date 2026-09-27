@@ -17,7 +17,7 @@ public sealed partial class SandboxHost : IDisposable
     private readonly ISandboxInterpreter _interpreter;
     private readonly CompiledExecutionProvider _compiled;
     private readonly IExecutionModeSelector _modeSelector;
-    private readonly Action<SandboxAuditEvent>[] _auditObservers;
+    private Action<SandboxAuditEvent>[] _auditObservers;
     private readonly SandboxWorkerExecutor _workerExecutor;
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly AutoExecutionHotness _autoHotness = new();
@@ -216,25 +216,27 @@ public sealed partial class SandboxHost : IDisposable
 
     private SandboxExecutionResult Publish(SandboxExecutionResult result)
     {
-        if (_auditObservers.Length == 0)
+        var observers = Volatile.Read(ref _auditObservers);
+        if (observers.Length == 0)
         {
             return result;
         }
 
         foreach (var auditEvent in result.AuditEvents)
         {
-            PublishToAuditObservers(auditEvent);
+            PublishToAuditObservers(auditEvent, observers);
         }
 
         return result;
     }
 
-    private void PublishToAuditObservers(SandboxAuditEvent auditEvent)
+    private static void PublishToAuditObservers(
+        SandboxAuditEvent auditEvent,
+        Action<SandboxAuditEvent>[] observers)
     {
-        // The observer set is fixed for the lifetime of the host, so dispatch reuses the
-        // snapshot captured at construction instead of materializing the multicast invocation
-        // list per audit event.
-        foreach (var observer in _auditObservers)
+        // Keep this publication's snapshot so disposal from a callback does not
+        // interrupt later observers or events in the same result.
+        foreach (var observer in observers)
         {
             try
             {
@@ -283,6 +285,7 @@ public sealed partial class SandboxHost : IDisposable
 
     public void Dispose()
     {
+        Volatile.Write(ref _auditObservers, []);
         if (TryDisposeCompiledNoAuditStatePool())
         {
             _compiled.Dispose();
