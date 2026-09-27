@@ -42,6 +42,7 @@ $defaultMinimums = @{
     CompiledCacheConcurrencyTests = 4
     CompiledCacheFailureObservationTests = 8
     CompiledCacheCancellationRecoveryTests = 10
+    PreparedPlanMetadataValidationTests = 16
     CompiledCacheEntrypointTests = 1
     CompiledCacheMetadataTests = 3
     CompiledCacheRootGuardTests = 6

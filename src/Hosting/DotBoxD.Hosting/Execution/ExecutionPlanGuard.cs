@@ -110,35 +110,31 @@ internal static class ExecutionPlanGuard
            preparedPlans.TryGetTrusted(plan.PlanSeal, out var trusted) &&
            MatchesTrustedIdentity(plan, trusted);
 
-    // The seal is an authentic host HMAC (a cache hit), but a caller can still rebuild a plan that
-    // reuses that seal while swapping fields. Two independent kinds of swap must be rejected:
-    //   * module/policy/bindings: confirmed by reference against the exact instances this host
-    //     validated and sealed (the trusted entry). A different module carrying stale copied hashes
-    //     would otherwise skip the validation that surfaces, e.g., E-CALL-UNKNOWN.
-    //   * function analysis / binding references: attacker-supplied metadata the constructor stores
-    //     verbatim, so they are compared structurally against the trusted prepared values.
-    // The hashes/seal are deterministically derived from these, so this is the full prepared identity.
+    // Copies must retain the validated module, policy, and binding instances. Their metadata uses
+    // the same comparison as a rebuilt plan, so cached and full validation agree.
     private static bool MatchesTrustedIdentity(ExecutionPlan candidate, ExecutionPlan trusted)
         => ReferenceEquals(candidate, trusted) ||
            (ReferenceEquals(candidate.Module, trusted.Module) &&
             ReferenceEquals(candidate.Policy, trusted.Policy) &&
             ReferenceEquals(candidate.Bindings, trusted.Bindings) &&
-            SameAnalysis(candidate.FunctionAnalysis, trusted.FunctionAnalysis) &&
-            SameBindingReferences(candidate.BindingReferences, trusted.BindingReferences));
+            SamePreparedMetadata(candidate, trusted));
+
+    private static bool SamePreparedMetadata(ExecutionPlan candidate, ExecutionPlan expected)
+        => candidate.ModuleHash == expected.ModuleHash &&
+           candidate.PolicyHash == expected.PolicyHash &&
+           candidate.BindingManifestHash == expected.BindingManifestHash &&
+           candidate.PlanHash == expected.PlanHash &&
+           candidate.PlanSeal.Equals(expected.PlanSeal) &&
+           candidate.Budget == expected.Budget &&
+           SameAnalysis(candidate.FunctionAnalysis, expected.FunctionAnalysis) &&
+           SameBindingReferences(candidate.BindingReferences, expected.BindingReferences);
 
     private static void ComparePlan(
         ExecutionPlan plan,
         ExecutionPlan expected,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (plan.ModuleHash != expected.ModuleHash ||
-            plan.PolicyHash != expected.PolicyHash ||
-            plan.BindingManifestHash != expected.BindingManifestHash ||
-            plan.PlanHash != expected.PlanHash ||
-            !plan.PlanSeal.Equals(expected.PlanSeal) ||
-            plan.Budget != expected.Budget ||
-            !SameAnalysis(plan.FunctionAnalysis, expected.FunctionAnalysis) ||
-            !SameBindingReferences(plan.BindingReferences, expected.BindingReferences))
+        if (!SamePreparedMetadata(plan, expected))
         {
             diagnostics.Add(new SandboxDiagnostic("E-PLAN-INTEGRITY", "execution plan does not match validated module, policy, and bindings"));
         }
