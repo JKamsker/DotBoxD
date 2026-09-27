@@ -45,8 +45,7 @@ public interface ISandboxWorkerClient
 public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 {
     private readonly WorkerPreparedPlanCache _preparedPlans = new();
-    private readonly Lazy<SandboxHost> _workerHost;
-    private int _disposed;
+    private Lazy<SandboxHost>? _workerHost;
 
     public SandboxHostWorkerClient(Func<SandboxHost> hostFactory)
     {
@@ -92,15 +91,17 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        // Detach the factory, created host, or cached factory failure as one ownership unit.
+        var workerHost = Interlocked.Exchange(ref _workerHost, null);
+        if (workerHost is null)
         {
             return;
         }
 
         _preparedPlans.Dispose();
-        if (_workerHost.IsValueCreated)
+        if (workerHost.IsValueCreated)
         {
-            _workerHost.Value.Dispose();
+            workerHost.Value.Dispose();
         }
     }
 
@@ -123,9 +124,10 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
     private SandboxHost WorkerHost()
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        var workerHost = _workerHost.Value;
-        if (Volatile.Read(ref _disposed) == 0)
+        var lazyHost = Volatile.Read(ref _workerHost);
+        ObjectDisposedException.ThrowIf(lazyHost is null, this);
+        var workerHost = lazyHost.Value;
+        if (Volatile.Read(ref _workerHost) is not null)
         {
             return workerHost;
         }

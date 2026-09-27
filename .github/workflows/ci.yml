@@ -351,6 +351,8 @@ jobs:
               "WorkerPlanCacheLifetimeTests",
               "WorkerPlanCacheReuseTests",
               "WorkerPlanCacheAllocationTests",
+              "WorkerHostLifetimeTests",
+              "WorkerHostCreationDisposalTests",
               "CompiledCacheEntrypointTests",
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",
