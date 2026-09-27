@@ -340,6 +340,8 @@ jobs:
               "CompiledArtifactGuardTests",
               "CompiledAsyncCapabilityParityTests",
               "CompiledAsyncSynchronizationContextParityTests",
+              "CompiledAwaitPumpAllocationTests",
+              "CompiledAwaitPumpLifecycleTests",
               "CompiledRuntimeQuotaTests",
               "CompiledCacheAuditTests",
               "CompiledCacheConcurrencyTests",

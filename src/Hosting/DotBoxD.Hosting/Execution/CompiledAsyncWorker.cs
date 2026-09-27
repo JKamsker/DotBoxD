@@ -127,7 +127,7 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
 
         public void Dispose()
         {
-            var pending = new List<WorkItem>();
+            WorkItem[] pending;
             lock (_queue)
             {
                 if (_disposed)
@@ -136,10 +136,8 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
                 }
 
                 _disposed = true;
-                while (_queue.Count > 0)
-                {
-                    pending.Add(_queue.Dequeue());
-                }
+                pending = _queue.ToArray();
+                _queue.Clear();
             }
 
             foreach (var item in pending)
