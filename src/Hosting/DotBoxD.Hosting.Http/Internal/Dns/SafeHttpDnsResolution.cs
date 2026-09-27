@@ -85,6 +85,8 @@ internal static class SafeHttpDnsResolution
         }
 
         // The resolver can finish after cancellation has detached the request's waiter.
+        // Fault observation must not retain the canceled waiter's ambient state.
+        using var flow = ExecutionContext.SuppressFlow();
         _ = pending.ContinueWith(
             static completed => { _ = completed.Exception; },
             CancellationToken.None,

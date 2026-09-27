@@ -123,6 +123,8 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
         }
 
         // Cancellation stops the wait, but a worker can still complete with a failure later.
+        // Fault observation must not retain the canceled waiter's ambient state.
+        using var flow = ExecutionContext.SuppressFlow();
         _ = pending.ContinueWith(
             static completed => { _ = completed.Exception; },
             CancellationToken.None,

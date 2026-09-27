@@ -17,6 +17,8 @@ internal static class CompiledWorkFailureObserver
         }
 
         // Shared work continues after a waiter cancels, possibly with no remaining observer.
+        // Fault observation must not retain the canceled waiter's ambient state.
+        using var flow = ExecutionContext.SuppressFlow();
         _ = task.ContinueWith(
             static completed => { _ = completed.Exception; },
             CancellationToken.None,
