@@ -142,6 +142,13 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
     }
 
+    public void DisposeInBackground() =>
+        _ = Task.Factory.StartNew(
+            async () => await DisposeAsync().ConfigureAwait(false),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
+
     private Task[]? GetTasksOrClaimUnstartedForDispose()
     {
         lock (_startGate)

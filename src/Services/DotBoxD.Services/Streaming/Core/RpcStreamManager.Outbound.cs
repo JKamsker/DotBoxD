@@ -208,7 +208,7 @@ internal sealed partial class RpcStreamManager
     {
         if (_senders.TryGetValue(streamId, out var state))
         {
-            state.Cancel();
+            state.CancelInBackground();
             return;
         }
 
@@ -217,7 +217,7 @@ internal sealed partial class RpcStreamManager
         {
             if (_senders.TryGetValue(streamId, out state))
             {
-                state.Cancel();
+                state.CancelInBackground();
             }
 
             return;
@@ -227,7 +227,7 @@ internal sealed partial class RpcStreamManager
         if (_senders.TryGetValue(streamId, out state) &&
             _canceledOutbound.TryRemove(streamId, out _))
         {
-            state.Cancel();
+            state.CancelInBackground();
         }
         else if (!_reservedOutbound.ContainsKey(streamId))
         {
