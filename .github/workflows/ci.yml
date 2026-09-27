@@ -613,6 +613,8 @@ jobs:
               "SafeHttpCompletedDnsAllocationTests",
               "SafeHttpRequestAllocationTests",
               "SafeHttpCompletedDnsTests",
+              "SafeHttpDnsFailureObservationTests",
+              "SafeHttpDnsRecoveryTests",
               "QueryNumericComparisonAllocationTests",
               "QueryIncomparableNumericAllocationTests",
               "QueryFilterValidationAllocationTests",

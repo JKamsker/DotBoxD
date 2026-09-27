@@ -39,10 +39,10 @@ public static class SafeHttpClient
                 cancellationToken,
                 context.CancellationToken,
                 requestTimeout.Token);
-            var addresses = await ResolveVettedAddressesAsync(
+            var addresses = await SafeHttpDnsResolution.ResolveAsync(
                     request.Grant,
                     request.Uri.Host,
-                    dnsResolver ?? ResolveDnsAsync,
+                    dnsResolver,
                     timeout.Token)
                 .ConfigureAwait(false);
             using var message = new HttpRequestMessage(HttpMethod.Get, request.Uri);
@@ -176,49 +176,6 @@ public static class SafeHttpClient
         }
     }
 
-    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveVettedAddressesAsync(
-        SafeHttpGrantOptions grant,
-        string host,
-        SafeDnsResolver dnsResolver,
-        CancellationToken cancellationToken)
-    {
-        if (IPAddress.TryParse(host, out var address))
-        {
-            RequireIpLiteralAllowed(grant, address);
-            return [address];
-        }
-
-        var resolution = dnsResolver(host, cancellationToken);
-        var addresses = resolution.IsCompletedSuccessfully
-            ? resolution.Result
-            : await resolution.AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (addresses.Count == 0)
-        {
-            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: DNS resolution returned no addresses");
-        }
-
-        if (!grant.AllowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal))
-        {
-            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
-        }
-
-        return addresses;
-    }
-
-    private static void RequireIpLiteralAllowed(SafeHttpGrantOptions grant, IPAddress address)
-    {
-        if (!grant.AllowIpLiterals)
-        {
-            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: IP literals are not allowed");
-        }
-
-        if (!grant.AllowPrivateNetwork && SafeIpAddressClassifier.IsNonGlobal(address))
-        {
-            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
-        }
-    }
-
     private static void RequireSuccessfulFinalResponse(HttpResponseMessage response, Uri requestedUri)
     {
         if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, requestedUri))
@@ -250,9 +207,6 @@ public static class SafeHttpClient
         var remaining = context.Budget.RemainingWallTime();
         return remaining < requestTimeout ? remaining : requestTimeout;
     }
-
-    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveDnsAsync(string host, CancellationToken cancellationToken)
-        => await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
 
     private static void Audit(
         SandboxContext context,

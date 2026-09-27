@@ -5,9 +5,10 @@ namespace DotBoxD.Kernels.Tests.Runtime.Network;
 [Trait("Category", "AllocationMeasurement")]
 public sealed class SafeHttpRequestAllocationTests
 {
+    // Pending DNS retains its Task to observe failures after cancellation.
     [Theory]
     [InlineData(false, 2904)]
-    [InlineData(true, 1808)]
+    [InlineData(true, 1816)]
     public async Task Request_settings_do_not_require_a_separate_allocation(bool pendingDns, long maximumBytes)
     {
         using var fixture = new CompletedDnsFixture();
