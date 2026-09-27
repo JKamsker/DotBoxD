@@ -106,7 +106,7 @@ internal sealed partial class RpcStreamManager
         {
             for (var i = 0; i < addedCount; i++)
             {
-                RemoveOutbound(added[i].StreamId);
+                RemoveOutbound(added[i]);
             }
             for (var i = 0; i < claimedCount; i++)
             {
@@ -155,7 +155,7 @@ internal sealed partial class RpcStreamManager
         {
             if (added)
             {
-                RemoveOutbound(state!.StreamId);
+                RemoveOutbound(state!);
             }
             else
             {
@@ -233,21 +233,26 @@ internal sealed partial class RpcStreamManager
         }
     }
 
-    public void RemoveOutbound(int streamId)
+    internal void RemoveOutbound(RpcStreamSendState state, bool completed = false)
     {
-        ClearOutboundTracking(streamId);
-        if (_senders.TryRemove(streamId, out var state))
+        if (!state.TryClaimRemoval())
         {
-            state.Dispose();
+            return;
         }
-    }
 
-    internal void RemoveCompletedOutbound(int streamId)
-    {
-        ClearOutboundTracking(streamId);
-        if (_senders.TryRemove(streamId, out var state))
+        // Only this state's cleanup may clear tracking, while it still occupies the ID.
+        // Vacating the slot first would let cleanup erase a replacement's reservation.
+        _pendingCredits.TryRemove(state.StreamId, out _);
+        _reservedOutbound.TryRemove(state.StreamId, out _);
+        _canceledOutbound.TryRemove(state.StreamId, out _);
+        _senders.TryRemove(state.StreamId, out _);
+        if (completed)
         {
             state.DisposeAfterCompletion();
+        }
+        else
+        {
+            state.Dispose();
         }
     }
 
@@ -289,12 +294,5 @@ internal sealed partial class RpcStreamManager
             _reservedOutbound,
             streamId,
             count);
-    }
-
-    private void ClearOutboundTracking(int streamId)
-    {
-        _pendingCredits.TryRemove(streamId, out _);
-        _reservedOutbound.TryRemove(streamId, out _);
-        _canceledOutbound.TryRemove(streamId, out _);
     }
 }

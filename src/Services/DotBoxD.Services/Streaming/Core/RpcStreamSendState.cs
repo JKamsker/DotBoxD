@@ -9,6 +9,7 @@ internal sealed class RpcStreamSendState : IDisposable
     private readonly SemaphoreSlim _credits = new(0);
     private int _availableCredits;
     private int _disposed;
+    private int _removalClaimed;
 
     public RpcStreamSendState(int streamId, CancellationToken ownerToken)
     {
@@ -78,6 +79,8 @@ internal sealed class RpcStreamSendState : IDisposable
             }
         }
     }
+
+    internal bool TryClaimRemoval() => Interlocked.Exchange(ref _removalClaimed, 1) == 0;
 
     public void Cancel()
     {

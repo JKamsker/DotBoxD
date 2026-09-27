@@ -199,7 +199,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
             }
             catch
             {
-                _streams.RemoveOutbound(handle.StreamId);
+                _streams.ReleaseOutboundReservation(handle.StreamId);
                 throw;
             }
         }

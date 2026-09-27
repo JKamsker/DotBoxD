@@ -132,7 +132,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         {
             foreach (var pair in _streams)
             {
-                _manager.RemoveOutbound(pair.State.StreamId);
+                _manager.RemoveOutbound(pair.State);
                 pair.Attachment.ReleaseOutboundRegistration();
             }
 
@@ -187,7 +187,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
         finally
         {
-            _manager.RemoveCompletedOutbound(state.StreamId);
+            _manager.RemoveOutbound(state, completed: true);
         }
     }
 

@@ -336,6 +336,7 @@ $defaultMinimums = @{
     RpcPipeChunkingTests = 18
     RpcPipeChunkProgressTests = 12
     RpcPipeChunkingPeerTests = 2
+    RpcOutboundRegistrationOwnershipTests = 24
     RpcStreamingContextPeerLifetimeTests = 8
     RpcStreamingContextAccessorLifetimeTests = 6
     QueryCollectionCaptureTests = 4

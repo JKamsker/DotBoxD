@@ -649,6 +649,7 @@ jobs:
               "RpcPipeChunkingTests",
               "RpcPipeChunkProgressTests",
               "RpcPipeChunkingPeerTests",
+              "RpcOutboundRegistrationOwnershipTests",
               "RpcStreamingContextPeerLifetimeTests",
               "RpcStreamingContextAccessorLifetimeTests",
               "MessagePackPolymorphicDtoUnionTests"
