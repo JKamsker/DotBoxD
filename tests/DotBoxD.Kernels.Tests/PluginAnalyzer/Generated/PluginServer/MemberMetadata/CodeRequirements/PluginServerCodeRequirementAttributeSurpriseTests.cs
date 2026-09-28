@@ -43,7 +43,7 @@ public sealed class PluginServerCodeRequirementAttributeSurpriseTests
     }
 
     private const string RootAttributes =
-        "    [global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"root assembly-files requirement\", Url = \"https://example.invalid/root-assembly-files\")]\n" +
+        "    [global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute]\n" +
         "    [global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"root dynamic-code requirement\", Url = \"https://example.invalid/root-dynamic\")]\n" +
         "    [global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute(\"root trimming requirement\", Url = \"https://example.invalid/root-trimming\")]\n";
 
@@ -68,7 +68,7 @@ public sealed class PluginServerCodeRequirementAttributeSurpriseTests
             {
                 [RequiresUnreferencedCode("root trimming requirement", Url = "https://example.invalid/root-trimming")]
                 [RequiresDynamicCode("root dynamic-code requirement", Url = "https://example.invalid/root-dynamic")]
-                [RequiresAssemblyFiles("root assembly-files requirement", Url = "https://example.invalid/root-assembly-files")]
+                [RequiresAssemblyFiles]
                 ValueTask<int> RootRequirementAsync();
 
                 ValueTask<int> CleanRootAsync();
