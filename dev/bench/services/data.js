@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789985778031,
+  "lastUpdate": 1790594118210,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Services Benchmarks": [
@@ -1524,6 +1524,136 @@ window.BENCHMARK_DATA = {
             "value": 105.18732723924849,
             "unit": "ns",
             "range": "± 0.028291032126394094"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c305ecbf51992cda417b27866edbc262520fd8a0",
+          "message": "Fix query correctness, allocations, validation, and resource cleanup (#1392)\n\n* Avoid registry snapshots when returning instance leases\n\n* Validate RPC stream handle envelope fields consistently\n\n* Dispose pinned HTTP transport when response cleanup fails\n\n* Remove per-comparison closures from numeric query evaluation\n\n* Validate readable query properties before reflection access\n\n* Preserve mixed numeric equality in event query routing\n\n* Preserve numeric bounds when compiling event index checks\n\n* Avoid enumerator allocations in event index matching\n\n* Isolate stream cancellation callback failures during cleanup\n\n* Preserve borrowed pipe data when a pending read is canceled\n\n* Create new Unix compiled cache roots with owner-only permissions\n\n* Defer unused host dictionaries to reduce cold-host allocations\n\n* Avoid prefix string allocations in wildcard capability matching\n\n* Avoid collection snapshots and boxing in capability checks\n\n* Reject frame size settings above the protocol maximum\n\n* Reject unsupported string comparers during query translation\n\n* Capture query collection operands once during translation\n\n* Evaluate constant conversions when translating queries\n\n* Serialize named pipe server lifecycle transitions\n\n* Validate immutable set comparers during query translation\n\n* Remove per-node scratch allocations from query validation\n\n* Validate query field paths without substring allocations\n\n* Remove boxed enumerators from interpreted query evaluation\n\n* Await queued subscription delivery in concurrency regression\n\n* Validate sorted list key-view comparers during translation\n\n* Allow asynchronous cleanup to unwind in receive retention regression\n\n* Validate comparers through nested dictionary key views\n\n* Evaluate collection conversions before translating membership\n\n* Check interleaved lifecycle assertions before expected task failure\n\n* Preserve converted span contents during query translation\n\n* Preserve boolean conversion semantics in query predicates\n\n* Validate membership comparers through framework collection wrappers\n\n* Avoid conversion exceptions for nonnumeric query values\n\n* Serialize TCP server listener startup and shutdown\n\n* Keep TCP accept cancellation scoped to its listener\n\n* Avoid numeric conversion exceptions for incompatible framework values\n\n* Preserve unobserved live update failures across flushes\n\n* Isolate numeric allocation measurements from harness optimization\n\n* Preserve exact decimal and unsigned live-setting bounds\n\n* Support inherited live-context interface properties\n\n* Release collectible live-setting types from the property cache\n\n* Release collectible host-service return types from the reader cache\n\n* Log GameServer extension failures on the server\n\n* Preserve interruption errors after successful binding audits\n\n* Release collectible event types from the capability metadata cache\n\n* Avoid task wrappers for completed void server extension calls\n\n* Reuse stateless ValueTask completions in server extension proxies\n\n* Keep caller cancellation out of GameServer failure diagnostics\n\n* Preserve GameServer failures when diagnostic output throws\n\n* Release collectible types from RPC marshalling caches\n\n* Release collectible capability parameter types from the accessor cache\n\n* Release compiled expected cache keys with their execution plans\n\n* Avoid boxing decimal capability parameters during formatting\n\n* Avoid boxing formattable capability parameter values\n\n* Resolve inherited interface properties in event query paths\n\n* Release collectible event types from shared query readers\n\n* Preserve declared event types when evaluating queries\n\n* Resolve the nearest class member in query paths\n\n* Release oversized event routing buffers after publish\n\n* Wait for asynchronous cleanup in TCP retention regression\n\n* Avoid temporary query values when routing strings\n\n* Validate actual collection Contains dispatch before translation\n\n* Preserve LINQ Contains dispatch when capturing queries\n\n* Read collection comparers from framework declarations\n\n* Capture inherited collection membership through framework enumerators\n\n* Preserve declared element types when capturing membership values\n\n* Preserve empty-span semantics when captured arrays are null\n\n* Stabilize literal allocation measurements after type unloading\n\n* Validate actual scalar comparison methods before translation\n\n* Reject custom boolean negation methods before operand capture\n\n* Reject reference identity comparisons against captured values\n\n* Treat runtime NaN values as unordered in query comparisons\n\n* Reuse immutable boolean query values to reduce routing allocations\n\n* Validate conversion methods before lowering event member paths\n\n* Set an explicit wall-time budget for the GameServer demo\n\n* Release completed query callbacks when disposed handles are retained\n\n* Release idle query dispatchers without weakening active subscriptions\n\n* Preserve exact enum conversions in authored queries\n\n* Support default span comparers in portable collection membership\n\n* Release collectible payload types from constructor validation caches\n\n* Release unused assemblies from generated service lookup caches\n\n* Observe handled instance disposal completion failures\n\n* Release instance references from disposed registry leases\n\n* Complete instance releases after registry cleanup\n\n* Release receiver references from disposed remote streams\n\n* Release completed remote enumeration ownership\n\n* Release completed streaming context ownership\n\n* Provide handwritten dispatchers through concrete generic calls\n\n* Release owned stream attachment sources after cleanup\n\n* Preserve unsent borrowed pipe data after send failures\n\n* Bound pipe upload chunks to the stream frame size\n\n* Keep outbound cleanup tied to its original registration\n\n* Retain attachment registration until canceled pumps finish\n\n* Preserve active attachment sources when another call fails setup\n\n* Skip negative stream IDs promptly after counter overflow\n\n* Avoid task wrappers for completed DNS results\n\n* Give worker audit fixtures time to validate covered runs\n\n* Isolate the source line guard regression fixture\n\n* Avoid allocating resolved HTTP request settings\n\n* Observe shared compilation failures after waiter cancellation\n\n* Keep cached plan metadata validation consistent\n\n* Release unused prepared plan identities from host caches\n\n* Bound prepared worker plans and release disposed cache entries\n\n* Measure steady-state field path validation allocations\n\n* Release worker host ownership when clients are disposed\n\n* Release compiler and artifact ownership when hosts are disposed\n\n* Use fixed-time comparison for execution plan seals\n\n* Avoid temporary lists during async pump cleanup\n\n* Avoid allocating async pump restoration scopes\n\n* Preserve the existing async pump factory binary contract\n\n* Release audit observers when sandbox hosts are disposed\n\n* Avoid iterator allocations when publishing audit events\n\n* Release stream chunk owners after disposal\n\n* Snapshot external audit events before validation\n\n* Snapshot audit fields before validating their values\n\n* Release configured worker clients when hosts are disposed\n\n* Observe worker failures after canceled or expired waits\n\n* Observe late DNS failures after HTTP cancellation\n\n* Snapshot DNS addresses before validation and pinning\n\n* Avoid capturing caller context in fault observers\n\n* Stabilize repeated pump disposal allocation measurements\n\n* Observe abandoned RPC response failures",
+          "timestamp": "2026-09-27T14:16:50Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/c305ecbf51992cda417b27866edbc262520fd8a0"
+        },
+        "date": 1790594117386,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.ParseFrameOnly",
+            "value": 13.922743386030197,
+            "unit": "ns",
+            "range": "± 0.023713654294633235"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.FrameRequest",
+            "value": 454.74840054512026,
+            "unit": "ns",
+            "range": "± 0.36247701156167644"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.DeserializeArgument",
+            "value": 152.46238244904413,
+            "unit": "ns",
+            "range": "± 0.36431191606083524"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: False)",
+            "value": 10317.03416748047,
+            "unit": "ns",
+            "range": "± 1449.1995601118022"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: True)",
+            "value": 8706.966723632813,
+            "unit": "ns",
+            "range": "± 1360.710534834867"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners",
+            "value": 2.8970874305814505,
+            "unit": "ns",
+            "range": "± 0.0023180180760063785"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 10)",
+            "value": 1775007.734375,
+            "unit": "ns",
+            "range": "± 75282.31014614867"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 100)",
+            "value": 50126282.355555564,
+            "unit": "ns",
+            "range": "± 179335.9682559183"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 500)",
+            "value": 1006405371.1,
+            "unit": "ns",
+            "range": "± 2358383.985689893"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.SingleStreamUpload",
+            "value": 20.92633118894365,
+            "unit": "ns",
+            "range": "± 0.06863370221022408"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.TwoStreamUpload",
+            "value": 22.7848485675123,
+            "unit": "ns",
+            "range": "± 0.11542624677901081"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.RegisterPlayerFlow",
+            "value": 17.725786838680506,
+            "unit": "ns",
+            "range": "± 0.02631326297813459"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.GetPlayerStateFlow",
+            "value": 12.851002180576325,
+            "unit": "ns",
+            "range": "± 0.10374549486911198"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MovePlayerFlow",
+            "value": 23.62422971924146,
+            "unit": "ns",
+            "range": "± 0.022483343251329457"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.PerformActionFlow",
+            "value": 19.220389646291732,
+            "unit": "ns",
+            "range": "± 0.011667703062169693"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MissingPlayerFailureFlow",
+            "value": 10.461045061548552,
+            "unit": "ns",
+            "range": "± 0.003059089146081214"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.VoidHeartbeatFlow",
+            "value": 4.259988921384017,
+            "unit": "ns",
+            "range": "± 0.018570781160342456"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.FullGameplaySessionFlow",
+            "value": 92.60342898633745,
+            "unit": "ns",
+            "range": "± 0.03756446627946028"
           }
         ]
       }
