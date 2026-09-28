@@ -12,6 +12,8 @@ internal static class CollectionScanPolicy
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string SortedDictionaryTypeName =
+        "System.Collections.Generic.SortedDictionary<TKey, TValue>";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
 
@@ -36,6 +38,8 @@ internal static class CollectionScanPolicy
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
+            (SortedDictionaryTypeName, "ContainsValue", _) =>
+                "System.Collections.Generic.SortedDictionary.ContainsValue",
             (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
             _ => null
         };
