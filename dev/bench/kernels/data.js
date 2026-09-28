@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789380717170,
+  "lastUpdate": 1790594121037,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Kernels Benchmarks": [
@@ -3640,6 +3640,526 @@ window.BENCHMARK_DATA = {
             "value": 9838943.390625,
             "unit": "ns",
             "range": "± 207167.12712727542"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c305ecbf51992cda417b27866edbc262520fd8a0",
+          "message": "Fix query correctness, allocations, validation, and resource cleanup (#1392)\n\n* Avoid registry snapshots when returning instance leases\n\n* Validate RPC stream handle envelope fields consistently\n\n* Dispose pinned HTTP transport when response cleanup fails\n\n* Remove per-comparison closures from numeric query evaluation\n\n* Validate readable query properties before reflection access\n\n* Preserve mixed numeric equality in event query routing\n\n* Preserve numeric bounds when compiling event index checks\n\n* Avoid enumerator allocations in event index matching\n\n* Isolate stream cancellation callback failures during cleanup\n\n* Preserve borrowed pipe data when a pending read is canceled\n\n* Create new Unix compiled cache roots with owner-only permissions\n\n* Defer unused host dictionaries to reduce cold-host allocations\n\n* Avoid prefix string allocations in wildcard capability matching\n\n* Avoid collection snapshots and boxing in capability checks\n\n* Reject frame size settings above the protocol maximum\n\n* Reject unsupported string comparers during query translation\n\n* Capture query collection operands once during translation\n\n* Evaluate constant conversions when translating queries\n\n* Serialize named pipe server lifecycle transitions\n\n* Validate immutable set comparers during query translation\n\n* Remove per-node scratch allocations from query validation\n\n* Validate query field paths without substring allocations\n\n* Remove boxed enumerators from interpreted query evaluation\n\n* Await queued subscription delivery in concurrency regression\n\n* Validate sorted list key-view comparers during translation\n\n* Allow asynchronous cleanup to unwind in receive retention regression\n\n* Validate comparers through nested dictionary key views\n\n* Evaluate collection conversions before translating membership\n\n* Check interleaved lifecycle assertions before expected task failure\n\n* Preserve converted span contents during query translation\n\n* Preserve boolean conversion semantics in query predicates\n\n* Validate membership comparers through framework collection wrappers\n\n* Avoid conversion exceptions for nonnumeric query values\n\n* Serialize TCP server listener startup and shutdown\n\n* Keep TCP accept cancellation scoped to its listener\n\n* Avoid numeric conversion exceptions for incompatible framework values\n\n* Preserve unobserved live update failures across flushes\n\n* Isolate numeric allocation measurements from harness optimization\n\n* Preserve exact decimal and unsigned live-setting bounds\n\n* Support inherited live-context interface properties\n\n* Release collectible live-setting types from the property cache\n\n* Release collectible host-service return types from the reader cache\n\n* Log GameServer extension failures on the server\n\n* Preserve interruption errors after successful binding audits\n\n* Release collectible event types from the capability metadata cache\n\n* Avoid task wrappers for completed void server extension calls\n\n* Reuse stateless ValueTask completions in server extension proxies\n\n* Keep caller cancellation out of GameServer failure diagnostics\n\n* Preserve GameServer failures when diagnostic output throws\n\n* Release collectible types from RPC marshalling caches\n\n* Release collectible capability parameter types from the accessor cache\n\n* Release compiled expected cache keys with their execution plans\n\n* Avoid boxing decimal capability parameters during formatting\n\n* Avoid boxing formattable capability parameter values\n\n* Resolve inherited interface properties in event query paths\n\n* Release collectible event types from shared query readers\n\n* Preserve declared event types when evaluating queries\n\n* Resolve the nearest class member in query paths\n\n* Release oversized event routing buffers after publish\n\n* Wait for asynchronous cleanup in TCP retention regression\n\n* Avoid temporary query values when routing strings\n\n* Validate actual collection Contains dispatch before translation\n\n* Preserve LINQ Contains dispatch when capturing queries\n\n* Read collection comparers from framework declarations\n\n* Capture inherited collection membership through framework enumerators\n\n* Preserve declared element types when capturing membership values\n\n* Preserve empty-span semantics when captured arrays are null\n\n* Stabilize literal allocation measurements after type unloading\n\n* Validate actual scalar comparison methods before translation\n\n* Reject custom boolean negation methods before operand capture\n\n* Reject reference identity comparisons against captured values\n\n* Treat runtime NaN values as unordered in query comparisons\n\n* Reuse immutable boolean query values to reduce routing allocations\n\n* Validate conversion methods before lowering event member paths\n\n* Set an explicit wall-time budget for the GameServer demo\n\n* Release completed query callbacks when disposed handles are retained\n\n* Release idle query dispatchers without weakening active subscriptions\n\n* Preserve exact enum conversions in authored queries\n\n* Support default span comparers in portable collection membership\n\n* Release collectible payload types from constructor validation caches\n\n* Release unused assemblies from generated service lookup caches\n\n* Observe handled instance disposal completion failures\n\n* Release instance references from disposed registry leases\n\n* Complete instance releases after registry cleanup\n\n* Release receiver references from disposed remote streams\n\n* Release completed remote enumeration ownership\n\n* Release completed streaming context ownership\n\n* Provide handwritten dispatchers through concrete generic calls\n\n* Release owned stream attachment sources after cleanup\n\n* Preserve unsent borrowed pipe data after send failures\n\n* Bound pipe upload chunks to the stream frame size\n\n* Keep outbound cleanup tied to its original registration\n\n* Retain attachment registration until canceled pumps finish\n\n* Preserve active attachment sources when another call fails setup\n\n* Skip negative stream IDs promptly after counter overflow\n\n* Avoid task wrappers for completed DNS results\n\n* Give worker audit fixtures time to validate covered runs\n\n* Isolate the source line guard regression fixture\n\n* Avoid allocating resolved HTTP request settings\n\n* Observe shared compilation failures after waiter cancellation\n\n* Keep cached plan metadata validation consistent\n\n* Release unused prepared plan identities from host caches\n\n* Bound prepared worker plans and release disposed cache entries\n\n* Measure steady-state field path validation allocations\n\n* Release worker host ownership when clients are disposed\n\n* Release compiler and artifact ownership when hosts are disposed\n\n* Use fixed-time comparison for execution plan seals\n\n* Avoid temporary lists during async pump cleanup\n\n* Avoid allocating async pump restoration scopes\n\n* Preserve the existing async pump factory binary contract\n\n* Release audit observers when sandbox hosts are disposed\n\n* Avoid iterator allocations when publishing audit events\n\n* Release stream chunk owners after disposal\n\n* Snapshot external audit events before validation\n\n* Snapshot audit fields before validating their values\n\n* Release configured worker clients when hosts are disposed\n\n* Observe worker failures after canceled or expired waits\n\n* Observe late DNS failures after HTTP cancellation\n\n* Snapshot DNS addresses before validation and pinning\n\n* Avoid capturing caller context in fault observers\n\n* Stabilize repeated pump disposal allocation measurements\n\n* Observe abandoned RPC response failures",
+          "timestamp": "2026-09-27T14:16:50Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/c305ecbf51992cda417b27866edbc262520fd8a0"
+        },
+        "date": 1790594120671,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 1)",
+            "value": 31348.287923177082,
+            "unit": "ns",
+            "range": "± 379.46758713162234"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 10)",
+            "value": 71096.41959635417,
+            "unit": "ns",
+            "range": "± 9047.51588380758"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 100)",
+            "value": 531884.6171875,
+            "unit": "ns",
+            "range": "± 59740.47677002158"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 100)",
+            "value": 3229.8834953308105,
+            "unit": "ns",
+            "range": "± 60.28931307862517"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 100)",
+            "value": 2788.5,
+            "unit": "ns",
+            "range": "± 138.33654614742989"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 1000)",
+            "value": 33487.080627441406,
+            "unit": "ns",
+            "range": "± 341.0046900375944"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 1000)",
+            "value": 3276.1666666666665,
+            "unit": "ns",
+            "range": "± 274.6094196005179"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 10000)",
+            "value": 623171.9622395834,
+            "unit": "ns",
+            "range": "± 28833.996722478267"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 10000)",
+            "value": 3549.6666666666665,
+            "unit": "ns",
+            "range": "± 357.50571091009624"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 1)",
+            "value": 54550.166666666664,
+            "unit": "ns",
+            "range": "± 3512.9284554817414"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 10)",
+            "value": 166096.83333333334,
+            "unit": "ns",
+            "range": "± 20866.557845829135"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 1000)",
+            "value": 11044428.333333334,
+            "unit": "ns",
+            "range": "± 28811.889947265405"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 1)",
+            "value": 50528.333333333336,
+            "unit": "ns",
+            "range": "± 2720.2588724849948"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 10)",
+            "value": 144249.33333333334,
+            "unit": "ns",
+            "range": "± 902.9741598369985"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 1000)",
+            "value": 11039167,
+            "unit": "ns",
+            "range": "± 46494.742294156225"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 1)",
+            "value": 62275.666666666664,
+            "unit": "ns",
+            "range": "± 7112.14780030149"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 10)",
+            "value": 170201.33333333334,
+            "unit": "ns",
+            "range": "± 22806.693016159385"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 1000)",
+            "value": 11437172,
+            "unit": "ns",
+            "range": "± 50925.31856552298"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 1)",
+            "value": 105006.16666666667,
+            "unit": "ns",
+            "range": "± 2980.843225218887"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 10)",
+            "value": 1138886.1666666667,
+            "unit": "ns",
+            "range": "± 31959.530195754338"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 1000)",
+            "value": 75102792.33333333,
+            "unit": "ns",
+            "range": "± 4352787.587709322"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterExpressionBenchmarks.ExecuteArithmeticLoopAsync(Iterations: 100)",
+            "value": 21473.18022664388,
+            "unit": "ns",
+            "range": "± 45.58627375856591"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterExpressionBenchmarks.ExecuteArithmeticLoopAsync(Iterations: 10000)",
+            "value": 59820.889404296875,
+            "unit": "ns",
+            "range": "± 459.18310924470023"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: False)",
+            "value": 9064.740854899088,
+            "unit": "ns",
+            "range": "± 1219.1499302791624"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: False)",
+            "value": 11913.570119222006,
+            "unit": "ns",
+            "range": "± 1073.596829313013"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: True)",
+            "value": 11051.635131835938,
+            "unit": "ns",
+            "range": "± 3141.8906411949147"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: True)",
+            "value": 9435.002909342447,
+            "unit": "ns",
+            "range": "± 1434.0661220169031"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: False)",
+            "value": 50138.942708333336,
+            "unit": "ns",
+            "range": "± 1625.8197517939223"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: False)",
+            "value": 62755.72273763021,
+            "unit": "ns",
+            "range": "± 4056.591642896022"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: True)",
+            "value": 57099.9619140625,
+            "unit": "ns",
+            "range": "± 5461.8802349885755"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: True)",
+            "value": 49636.88553873698,
+            "unit": "ns",
+            "range": "± 780.8032410117913"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.MessagePackPayloadBenchmarks.SerializeStructPayload",
+            "value": 42.00243051846822,
+            "unit": "ns",
+            "range": "± 0.052118209178019764"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.MessagePackPayloadBenchmarks.DeserializeStructPayload",
+            "value": 57.76503372192383,
+            "unit": "ns",
+            "range": "± 0.03693767244073413"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Int32)",
+            "value": 9.634185468157133,
+            "unit": "ns",
+            "range": "± 0.013841810170501392"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Int32)",
+            "value": 55.45896238088608,
+            "unit": "ns",
+            "range": "± 0.007614495283936561"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Int32)",
+            "value": 26.650702506303787,
+            "unit": "ns",
+            "range": "± 0.011522647344502514"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Int32)",
+            "value": 65.85247075557709,
+            "unit": "ns",
+            "range": "± 0.1648839330699926"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: String)",
+            "value": 23.007282892862957,
+            "unit": "ns",
+            "range": "± 0.12153923998581799"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: String)",
+            "value": 101.17698762814204,
+            "unit": "ns",
+            "range": "± 0.2995822075248814"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: String)",
+            "value": 54.681523551543556,
+            "unit": "ns",
+            "range": "± 0.16703670768550563"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: String)",
+            "value": 123.79492004712422,
+            "unit": "ns",
+            "range": "± 0.516132045029196"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Enum)",
+            "value": 9.651654064655304,
+            "unit": "ns",
+            "range": "± 0.004400086608884843"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Enum)",
+            "value": 54.956811825434364,
+            "unit": "ns",
+            "range": "± 0.014656643905906513"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Enum)",
+            "value": 28.09453870852788,
+            "unit": "ns",
+            "range": "± 0.017318324673348703"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Enum)",
+            "value": 62.490256110827126,
+            "unit": "ns",
+            "range": "± 0.14336326275803932"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: ListInt32)",
+            "value": 61.758234779040016,
+            "unit": "ns",
+            "range": "± 0.04157353275089906"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: ListInt32)",
+            "value": 358.9237416585286,
+            "unit": "ns",
+            "range": "± 0.7161937610403156"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: ListInt32)",
+            "value": 62.94809955358505,
+            "unit": "ns",
+            "range": "± 0.09080855501106287"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: ListInt32)",
+            "value": 457.2605136235555,
+            "unit": "ns",
+            "range": "± 0.6416699944450981"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Dto)",
+            "value": 44.1254134674867,
+            "unit": "ns",
+            "range": "± 0.10425782290783955"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Dto)",
+            "value": 226.1750034491221,
+            "unit": "ns",
+            "range": "± 1.0145408397804165"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Dto)",
+            "value": 68.70120745897293,
+            "unit": "ns",
+            "range": "± 0.08871953146310226"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Dto)",
+            "value": 277.5073978106181,
+            "unit": "ns",
+            "range": "± 1.7137204870845582"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: AnonymousDto)",
+            "value": 44.04142983754476,
+            "unit": "ns",
+            "range": "± 0.0833216995585309"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: AnonymousDto)",
+            "value": 425.34160629908246,
+            "unit": "ns",
+            "range": "± 0.6944237386515053"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: AnonymousDto)",
+            "value": 81.40841627120972,
+            "unit": "ns",
+            "range": "± 0.308921544584749"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: AnonymousDto)",
+            "value": 539.9505093892416,
+            "unit": "ns",
+            "range": "± 3.074247457224641"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: WholeEvent)",
+            "value": 50.675244212150574,
+            "unit": "ns",
+            "range": "± 0.04382723362019483"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: WholeEvent)",
+            "value": 303.5270773569743,
+            "unit": "ns",
+            "range": "± 0.13628235682991355"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: WholeEvent)",
+            "value": 57.64814803997675,
+            "unit": "ns",
+            "range": "± 0.11638547565774789"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: WholeEvent)",
+            "value": 349.27756468455,
+            "unit": "ns",
+            "range": "± 0.38142415353597026"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 100, DuplicateLiterals: False)",
+            "value": 293292.7975260417,
+            "unit": "ns",
+            "range": "± 1676.9977292508192"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 100, DuplicateLiterals: True)",
+            "value": 1366775.2057291667,
+            "unit": "ns",
+            "range": "± 40796.482767752204"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 1000, DuplicateLiterals: False)",
+            "value": 3118204.7591145835,
+            "unit": "ns",
+            "range": "± 14147.88172049113"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 1000, DuplicateLiterals: True)",
+            "value": 102686379.5,
+            "unit": "ns",
+            "range": "± 493621.3199731146"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 5000, DuplicateLiterals: False)",
+            "value": 16843914.6875,
+            "unit": "ns",
+            "range": "± 283136.7988147176"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 5000, DuplicateLiterals: True)",
+            "value": 2237352192,
+            "unit": "ns",
+            "range": "± 29926867.76916186"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 100)",
+            "value": 16687470.875,
+            "unit": "ns",
+            "range": "± 3780699.6774772783"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 1000)",
+            "value": 108996550.66666667,
+            "unit": "ns",
+            "range": "± 1630784.4299185574"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 10000)",
+            "value": 1290995460,
+            "unit": "ns",
+            "range": "± 17626649.049671665"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 10)",
+            "value": 657997.455078125,
+            "unit": "ns",
+            "range": "± 14069.859257321648"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 100)",
+            "value": 3047329.0885416665,
+            "unit": "ns",
+            "range": "± 134421.64117817403"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 500)",
+            "value": 13517763.447916666,
+            "unit": "ns",
+            "range": "± 40592.32361103394"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.OneProperty",
+            "value": 12.509993960460028,
+            "unit": "ns",
+            "range": "± 0.20578153330371682"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.FiveProperties",
+            "value": 39.12336492538452,
+            "unit": "ns",
+            "range": "± 0.290325932763594"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.TwentyProperties",
+            "value": 190.1960916519165,
+            "unit": "ns",
+            "range": "± 2.6664944533474304"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.GetSettings(Iterations: 1000)",
+            "value": 279174.48063151044,
+            "unit": "ns",
+            "range": "± 1242.889807192835"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.SetSettings(Iterations: 1000)",
+            "value": 375365.9514973958,
+            "unit": "ns",
+            "range": "± 323.5066950451386"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.GetSettings(Iterations: 100000)",
+            "value": 25185765.635416668,
+            "unit": "ns",
+            "range": "± 31934.350146016317"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.SetSettings(Iterations: 100000)",
+            "value": 36588704.76190477,
+            "unit": "ns",
+            "range": "± 91150.8096244653"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 100)",
+            "value": 111973.88346354167,
+            "unit": "ns",
+            "range": "± 469.14605696352123"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 1000)",
+            "value": 1103014.6686197917,
+            "unit": "ns",
+            "range": "± 11845.786450674694"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 10000)",
+            "value": 11902932.473958334,
+            "unit": "ns",
+            "range": "± 194603.7960445337"
           }
         ]
       }
