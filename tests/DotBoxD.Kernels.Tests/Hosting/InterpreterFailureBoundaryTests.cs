@@ -64,7 +64,7 @@ public sealed class InterpreterFailureBoundaryTests
     }
 
     [Fact]
-    public async Task Interpreter_fault_after_cancelling_caller_token_stays_cancelled()
+    public async Task Interpreter_fault_after_cancelling_caller_token_is_host_failure()
     {
         using var cancellation = new CancellationTokenSource();
         using var host = CreateHost(new CallerCancellingFaultingInterpreter(cancellation));
@@ -72,15 +72,10 @@ public sealed class InterpreterFailureBoundaryTests
 
         var result = await ExecuteAsync(host, plan, cancellation.Token);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
-        Assert.True(result.ExecutionDispatched);
-        Assert.Equal(SandboxErrorCode.Cancelled, result.Error!.Code);
-        Assert.Equal("execution cancelled", result.Error.SafeMessage);
-        AssertRunSummary(result, SandboxErrorCode.Cancelled);
+        AssertHostFailure(result);
         Assert.DoesNotContain(
             CallerCancellingFaultingInterpreter.SensitiveMessage,
-            result.Error.SafeMessage,
+            result.Error!.SafeMessage,
             StringComparison.Ordinal);
     }
 

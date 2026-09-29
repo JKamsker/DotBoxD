@@ -44,7 +44,7 @@ internal static class InterpreterExecutionBoundary
                 ? InterpreterCancellationBoundary.CancelledResult(plan, options, validatedResult)
                 : validatedResult;
         }
-        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return FailureResult(
                 plan,
