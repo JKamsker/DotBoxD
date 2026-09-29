@@ -6,6 +6,7 @@ internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
@@ -24,6 +25,12 @@ internal static class ForbiddenCollectionScanPolicy
         if (IsForbiddenListScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        if (IsForbiddenHashtableScan(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Hashtable.ContainsValue";
             return true;
         }
 
@@ -64,6 +71,9 @@ internal static class ForbiddenCollectionScanPolicy
     private static bool IsForbiddenListScan(string methodName, string typeName)
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
+
+    private static bool IsForbiddenHashtableScan(string methodName, string typeName)
+        => methodName == "ContainsValue" && string.Equals(typeName, HashtableTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&
