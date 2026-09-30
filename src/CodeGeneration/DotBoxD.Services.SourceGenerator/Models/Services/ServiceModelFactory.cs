@@ -103,6 +103,7 @@ internal static partial class ServiceModelFactory
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
         var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol, context.SemanticModel.Compilation);
+        var typeAttributePrefix = BuildTypeAttributePrefix(interfaceSymbol, experimentalAttribute.AttributePrefix, ct);
         var externAliases = new HashSet<string>(StringComparer.Ordinal);
         foreach (var method in methods)
         {
@@ -122,7 +123,7 @@ internal static partial class ServiceModelFactory
                 ExternAliases: externAliases.ToEquatableArray(),
                 RawServiceName: serviceName,
                 ObsoleteAttribute: obsoleteAttribute.Source,
-                TypeAttributePrefix: experimentalAttribute.AttributePrefix,
+                TypeAttributePrefix: typeAttributePrefix,
                 ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
