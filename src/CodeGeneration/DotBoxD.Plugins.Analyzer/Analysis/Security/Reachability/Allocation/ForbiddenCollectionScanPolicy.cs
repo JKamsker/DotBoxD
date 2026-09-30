@@ -1,18 +1,23 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionScanPolicy
 {
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string CollectionInterfaceTypeName = "System.Collections.Generic.ICollection<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string ListInterfaceTypeName = "System.Collections.Generic.IList<T>";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
+    private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
-    public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
+    public static bool TryGetDisplayName(IInvocationOperation invocation, out string forbidden)
     {
+        var method = invocation.TargetMethod;
         if (method is not { IsStatic: false, MethodKind: MethodKind.Ordinary })
         {
             forbidden = null!;
@@ -24,6 +29,12 @@ internal static class ForbiddenCollectionScanPolicy
         if (IsForbiddenListScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
+            return true;
+        }
+
+        if (IsSortedListValuesScan(method, typeName, invocation.Instance))
+        {
+            forbidden = $"System.Collections.Generic.{CollectionType(typeName)}.{method.Name}";
             return true;
         }
 
@@ -64,6 +75,28 @@ internal static class ForbiddenCollectionScanPolicy
     private static bool IsForbiddenListScan(string methodName, string typeName)
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
            string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
+
+    private static bool IsSortedListValuesScan(
+        IMethodSymbol method,
+        string typeName,
+        IOperation? instance)
+        => IsSortedListValuesScanMethod(method.Name, typeName) &&
+           instance is IPropertyReferenceOperation
+           {
+               Property.Name: "Values",
+               Property.ContainingType.OriginalDefinition: { } containingType
+           } &&
+           string.Equals(
+               containingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+               SortedListTypeName,
+               StringComparison.Ordinal);
+
+    private static bool IsSortedListValuesScanMethod(string methodName, string typeName)
+        => (methodName == "Contains" && string.Equals(typeName, CollectionInterfaceTypeName, StringComparison.Ordinal)) ||
+           (methodName == "IndexOf" && string.Equals(typeName, ListInterfaceTypeName, StringComparison.Ordinal));
+
+    private static string CollectionType(string typeName)
+        => string.Equals(typeName, ListInterfaceTypeName, StringComparison.Ordinal) ? "IList" : "ICollection";
 
     private static bool IsForbiddenSetScan(string methodName, string typeName)
         => methodName is "IsSubsetOf" or "IsProperSupersetOf" &&

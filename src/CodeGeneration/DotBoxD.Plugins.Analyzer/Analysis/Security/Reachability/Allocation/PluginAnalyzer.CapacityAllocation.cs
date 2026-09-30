@@ -30,7 +30,7 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IInvocationOperation invocation)
     {
-        if (ForbiddenCollectionScanPolicy.TryGetDisplayName(invocation.TargetMethod, out var forbidden))
+        if (ForbiddenCollectionScanPolicy.TryGetDisplayName(invocation, out var forbidden))
         {
             ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
         }
