@@ -32,6 +32,14 @@ internal static class MergeableIrStepModelFactory
                 return null;
             }
 
+            if (MergeableIrErrorObsoleteTypeValidator.TryGetUnsupportedTypeName(
+                    call,
+                    context.SemanticModel.Compilation) is { } typeName)
+            {
+                throw new NotSupportedException(
+                    $"payload type '{typeName}' is marked [Obsolete(..., error: true)]; generated mergeable IR source cannot reference compiler-error obsolete types.");
+            }
+
             return new MergeableIrStepCreateResult(
                 Create(invocation, context.SemanticModel, call, cancellationToken),
                 null);
