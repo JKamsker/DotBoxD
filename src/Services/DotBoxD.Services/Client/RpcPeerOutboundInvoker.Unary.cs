@@ -40,7 +40,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
-            return ToFaultedTask<TResponse>(ex);
+            return ToFaultedOrCanceledTask<TResponse>(ct, ex);
         }
 
         return SendFrameAndReadUnaryResponseAsync<TResponse>(
@@ -224,4 +224,7 @@ internal sealed partial class RpcPeerOutboundInvoker
 
     private static Task<T> ToFaultedTask<T>(Exception error) =>
         Task.FromException<T>(error);
+
+    private static Task<T> ToFaultedOrCanceledTask<T>(CancellationToken ct, Exception error) =>
+        ct.IsCancellationRequested ? Task.FromCanceled<T>(ct) : ToFaultedTask<T>(error);
 }
