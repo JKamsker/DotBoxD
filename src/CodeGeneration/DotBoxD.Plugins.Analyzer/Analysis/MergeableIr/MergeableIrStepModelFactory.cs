@@ -82,7 +82,7 @@ internal static class MergeableIrStepModelFactory
         var outputTag = OutputTag(call.Kind, call.OutputType);
         var irFuncType = IRFuncType(call);
         var receiverType = ReceiverType(invocation, model, cancellationToken);
-        var generatedAttributeSource = ExperimentalAttributeSource.FromTypes(
+        var generatedAttributeSource = ExperimentalAttributeSource.FromTypesWithSharedSupportedPlatform(
             receiverType,
             call.InputType,
             call.OutputType);
