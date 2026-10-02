@@ -96,7 +96,7 @@ internal static class ForbiddenCollectionScanPolicy
 
     private static bool IsForbiddenEnumerableScan(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
-           method.Name == "Contains" &&
+           method.Name is "Contains" or "Any" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenListScan(string methodName, string typeName)
