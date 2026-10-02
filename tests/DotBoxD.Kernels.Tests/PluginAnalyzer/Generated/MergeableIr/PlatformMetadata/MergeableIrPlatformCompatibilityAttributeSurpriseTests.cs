@@ -4,6 +4,63 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class MergeableIrStepGeneratorTests
 {
+    [Theory]
+    [InlineData("osx", "osx", "macos", "macos")]
+    [InlineData("macos", "macos", "OSX", "macos")]
+    [InlineData("osx10.0", "osx12.0", "macos11.0", "macos11.0")]
+    [InlineData("windows7.0", "windows10.0", "windows8.0", "windows8.0")]
+    [InlineData("windows10.0", "windows7.0", "windows8.0", "windows8.0")]
+    [InlineData("windows", "windows10.0", "windows", "windows")]
+    public void Generator_intersects_platform_aliases_and_version_ranges(
+        string firstInputPlatform,
+        string secondInputPlatform,
+        string outputPlatform,
+        string expectedPlatform)
+    {
+        var result = RunGeneratorAndAssertCompiles($$"""
+            using System;
+            using System.Runtime.Versioning;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [SupportedOSPlatform("{{firstInputPlatform}}")]
+            [SupportedOSPlatform("{{secondInputPlatform}}")]
+            public sealed record InputEvent(int Value);
+
+            [SupportedOSPlatform("{{outputPlatform}}")]
+            public sealed record OutputEvent(int Value);
+
+            public sealed class StepPipeline<T>
+            {
+                public StepPipeline<TNext> Select<TNext>(
+                    Func<T, TNext> selector,
+                    [IRBodyOf(nameof(selector))] IRFunc<T, TNext>? irSelector = null)
+                    => new();
+            }
+
+            public static class Usage
+            {
+                public static StepPipeline<OutputEvent> Configure(StepPipeline<InputEvent> pipeline)
+                    => pipeline.Select(item => new OutputEvent(item.Value));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = GeneratedSource(result);
+        var attribute = "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(\"" + expectedPlatform + "\")]";
+        Assert.Contains(
+            attribute +
+            "\n    public static global::DotBoxD.Abstractions.IRFunc<global::Sample.InputEvent, global::Sample.OutputEvent> CreateIRFunc()",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            attribute +
+            "\n        public static global::Sample.StepPipeline<global::Sample.OutputEvent> Intercept_",
+            generated,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Generator_preserves_or_rejects_platform_restricted_ir_body_signatures()
     {

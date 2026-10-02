@@ -31,6 +31,28 @@ public sealed class PluginAnalyzerForbiddenApiSortedListValuesScanReachabilityTe
         Assert.Contains(expectedApi, diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("ICollection<string> values = Retained.Values; values = new HashSet<string>();", "values", false)]
+    [InlineData("ICollection<string> values = new HashSet<string>(); values = Retained.Values;", "values", true)]
+    [InlineData("ICollection<string> values; values = Retained.Values;", "values", true)]
+    [InlineData("ICollection<string> values = Retained.Values; if (e.Length == 0) values = new HashSet<string>();", "values", true)]
+    [InlineData("ICollection<string> values = new HashSet<string>(); if (e.Length == 0) values = Retained.Values;", "values", true)]
+    [InlineData("ICollection<string> values = Retained.Values; var alias = values; values = new HashSet<string>();", "alias", true)]
+    [InlineData("ICollection<string> values = new HashSet<string>(); var alias = values; values = Retained.Values;", "alias", false)]
+    [InlineData("ICollection<string> values = new HashSet<string>(); values = Retained.Values; var alias = values; var chained = alias;", "chained", true)]
+    [InlineData("ICollection<string> values = Retained.Values; { values = new HashSet<string>(); }", "values", false)]
+    public async Task Values_origins_follow_assignments_at_the_time_of_each_read(
+        string statements, string receiver, bool reportsScan)
+    {
+        var expression = receiver + ".Contains(e)";
+        var source = Source(expression).Replace(
+            "return " + expression,
+            statements + " return " + expression,
+            StringComparison.Ordinal);
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "SortedListValuesAssignments");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
+
     [Fact]
     public async Task Does_not_report_bounded_retained_sorted_list_add_and_count_control()
     {

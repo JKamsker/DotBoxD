@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
@@ -7,9 +6,9 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class SortedListValuesOrigin
 {
     public static bool IsMatch(IOperation? receiver, Compilation compilation)
-        => IsMatch(receiver, compilation, new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+        => IsMatch(receiver, compilation, new HashSet<SyntaxNode>());
 
-    private static bool IsMatch(IOperation? receiver, Compilation compilation, HashSet<ISymbol> visited)
+    private static bool IsMatch(IOperation? receiver, Compilation compilation, HashSet<SyntaxNode> visited)
     {
         while (receiver is IConversionOperation conversion)
         {
@@ -24,20 +23,17 @@ internal static class SortedListValuesOrigin
                    "System.Collections.Generic.SortedList<TKey, TValue>";
         }
 
-        if (receiver is not ILocalReferenceOperation local || !visited.Add(local.Local))
+        if (receiver is not ILocalReferenceOperation local || !visited.Add(local.Syntax))
         {
             return false;
         }
 
-        foreach (var reference in local.Local.DeclaringSyntaxReferences)
+        foreach (var value in LocalValueOrigins.GetValues(local, compilation))
         {
-            if (reference.GetSyntax() is VariableDeclaratorSyntax { Initializer.Value: { } value })
+            var origin = compilation.GetSemanticModel(value.SyntaxTree).GetOperation(value);
+            if (IsMatch(origin, compilation, visited))
             {
-                var initializer = compilation.GetSemanticModel(value.SyntaxTree).GetOperation(value);
-                if (IsMatch(initializer, compilation, visited))
-                {
-                    return true;
-                }
+                return true;
             }
         }
 

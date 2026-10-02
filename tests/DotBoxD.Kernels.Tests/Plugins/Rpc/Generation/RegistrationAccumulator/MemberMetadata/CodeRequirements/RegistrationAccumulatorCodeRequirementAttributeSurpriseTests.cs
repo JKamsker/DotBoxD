@@ -17,6 +17,37 @@ public sealed class RegistrationAccumulatorCodeRequirementAttributeSurpriseTests
     private const string RequiresAssemblyFiles =
         "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"Assembly-files contract\", Url = \"https://example.test/assembly-files\")]";
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("(Url = \"https://example.test/assembly-files\")")]
+    public void Generated_accumulators_preserve_parameterless_assembly_file_requirements(
+        string arguments)
+    {
+        var result = RunGenerator($$"""
+            using System.Diagnostics.CodeAnalysis;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationAccumulator("RegistrationAccumulator", "Replace")]
+            internal sealed class RegistrationControl
+            {
+                [RequiresAssemblyFiles{{arguments}}]
+                public ValueTask<string> Replace<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => ValueTask.FromResult("registered");
+            }
+            """);
+
+        Assert.Contains(
+            "    [global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute" + arguments + "]\n" +
+            "    public RegistrationAccumulator Replace<TService, TKernel>()",
+            NormalizeLineEndings(GeneratedSource(result, "RegistrationAccumulator")),
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Generated_accumulators_preserve_genuine_code_requirement_contracts()
     {

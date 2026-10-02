@@ -151,7 +151,8 @@ internal static class ExperimentalAttributeSource
             }
 
             var platform = new PlatformSupport(name);
-            if (!platforms.TryGetValue(platform.Family, out var existing) || platform.IsMoreRestrictiveThan(existing))
+            // Repeated support annotations on one type start at the earliest version.
+            if (!platforms.TryGetValue(platform.Family, out var existing) || existing.IsMoreRestrictiveThan(platform))
             {
                 platforms[platform.Family] = platform;
             }
@@ -250,9 +251,10 @@ internal static class ExperimentalAttributeSource
     {
         public PlatformSupport(string name)
         {
-            Name = name;
             var versionStart = name.TakeWhile(static character => !char.IsDigit(character)).Count();
-            Family = name.Substring(0, versionStart);
+            var family = name.Substring(0, versionStart);
+            Family = string.Equals(family, "osx", StringComparison.OrdinalIgnoreCase) ? "macos" : family;
+            Name = Family + name.Substring(versionStart);
             Version = versionStart == name.Length || !System.Version.TryParse(name.Substring(versionStart), out var version)
                 ? null
                 : version;

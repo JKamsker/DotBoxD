@@ -18,14 +18,23 @@ internal static class CodeRequirementAttributeSourceFactory
         Dictionary<INamedTypeSymbol, string> codeRequirementAttributes)
     {
         if (attribute.AttributeClass is not { } attributeClass ||
-            !codeRequirementAttributes.TryGetValue(attributeClass, out var attributeName) ||
-            attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string message)
+            !codeRequirementAttributes.TryGetValue(attributeClass, out var attributeName))
         {
             return null;
         }
 
-        var arguments = new List<string> { LiteralReader.StringLiteral(message) };
+        var arguments = new List<string>();
+        if (attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0].Value is string message)
+        {
+            arguments.Add(LiteralReader.StringLiteral(message));
+        }
+        else if (attribute.ConstructorArguments.Length != 0 ||
+                 attributeName != "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute")
+        {
+            return null;
+        }
+
         foreach (var argument in attribute.NamedArguments)
         {
             if (argument is { Key: "Url", Value.Value: string url })
@@ -34,7 +43,9 @@ internal static class CodeRequirementAttributeSourceFactory
             }
         }
 
-        return "[" + attributeName + "(" + string.Join(", ", arguments) + ")]";
+        return arguments.Count == 0
+            ? "[" + attributeName + "]"
+            : "[" + attributeName + "(" + string.Join(", ", arguments) + ")]";
     }
 
     private static void Add(

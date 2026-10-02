@@ -144,7 +144,13 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     // Cancel invokes user callbacks synchronously before DisposeAsync first yields.
     // A dedicated thread prevents a blocking callback from occupying a frame-processing or pool thread.
-    public void DisposeInBackground() =>
+    public void DisposeInBackground()
+    {
+        if (IsEmpty || Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
         _ = Task.Factory.StartNew(
             async () =>
             {
@@ -160,6 +166,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             CancellationToken.None,
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default).Unwrap();
+    }
 
     private Task[]? GetTasksOrClaimUnstartedForDispose()
     {

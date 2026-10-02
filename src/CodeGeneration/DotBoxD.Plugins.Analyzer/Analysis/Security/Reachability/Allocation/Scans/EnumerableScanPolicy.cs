@@ -51,7 +51,9 @@ internal static class EnumerableScanPolicy
     private static bool HasBoundedCount(string typeName)
         => typeName is "System.Collections.Generic.List<T>" or "System.Collections.Generic.HashSet<T>" or
             "System.Collections.Generic.SortedSet<T>" or "System.Collections.Generic.Dictionary<TKey, TValue>" or
-            "System.Collections.Generic.SortedList<TKey, TValue>";
+            "System.Collections.Generic.SortedList<TKey, TValue>" or "System.Collections.Generic.Queue<T>" or
+            "System.Collections.Generic.Stack<T>" or "System.Collections.Generic.LinkedList<T>" or
+            "System.Collections.Generic.SortedDictionary<TKey, TValue>";
 
     private static bool HasBoundedContains(string typeName)
         => typeName is "System.Collections.Generic.HashSet<T>" or "System.Collections.Generic.SortedSet<T>";

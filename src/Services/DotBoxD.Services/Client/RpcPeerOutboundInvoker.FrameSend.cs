@@ -107,7 +107,16 @@ internal sealed partial class RpcPeerOutboundInvoker
             ReleasePendingSlot();
             if (!consumed)
             {
-                await outboundStreams.DisposeAsync().ConfigureAwait(false);
+                if (requestSent)
+                {
+                    // A running source's cancellation callback can join this invocation.
+                    // Let its failure complete before waiting for source cleanup.
+                    outboundStreams.DisposeInBackground();
+                }
+                else
+                {
+                    await outboundStreams.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
     }
