@@ -1,6 +1,5 @@
 {
   "stryker-config": {
-    "solution": "../../../DotBoxD.slnx",
     "project": "DotBoxD.Codecs.MessagePack.csproj",
     "test-projects": [
       "../../../tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj"
@@ -15,6 +14,7 @@
     ],
     "reporters": ["progress", "html", "json", "markdown"],
     "concurrency": 2,
-    "thresholds": { "high": 80, "low": 70, "break": 0 }
+    "thresholds": { "high": 90, "low": 80, "break": 80 },
+    "test-case-filter": "FullyQualifiedName~Protocol|FullyQualifiedName~Tests.Fuzz|FullyQualifiedName~SerializationCoverage|FullyQualifiedName~RpcEnvelope"
   }
 }

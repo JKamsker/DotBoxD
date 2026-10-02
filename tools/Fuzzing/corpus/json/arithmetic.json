@@ -1,0 +1,1 @@
+{"id":"arithmetic","version":"1.0.0","functions":[{"id":"main","visibility":"entrypoint","parameters":[{"name":"x","type":"I32"}],"returnType":"I32","body":[{"op":"return","value":{"op":"add","left":{"var":"x"},"right":{"i32":2147483647}}}]}]}

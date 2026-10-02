@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "project": "DotBoxD.Kernels.Serialization.Json.csproj",
+    "test-projects": [
+      "../../../tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj"
+    ],
+    "configuration": "Release",
+    "target-framework": "net10.0",
+    "test-case-filter": "FullyQualifiedName~JsonBudget|FullyQualifiedName~JsonAggregateBudget|FullyQualifiedName~JsonImporterBudget|FullyQualifiedName~JsonEscapedUnicode|FullyQualifiedName~JsonExporter",
+    "mutation-level": "standard",
+    "mutate": [
+      "Internal/JsonImportBudgetGuard.cs",
+      "Internal/JsonStringSafety.cs",
+      "Internal/JsonEscapedStringValidator.cs"
+    ],
+    "reporters": ["progress", "html", "json", "markdown"],
+    "concurrency": 2,
+    "thresholds": { "high": 90, "low": 80, "break": 80 }
+  }
+}

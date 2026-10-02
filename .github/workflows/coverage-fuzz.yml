@@ -4,20 +4,64 @@ on:
   schedule:
     - cron: '37 3 * * 6'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/Fuzzing/**'
+      - 'src/Kernels/DotBoxD.Kernels.Serialization.Json/**'
+      - 'src/Kernels/DotBoxD.Kernels.Verifier/**'
+      - 'src/Services/DotBoxD.Services/Protocol/**'
+      - 'src/Channels/DotBoxD.Codecs.MessagePack/**'
+      - '.github/workflows/coverage-fuzz.yml'
+      - 'eng/scripts/check-fuzz-findings.sh'
 
 permissions:
   contents: read
 
+concurrency:
+  group: coverage-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  replay:
+    name: Replay fuzz corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Test findings gate
+        run: bash tools/Fuzzing/test-findings-gate.sh
+      - name: Build and replay all targets without instrumentation
+        shell: bash
+        run: |
+          dotnet publish tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj -c Release -o artifacts/fuzz/app
+          cp -r tools/Fuzzing/corpus artifacts/fuzz/corpus
+          dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll --write-corpus artifacts/fuzz/corpus
+          for target in json verifier framing messagepack-request messagepack-response; do
+            dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll "$target" --replay "artifacts/fuzz/corpus/$target"
+          done
+
   sharpfuzz:
     name: SharpFuzz (${{ matrix.target }})
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        target: [json, verifier]
+        include:
+          - target: json
+            assembly: DotBoxD.Kernels.Serialization.Json
+          - target: verifier
+            assembly: DotBoxD.Kernels.Verifier
+          - target: framing
+            assembly: DotBoxD.Services
+          - target: messagepack-request
+            assembly: DotBoxD.Codecs.MessagePack
+          - target: messagepack-response
+            assembly: DotBoxD.Codecs.MessagePack
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -28,24 +72,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes afl++
           dotnet tool install --global SharpFuzz.CommandLine --version 2.3.0
-      - name: Build and instrument harness
+      - name: Build, seed, and instrument target library
         run: |
           dotnet publish tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj -c Release -o artifacts/fuzz/app
-          sharpfuzz artifacts/fuzz/app/DotBoxD.Fuzzing.dll
+          cp -r tools/Fuzzing/corpus artifacts/fuzz/corpus
+          dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll --write-corpus artifacts/fuzz/corpus
+          sharpfuzz artifacts/fuzz/app/${{ matrix.assembly }}.dll
+          mkdir -p artifacts/fuzz/findings
       - name: Fuzz for five minutes
         env:
           AFL_SKIP_CPUFREQ: '1'
           AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: '1'
+          AFL_NO_UI: '1'
+          AFL_SKIP_BIN_CHECK: '1'
         run: >-
-          afl-fuzz -V 300
-          -i tools/Fuzzing/corpus/${{ matrix.target }}
+          afl-fuzz -m none -t 5000 -V 300
+          -i artifacts/fuzz/corpus/${{ matrix.target }}
           -o artifacts/fuzz/findings/${{ matrix.target }}
           -- dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll ${{ matrix.target }}
+      - name: Require completed run without crashes or hangs
+        if: always()
+        run: bash eng/scripts/check-fuzz-findings.sh artifacts/fuzz/findings/${{ matrix.target }}
       - name: Minimize crashes and hangs
+        timeout-minutes: 2
         if: always()
         shell: bash
+        env:
+          AFL_SKIP_BIN_CHECK: '1'
+          AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: '1'
         run: |
-          set -u
+          set -euo pipefail
           source_root="artifacts/fuzz/findings/${{ matrix.target }}/default"
           output_root="artifacts/fuzz/minimized/${{ matrix.target }}"
           mkdir -p "$output_root"
@@ -55,11 +111,14 @@ jobs:
             for input in "$input_dir"/id:*; do
               [[ -f "$input" ]] || continue
               output="$output_root/${category}-$(basename "$input")"
-              afl-tmin -i "$input" -o "$output" -- \
+              # Preserve the original when minimization times out or cannot reproduce.
+              mode=()
+              [[ "$category" != hangs ]] || mode=(-H)
+              timeout 30s afl-tmin "${mode[@]}" -m none -t 5000 -i "$input" -o "$output" -- \
                 dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll ${{ matrix.target }} || cp "$input" "$output"
             done
           done
-      - name: Upload minimized findings
+      - name: Upload findings and statistics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

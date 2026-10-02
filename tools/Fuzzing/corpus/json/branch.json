@@ -1,0 +1,1 @@
+{"id":"branch","version":"1.0.0","metadata":{"unicode":"世界🚀","empty":""},"functions":[{"id":"main","visibility":"entrypoint","parameters":[],"returnType":"String","body":[{"op":"if","condition":{"bool":true},"then":[{"op":"return","value":{"string":"yes"}}],"else":[{"op":"return","value":{"string":"no"}}]}]}]}

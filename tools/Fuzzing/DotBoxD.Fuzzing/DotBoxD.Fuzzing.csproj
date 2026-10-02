@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SharpFuzz" />
+    <ProjectReference Include="../../../src/Channels/DotBoxD.Codecs.MessagePack/DotBoxD.Codecs.MessagePack.csproj" />
     <ProjectReference Include="..\..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
     <ProjectReference Include="..\..\..\src\Kernels\DotBoxD.Kernels.Verifier\DotBoxD.Kernels.Verifier.csproj" />
   </ItemGroup>

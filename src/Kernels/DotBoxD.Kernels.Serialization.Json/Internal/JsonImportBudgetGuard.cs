@@ -79,6 +79,10 @@ internal static class JsonImportBudgetGuard
             }
 
             HandleToken(reader.TokenType, reader.ValueSpan.Length, stack, ref depth, ref totalStringBytes);
+            if (reader.TokenType is JsonTokenType.String or JsonTokenType.PropertyName)
+            {
+                JsonEscapedStringValidator.Validate(ref reader);
+            }
         }
     }
 
