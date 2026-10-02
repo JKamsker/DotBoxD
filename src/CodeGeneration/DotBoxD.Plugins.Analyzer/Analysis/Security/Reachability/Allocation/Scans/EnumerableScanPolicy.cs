@@ -48,7 +48,7 @@ internal static class EnumerableScanPolicy
         }
 
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        return IsBoundedFrameworkCall(method, name);
+        return IsBoundedFrameworkCall(method, source, name);
     }
 
     private static bool HasCompatibleCollectionElementType(IMethodSymbol method, IOperation? source)
@@ -57,6 +57,13 @@ internal static class EnumerableScanPolicy
                interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_ICollection_T &&
                FrameworkCollectionIdentity.IsFrameworkType(interfaceType) &&
                SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], method.TypeArguments[0]));
+
+    private static bool HasCompatibleCountFastPath(IMethodSymbol method, IOperation? source)
+        => HasCompatibleCollectionElementType(method, source) ||
+           source?.Type is INamedTypeSymbol type && type.AllInterfaces.Any(interfaceType =>
+               FrameworkCollectionIdentity.IsFrameworkType(interfaceType) &&
+               interfaceType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ==
+               "System.Collections.ICollection");
 
     private static bool IsBoundedSortedListContains(IMethodSymbol method, IOperation? source)
         => method.Name == "Contains" && method.Parameters.Length == 2 &&
@@ -68,10 +75,11 @@ internal static class EnumerableScanPolicy
            property.Property.ContainingType.OriginalDefinition.ToDisplayString(
                SymbolDisplayFormat.CSharpErrorMessageFormat) == "System.Collections.Generic.SortedList<TKey, TValue>";
 
-    private static bool IsBoundedFrameworkCall(IMethodSymbol method, string name)
+    private static bool IsBoundedFrameworkCall(IMethodSymbol method, IOperation? source, string name)
         => method.Name switch
         {
-            "Any" when method.Parameters.Length == 1 => HasBoundedCount(name),
+            "Any" when method.Parameters.Length == 1 =>
+                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             _ => false
         };

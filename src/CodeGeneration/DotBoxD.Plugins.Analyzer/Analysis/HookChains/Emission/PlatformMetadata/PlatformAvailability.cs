@@ -35,6 +35,11 @@ internal sealed class PlatformAvailability
             boundaries.Add(annotation.Boundary);
         }
 
+        return FromBoundaries(annotations);
+    }
+
+    public static PlatformAvailability FromBoundaries(Dictionary<string, List<PlatformBoundary>> annotations)
+    {
         // The platform analyzer combines implied iOS boundaries with any explicit
         // MacCatalyst annotations before choosing the earliest support/removal versions.
         if (annotations.TryGetValue("ios", out var ios))

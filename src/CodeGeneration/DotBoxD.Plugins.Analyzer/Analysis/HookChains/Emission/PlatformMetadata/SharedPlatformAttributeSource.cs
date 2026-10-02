@@ -19,6 +19,7 @@ internal static class SharedPlatformAttributeSource
 
         var supportsUnlisted = policies.All(static policy => policy.SupportsUnlistedPlatforms);
         var attributes = new List<string>();
+        var emittedBoundaries = new Dictionary<string, List<PlatformBoundary>>(StringComparer.OrdinalIgnoreCase);
         var hasSupportedPlatform = supportsUnlisted;
         var families = policies.SelectMany(static policy => policy.Families)
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static family => family, StringComparer.Ordinal);
@@ -29,6 +30,10 @@ internal static class SharedPlatformAttributeSource
             hasSupportedPlatform |= boundaries.Any(static boundary => boundary.Supported);
             ValidateRepresentable(boundaries);
             attributes.AddRange(boundaries.Select(boundary => Format(family, boundary)));
+            if (boundaries.Count > 0)
+            {
+                emittedBoundaries.Add(family, boundaries);
+            }
         }
 
         if (!hasSupportedPlatform)
@@ -36,7 +41,29 @@ internal static class SharedPlatformAttributeSource
             throw new NotSupportedException("the receiver, input, and output types do not share a supported platform.");
         }
 
+        ValidateImpliedMacCatalystSupport(policies, emittedBoundaries);
         return attributes;
+    }
+
+    private static void ValidateImpliedMacCatalystSupport(
+        IReadOnlyList<PlatformAvailability> policies,
+        Dictionary<string, List<PlatformBoundary>> emittedBoundaries)
+    {
+        if (!emittedBoundaries.ContainsKey("ios"))
+        {
+            return;
+        }
+
+        var emitted = PlatformAvailability.FromBoundaries(emittedBoundaries);
+        var versions = policies.SelectMany(static policy => policy.Boundaries("maccatalyst"))
+            .Concat(emitted.Boundaries("maccatalyst"))
+            .Select(static boundary => boundary.Version).Append(PlatformBoundary.Zero).Distinct();
+        if (versions.Any(version => emitted.Supports("maccatalyst", version) !=
+            policies.All(policy => policy.Supports("maccatalyst", version))))
+        {
+            throw new NotSupportedException(
+                "the shared platform availability cannot represent MacCatalyst support alongside implied iOS support.");
+        }
     }
 
     private static void PreserveMacCatalystExclusion(

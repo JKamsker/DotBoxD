@@ -5,6 +5,36 @@ public sealed class EnumerableBoundedCollectionTests
     [Theory]
     [InlineData("HashSet<string>", "Values", "string", false)]
     [InlineData("HashSet<string>", "Values", "object", true)]
+    [InlineData("List<string>", "Values", "string", false)]
+    [InlineData("List<string>", "Values", "object", false)]
+    [InlineData("Dictionary<string, string>", "Values.Keys", "object", false)]
+    [InlineData("Dictionary<string, string>", "Values.Values", "object", false)]
+    [InlineData("SortedList<string, string>", "Values.Keys", "object", false)]
+    [InlineData("SortedList<string, string>", "Values.Values", "object", false)]
+    public async Task Any_fast_path_requires_compatible_generic_or_nongeneric_collection(
+        string collectionType, string sourceExpression, string elementType, bool reportsScan)
+    {
+        var source = $$"""
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("bounded-any-element-type")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly {{collectionType}} Values = new();
+                public bool ShouldHandle(string e, HookContext context)
+                    => Enumerable.Any<{{elementType}}>({{sourceExpression}});
+                public void Handle(string e, HookContext context) { }
+            }
+            """;
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedAnyElementType");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
+
+    [Theory]
+    [InlineData("HashSet<string>", "Values", "string", false)]
+    [InlineData("HashSet<string>", "Values", "object", true)]
     [InlineData("SortedSet<string>", "Values", "string", false)]
     [InlineData("SortedSet<string>", "Values", "object", true)]
     [InlineData("Dictionary<string, int>", "Values.Keys", "string", false)]

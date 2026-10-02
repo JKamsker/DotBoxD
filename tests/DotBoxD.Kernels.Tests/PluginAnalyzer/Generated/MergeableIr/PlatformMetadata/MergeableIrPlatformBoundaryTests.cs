@@ -15,6 +15,10 @@ public sealed partial class MergeableIrStepGeneratorTests
         "[SupportedOSPlatform(\"ios15.0\")]", "maccatalyst15.0")]
     [InlineData("[SupportedOSPlatform(\"ios\")][SupportedOSPlatform(\"maccatalyst15.0\")]",
         "[SupportedOSPlatform(\"maccatalyst14.0\")]", "maccatalyst14.0")]
+    [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
+        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst15.0\")]", "maccatalyst16.0")]
+    [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
+        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst16.0\")]", "maccatalyst16.0")]
     public void Generator_intersects_denylist_and_implied_platform_support(
         string inputAttributes,
         string outputAttributes,
@@ -102,6 +106,9 @@ public sealed partial class MergeableIrStepGeneratorTests
         "[SupportedOSPlatform(\"maccatalyst12.0\")]", "do not share a supported platform")]
     [InlineData("[SupportedOSPlatform(\"windows10.0\")][UnsupportedOSPlatform(\"windows10.0\")]",
         "", "do not share a supported platform")]
+    [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
+        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst17.0\")]",
+        "cannot represent MacCatalyst support alongside implied iOS support")]
     public void Generator_rejects_empty_or_unrepresentable_platform_intersections(
         string inputAttributes,
         string outputAttributes,
