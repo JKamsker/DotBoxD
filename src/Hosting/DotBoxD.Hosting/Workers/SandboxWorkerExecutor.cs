@@ -74,7 +74,16 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
                     WorkerCancellationOrTimeoutError(cancellationToken));
             }
 
-            return SandboxWorkerResultValidator.Validate(plan, entrypoint, options, result, out var error)
+            var resultIsValid = SandboxWorkerResultValidator.Validate(plan, entrypoint, options, result, out var error);
+            if (timeout.IsCancellationRequested)
+            {
+                return Execution.SandboxHost.WorkerIsolationFailedResult(
+                    plan,
+                    options,
+                    WorkerCancellationOrTimeoutError(cancellationToken));
+            }
+
+            return resultIsValid
                 ? result with
                 {
                     AuditEvents = result.AuditEvents.ToSequencedArray(),
