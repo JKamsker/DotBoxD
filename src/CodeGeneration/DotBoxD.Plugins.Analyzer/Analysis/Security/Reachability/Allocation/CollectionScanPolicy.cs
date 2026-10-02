@@ -19,7 +19,9 @@ internal static class CollectionScanPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
-        forbidden = method.IsStatic ? null! : GetDisplayName(method, typeName)!;
+        forbidden = method.IsStatic || !FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType)
+            ? null!
+            : GetDisplayName(method, typeName)!;
         return forbidden is not null;
     }
 

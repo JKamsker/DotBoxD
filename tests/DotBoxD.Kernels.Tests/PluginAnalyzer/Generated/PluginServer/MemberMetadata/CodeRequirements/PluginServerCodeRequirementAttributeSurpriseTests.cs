@@ -42,6 +42,27 @@ public sealed class PluginServerCodeRequirementAttributeSurpriseTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generated_plugin_server_ignores_source_defined_code_requirement_lookalikes()
+    {
+        var source = ServerSource + """
+
+            namespace System.Diagnostics.CodeAnalysis
+            {
+                public sealed class RequiresDynamicCodeAttribute : System.Attribute
+                {
+                    public RequiresDynamicCodeAttribute(string message) { }
+                    public string? Url { get; set; }
+                }
+            }
+            """;
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(source);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.DoesNotContain("[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute", generated, StringComparison.Ordinal);
+        Assert.Contains("[global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute", generated, StringComparison.Ordinal);
+    }
+
     private const string RootAttributes =
         "    [global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute]\n" +
         "    [global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"root dynamic-code requirement\", Url = \"https://example.invalid/root-dynamic\")]\n" +

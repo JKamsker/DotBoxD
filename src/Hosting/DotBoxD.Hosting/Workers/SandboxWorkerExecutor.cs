@@ -94,6 +94,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
         }
         catch (Exception) when (timeout.IsCancellationRequested)
         {
+            ObserveLateFailure(pending);
             return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,

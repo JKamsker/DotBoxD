@@ -5,7 +5,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionScanPolicy
 {
-    private const string EnumerableTypeName = "System.Linq.Enumerable";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string CollectionInterfaceTypeName = "System.Collections.Generic.ICollection<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
@@ -13,18 +12,22 @@ internal static class ForbiddenCollectionScanPolicy
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string ListInterfaceTypeName = "System.Collections.Generic.IList<T>";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
-    private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
-    private const string SortedSetMetadataName = "System.Collections.Generic.SortedSet`1";
     private const string SetInterfaceTypeName = "System.Collections.Generic.ISet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IInvocationOperation invocation, Compilation compilation, out string forbidden)
     {
         var method = invocation.TargetMethod;
+        if (!FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType))
+        {
+            forbidden = null!;
+            return false;
+        }
+
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (IsForbiddenEnumerableScan(method, typeName))
+        if (EnumerableScanPolicy.IsScan(invocation, typeName))
         {
             forbidden = $"System.Linq.Enumerable.{method.Name}";
             return true;
@@ -54,13 +57,13 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsSortedListValuesScan(method, typeName, invocation.Instance))
+        if (IsSortedListValuesScan(method, typeName, invocation.Instance, compilation))
         {
             forbidden = $"System.Collections.Generic.{CollectionType(typeName)}.{method.Name}";
             return true;
         }
 
-        if (TryGetSetDisplayName(method, compilation, typeName, out forbidden))
+        if (TryGetSetDisplayName(method, typeName, out forbidden))
         {
             return true;
         }
@@ -77,7 +80,6 @@ internal static class ForbiddenCollectionScanPolicy
 
     private static bool TryGetSetDisplayName(
         IMethodSymbol method,
-        Compilation compilation,
         string typeName,
         out string forbidden)
     {
@@ -99,7 +101,7 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
-        if (IsSetProperSubsetOf(method, compilation, typeName))
+        if (IsSetProperSubsetOf(method, typeName))
         {
             forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.IsProperSubsetOf";
             return true;
@@ -108,11 +110,6 @@ internal static class ForbiddenCollectionScanPolicy
         forbidden = null!;
         return false;
     }
-
-    private static bool IsForbiddenEnumerableScan(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
-           method.Name is "Contains" or "Any" &&
-           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenListScan(string methodName, string typeName)
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
@@ -128,17 +125,10 @@ internal static class ForbiddenCollectionScanPolicy
     private static bool IsSortedListValuesScan(
         IMethodSymbol method,
         string typeName,
-        IOperation? instance)
+        IOperation? instance,
+        Compilation compilation)
         => IsSortedListValuesScanMethod(method.Name, typeName) &&
-           instance is IPropertyReferenceOperation
-           {
-               Property.Name: "Values",
-               Property.ContainingType.OriginalDefinition: { } containingType
-           } &&
-           string.Equals(
-               containingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-               SortedListTypeName,
-               StringComparison.Ordinal);
+           SortedListValuesOrigin.IsMatch(instance, compilation);
 
     private static bool IsSortedListValuesScanMethod(string methodName, string typeName)
         => (methodName == "Contains" && string.Equals(typeName, CollectionInterfaceTypeName, StringComparison.Ordinal)) ||
@@ -173,26 +163,12 @@ internal static class ForbiddenCollectionScanPolicy
             _ => "HashSet",
         };
 
-    private static bool IsSetProperSubsetOf(IMethodSymbol method, Compilation compilation, string typeName)
+    private static bool IsSetProperSubsetOf(IMethodSymbol method, string typeName)
         => method.Name == "IsProperSubsetOf" &&
            (string.Equals(typeName, HashSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, ReadOnlySetInterfaceTypeName, StringComparison.Ordinal) ||
-            IsFrameworkSortedSet(method.ContainingType, compilation) ||
+            string.Equals(typeName, SortedSetTypeName, StringComparison.Ordinal) ||
             string.Equals(typeName, SetInterfaceTypeName, StringComparison.Ordinal));
-
-    private static bool IsFrameworkSortedSet(INamedTypeSymbol type, Compilation compilation)
-    {
-        var frameworkAssembly = compilation.References
-            .Select(compilation.GetAssemblyOrModuleSymbol)
-            .OfType<IAssemblySymbol>()
-            .FirstOrDefault(assembly => string.Equals(
-                assembly.Identity.Name,
-                "System.Collections",
-                StringComparison.Ordinal));
-        var frameworkSortedSet = frameworkAssembly?.GetTypeByMetadataName(SortedSetMetadataName);
-        return frameworkSortedSet is not null &&
-               SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, frameworkSortedSet);
-    }
 
     private static bool IsStackTrimExcess(string methodName, string typeName)
         => methodName == "TrimExcess" && string.Equals(typeName, StackTypeName, StringComparison.Ordinal);

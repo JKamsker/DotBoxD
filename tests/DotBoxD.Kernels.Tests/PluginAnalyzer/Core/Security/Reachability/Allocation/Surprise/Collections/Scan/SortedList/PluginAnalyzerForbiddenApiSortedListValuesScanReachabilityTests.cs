@@ -17,6 +17,20 @@ public sealed class PluginAnalyzerForbiddenApiSortedListValuesScanReachabilityTe
         Assert.Contains(expectedApi, diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("values.Contains(\"missing\")", "System.Collections.Generic.ICollection.Contains")]
+    [InlineData("alias.IndexOf(\"missing\") >= 0", "System.Collections.Generic.IList.IndexOf")]
+    public async Task Reports_values_scan_through_local_alias(string expression, string expectedApi)
+    {
+        var source = Source(expression).Replace(
+            "return " + expression,
+            "var values = Retained.Values; var alias = values; return " + expression,
+            StringComparison.Ordinal);
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "SortedListValuesAlias");
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains(expectedApi, diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Does_not_report_bounded_retained_sorted_list_add_and_count_control()
     {
