@@ -26,6 +26,11 @@ internal static class EnumerableScanPolicy
 
     private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
     {
+        if (method.Name == "Contains" && !HasCompatibleCollectionElementType(method, source))
+        {
+            return false;
+        }
+
         if (method.Name == "Any" && method.Parameters.Length == 1 &&
             (source?.Type is IArrayTypeSymbol || IsSortedListView(source)))
         {
@@ -45,6 +50,13 @@ internal static class EnumerableScanPolicy
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return IsBoundedFrameworkCall(method, name);
     }
+
+    private static bool HasCompatibleCollectionElementType(IMethodSymbol method, IOperation? source)
+        => source?.Type is INamedTypeSymbol type &&
+           type.AllInterfaces.Any(interfaceType =>
+               interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_ICollection_T &&
+               FrameworkCollectionIdentity.IsFrameworkType(interfaceType) &&
+               SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], method.TypeArguments[0]));
 
     private static bool IsBoundedSortedListContains(IMethodSymbol method, IOperation? source)
         => method.Name == "Contains" && method.Parameters.Length == 2 &&

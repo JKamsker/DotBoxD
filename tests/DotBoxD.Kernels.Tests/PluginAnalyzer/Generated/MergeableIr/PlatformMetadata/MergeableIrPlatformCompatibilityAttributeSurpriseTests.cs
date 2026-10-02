@@ -5,6 +5,54 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed partial class MergeableIrStepGeneratorTests
 {
     [Theory]
+    [InlineData("\"https://example.invalid/replacement\"")]
+    [InlineData("null")]
+    public void Generator_preserves_platform_obsoletion_url(string urlLiteral)
+    {
+        var result = RunGeneratorAndAssertCompiles($$"""
+            using System;
+            using System.Runtime.Versioning;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ObsoletedOSPlatform("windows10.0", "use replacement", Url = {{urlLiteral}})]
+            public sealed record InputEvent(int Value);
+
+            public sealed record OutputEvent(int Value);
+
+            public sealed class StepPipeline<T>
+            {
+                public StepPipeline<TNext> Select<TNext>(
+                    Func<T, TNext> selector,
+                    [IRBodyOf(nameof(selector))] IRFunc<T, TNext>? irSelector = null)
+                    => new();
+            }
+
+            public static class Usage
+            {
+                public static StepPipeline<OutputEvent> Configure(StepPipeline<InputEvent> pipeline)
+                    => pipeline.Select(item => new OutputEvent(item.Value));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = GeneratedSource(result);
+        var attribute = "[global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute(\"windows10.0\", \"use replacement\", Url = " +
+            urlLiteral + ")]";
+        Assert.Contains(
+            attribute +
+            "\n    public static global::DotBoxD.Abstractions.IRFunc<global::Sample.InputEvent, global::Sample.OutputEvent> CreateIRFunc()",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            attribute +
+            "\n        public static global::Sample.StepPipeline<global::Sample.OutputEvent> Intercept_",
+            generated,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("osx", "osx", "macos", "macos")]
     [InlineData("macos", "macos", "OSX", "macos")]
     [InlineData("osx10.0", "osx12.0", "macos11.0", "macos11.0")]

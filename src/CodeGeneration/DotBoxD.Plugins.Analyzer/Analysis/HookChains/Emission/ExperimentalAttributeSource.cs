@@ -149,6 +149,9 @@ internal static class ExperimentalAttributeSource
         var arguments = string.Join(
             ", ",
             attribute.ConstructorArguments.Select(argument => LiteralReader.StringLiteral((string)argument.Value!)));
+        arguments += string.Concat(attribute.NamedArguments
+            .Where(static argument => argument.Key == "Url")
+            .Select(static argument => ", Url = " + LiteralReader.ObjectLiteral(argument.Value.Value)));
         return "[" + attributeType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
             "(" + arguments + ")]\n";
     }

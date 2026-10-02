@@ -3,6 +3,38 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 public sealed class EnumerableBoundedCollectionTests
 {
     [Theory]
+    [InlineData("HashSet<string>", "Values", "string", false)]
+    [InlineData("HashSet<string>", "Values", "object", true)]
+    [InlineData("SortedSet<string>", "Values", "string", false)]
+    [InlineData("SortedSet<string>", "Values", "object", true)]
+    [InlineData("Dictionary<string, int>", "Values.Keys", "string", false)]
+    [InlineData("Dictionary<string, int>", "Values.Keys", "object", true)]
+    [InlineData("SortedDictionary<string, int>", "Values.Keys", "string", false)]
+    [InlineData("SortedDictionary<string, int>", "Values.Keys", "object", true)]
+    [InlineData("SortedList<string, int>", "Values.Keys", "string", false)]
+    [InlineData("SortedList<string, int>", "Values.Keys", "object", true)]
+    public async Task Contains_fast_path_requires_matching_collection_element_type(
+        string collectionType, string sourceExpression, string elementType, bool reportsScan)
+    {
+        var source = $$"""
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("bounded-contains-element-type")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly {{collectionType}} Values = new();
+                public bool ShouldHandle(string e, HookContext context)
+                    => Enumerable.Contains<{{elementType}}>({{sourceExpression}}, "missing");
+                public void Handle(string e, HookContext context) { }
+            }
+            """;
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedContainsElementType");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
+
+    [Theory]
     [InlineData("Queue<int>")]
     [InlineData("Stack<int>")]
     [InlineData("LinkedList<int>")]
