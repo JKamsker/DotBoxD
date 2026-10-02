@@ -257,7 +257,8 @@ public sealed partial class MergeableIrStepGeneratorTests
     }
 
     private static string GeneratedSource(GeneratorDriverRunResult result)
-        => string.Join(Environment.NewLine, result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+        => string.Join("\n", result.GeneratedTrees.Select(tree => tree.GetText().ToString()))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string GeneratedHintNames(GeneratorDriverRunResult result)
         => string.Join(Environment.NewLine, result.GeneratedTrees.Select(tree => Path.GetFileName(tree.FilePath)));
