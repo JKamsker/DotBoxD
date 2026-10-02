@@ -40,6 +40,8 @@ internal static class CollectionScanPolicy
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
             (SortedDictionaryTypeName, "ContainsValue", _) =>
                 "System.Collections.Generic.SortedDictionary.ContainsValue",
+            (SortedListTypeName, "ContainsValue", _) => "System.Collections.Generic.SortedList.ContainsValue",
+            (SortedListTypeName, "IndexOfValue", _) => "System.Collections.Generic.SortedList.IndexOfValue",
             (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
             _ => null
         };
