@@ -1,6 +1,7 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Registration;
 
 using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 using Microsoft.CodeAnalysis;
 
 internal static class RegistrationAccumulatorMetadataAttributeSource
@@ -27,12 +28,17 @@ internal static class RegistrationAccumulatorMetadataAttributeSource
 
         var experimentalAttribute = compilation.GetTypeByMetadataName(
             "System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+        var codeRequirementAttributes = CodeRequirementAttributeSourceFactory.CreateMap(compilation);
 
         foreach (var attribute in symbol.GetAttributes())
         {
             if (ExperimentalAttribute(attribute, experimentalAttribute) is { } source)
             {
                 lines.Add(source);
+            }
+            else if (CodeRequirementAttributeSourceFactory.Create(attribute, codeRequirementAttributes) is { } codeRequirementSource)
+            {
+                lines.Add(codeRequirementSource);
             }
         }
 
