@@ -100,6 +100,8 @@ public sealed partial class MergeableIrStepGeneratorTests
         "[UnsupportedOSPlatform(\"windows9.0\")][SupportedOSPlatform(\"windows11.0\")]", "multiple support intervals")]
     [InlineData("[UnsupportedOSPlatform(\"ios10.0\")][UnsupportedOSPlatform(\"maccatalyst15.0\")]",
         "[SupportedOSPlatform(\"maccatalyst12.0\")]", "do not share a supported platform")]
+    [InlineData("[SupportedOSPlatform(\"windows10.0\")][UnsupportedOSPlatform(\"windows10.0\")]",
+        "", "do not share a supported platform")]
     public void Generator_rejects_empty_or_unrepresentable_platform_intersections(
         string inputAttributes,
         string outputAttributes,

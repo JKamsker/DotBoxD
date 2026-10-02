@@ -8,6 +8,26 @@ public sealed class ServerExtensionClientTypePlatformCompatibilityAttributeSurpr
         "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(\"windows\")]";
 
     [Fact]
+    public void Service_backed_generated_client_preserves_platform_obsoletion_url()
+    {
+        const string annotation =
+            "[ObsoletedOSPlatform(\"windows10.0\", \"use replacement\", Url = \"https://example.invalid/replacement\")]";
+        var source = ServiceBackedSource.Replace("[SupportedOSPlatform(\"windows\")]", annotation, StringComparison.Ordinal);
+        var result = RpcMemberMetadataGeneratorHarness.RunGenerator(source);
+
+        Assert.DoesNotContain(result.GeneratorDiagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(result.OutputCompilation.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var serviceType = result.OutputCompilation.GetTypeByMetadataName("Sample.IEchoService")!;
+        var clientType = result.OutputCompilation.GetSymbolsWithName("EchoKernelServerExtensionClient")
+            .OfType<INamedTypeSymbol>().Single();
+        var originalAttribute = Assert.Single(serviceType.GetAttributes(), attribute =>
+            attribute.AttributeClass?.Name == "ObsoletedOSPlatformAttribute");
+        var generatedAttribute = Assert.Single(clientType.GetAttributes(), attribute =>
+            attribute.AttributeClass?.Name == "ObsoletedOSPlatformAttribute");
+        Assert.Equal(originalAttribute.ToString(), generatedAttribute.ToString());
+    }
+
+    [Fact]
     public void Service_backed_generated_client_preserves_platform_compatibility_service_attribute()
     {
         var result = RpcMemberMetadataGeneratorHarness.RunGenerator(ServiceBackedSource);

@@ -55,14 +55,15 @@ internal static class LocalValueOrigins
         SemanticModel model)
         => assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
            SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(assignment.Left).Symbol, local.Local) &&
-           (assignment.SpanStart < local.Syntax.SpanStart || SharesLoop(assignment, local.Syntax));
+           (assignment.Span.End <= local.Syntax.SpanStart || SharesLoop(assignment, local.Syntax));
 
     private static bool DescendInto(SyntaxNode node)
         => node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax;
 
     private static bool IsDefiniteWrite(AssignmentExpressionSyntax assignment, SyntaxNode read)
     {
-        if (assignment.SpanStart >= read.SpanStart || assignment.Parent is not ExpressionStatementSyntax statement)
+        // The new value is unavailable to reads in the assignment's own right-hand side.
+        if (assignment.Span.End > read.SpanStart || assignment.Parent is not ExpressionStatementSyntax statement)
         {
             return false;
         }

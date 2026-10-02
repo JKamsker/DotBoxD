@@ -41,6 +41,8 @@ public sealed class PluginAnalyzerForbiddenApiSortedListValuesScanReachabilityTe
     [InlineData("ICollection<string> values = new HashSet<string>(); var alias = values; values = Retained.Values;", "alias", false)]
     [InlineData("ICollection<string> values = new HashSet<string>(); values = Retained.Values; var alias = values; var chained = alias;", "chained", true)]
     [InlineData("ICollection<string> values = Retained.Values; { values = new HashSet<string>(); }", "values", false)]
+    [InlineData("ICollection<string> values = Retained.Values; values = (ICollection<string>)values;", "values", true)]
+    [InlineData("ICollection<string> values = new HashSet<string>(); values = (ICollection<string>)values;", "values", false)]
     public async Task Values_origins_follow_assignments_at_the_time_of_each_read(
         string statements, string receiver, bool reportsScan)
     {

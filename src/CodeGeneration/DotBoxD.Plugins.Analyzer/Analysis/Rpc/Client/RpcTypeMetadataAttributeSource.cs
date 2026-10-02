@@ -139,14 +139,14 @@ internal static class RpcTypeMetadataAttributeSource
     }
 
     private static bool HasSupportedNamedArguments(AttributeData attribute)
-        => attribute.NamedArguments.Any(static argument => argument.Key is "DiagnosticId" or "UrlFormat" or "Message");
+        => attribute.NamedArguments.Any(static argument => argument.Key is "DiagnosticId" or "UrlFormat" or "Message" or "Url");
 
     private static bool TryAppendNamedArgument(
         StringBuilder builder,
         KeyValuePair<string, TypedConstant> argument,
         ref bool needsSeparator)
     {
-        if (argument.Key is not ("DiagnosticId" or "UrlFormat" or "Message"))
+        if (argument.Key is not ("DiagnosticId" or "UrlFormat" or "Message" or "Url"))
         {
             return true;
         }
