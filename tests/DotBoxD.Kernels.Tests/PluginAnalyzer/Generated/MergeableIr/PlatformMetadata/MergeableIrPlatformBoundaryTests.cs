@@ -16,9 +16,9 @@ public sealed partial class MergeableIrStepGeneratorTests
     [InlineData("[SupportedOSPlatform(\"ios\")][SupportedOSPlatform(\"maccatalyst15.0\")]",
         "[SupportedOSPlatform(\"maccatalyst14.0\")]", "maccatalyst14.0")]
     [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
-        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst15.0\")]", "maccatalyst16.0")]
+        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst15.0\")]", "ios16.0")]
     [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
-        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst16.0\")]", "maccatalyst16.0")]
+        "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst16.0\")]", "ios16.0")]
     public void Generator_intersects_denylist_and_implied_platform_support(
         string inputAttributes,
         string outputAttributes,
@@ -75,6 +75,23 @@ public sealed partial class MergeableIrStepGeneratorTests
         Assert.Contains(PlatformAttribute("Unsupported", "linux"), generated, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generator_preserves_final_implied_maccatalyst_removal_without_duplicate_boundaries()
+    {
+        var result = RunGeneratorAndAssertCompiles(PlatformBoundarySource(
+            "[UnsupportedOSPlatform(\"ios10.0\")][SupportedOSPlatform(\"ios12.0\")][UnsupportedOSPlatform(\"ios15.0\")]",
+            ""));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = GeneratedSource(result);
+        var attributes = PlatformAttribute("Supported", "ios12.0") + "\n    " +
+            PlatformAttribute("Unsupported", "ios10.0") + "\n    " + PlatformAttribute("Unsupported", "ios15.0");
+        Assert.Contains(attributes + "\n    public static global::DotBoxD.Abstractions.IRFunc", generated, StringComparison.Ordinal);
+        Assert.Contains(attributes.Replace("\n    ", "\n        ", StringComparison.Ordinal) +
+            "\n        public static global::Sample.StepPipeline", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("maccatalyst", generated, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("[SupportedOSPlatform(\"ios\")][UnsupportedOSPlatform(\"maccatalyst\")]",
         "[SupportedOSPlatform(\"ios\")]", "ios")]
@@ -108,6 +125,9 @@ public sealed partial class MergeableIrStepGeneratorTests
         "", "do not share a supported platform")]
     [InlineData("[SupportedOSPlatform(\"ios16.0\")]",
         "[UnsupportedOSPlatform(\"maccatalyst\")][SupportedOSPlatform(\"maccatalyst17.0\")]",
+        "cannot represent MacCatalyst support alongside implied iOS support")]
+    [InlineData("[UnsupportedOSPlatform(\"ios10.0\")][SupportedOSPlatform(\"ios12.0\")][UnsupportedOSPlatform(\"ios20.0\")]",
+        "[UnsupportedOSPlatform(\"maccatalyst15.0\")]",
         "cannot represent MacCatalyst support alongside implied iOS support")]
     public void Generator_rejects_empty_or_unrepresentable_platform_intersections(
         string inputAttributes,

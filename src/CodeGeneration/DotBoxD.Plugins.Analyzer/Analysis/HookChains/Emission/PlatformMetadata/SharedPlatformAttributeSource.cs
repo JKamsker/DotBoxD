@@ -29,6 +29,15 @@ internal static class SharedPlatformAttributeSource
             PreserveMacCatalystExclusion(policies, family, supportsUnlisted, boundaries);
             hasSupportedPlatform |= boundaries.Any(static boundary => boundary.Supported);
             ValidateRepresentable(boundaries);
+            if (family == "maccatalyst" && emittedBoundaries.TryGetValue("ios", out var ios) &&
+                boundaries.Select(static boundary => (boundary.Version, boundary.Supported))
+                    .SequenceEqual(ios.Select(static boundary => (boundary.Version, boundary.Supported))))
+            {
+                // iOS already implies this interval. Repeating unsupported boundaries can
+                // consume the platform analyzer's second removal slot and lose a later removal.
+                continue;
+            }
+
             attributes.AddRange(boundaries.Select(boundary => Format(family, boundary)));
             if (boundaries.Count > 0)
             {

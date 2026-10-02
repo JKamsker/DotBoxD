@@ -98,11 +98,11 @@ internal sealed class PlatformAvailability
     private static PlatformBoundary[] Normalize(IEnumerable<PlatformBoundary> boundaries)
     {
         // These are the boundaries recognized by the platform compatibility analyzer:
-        // the earliest supported version and the two earliest unsupported versions.
+        // the earliest supported version and the two earliest unsupported entries.
+        // Duplicate unsupported versions still occupy one of the analyzer's two slots.
         var ordered = boundaries.OrderBy(static boundary => boundary.Version).ToArray();
         return ordered.Where(static boundary => boundary.Supported).Take(1)
-            .Concat(ordered.Where(static boundary => !boundary.Supported)
-                .GroupBy(static boundary => boundary.Version).Select(static group => group.First()).Take(2))
+            .Concat(ordered.Where(static boundary => !boundary.Supported).Take(2))
             .OrderBy(static boundary => boundary.Version)
             .ThenByDescending(static boundary => boundary.Supported)
             .ToArray();
