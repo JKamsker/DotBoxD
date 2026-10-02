@@ -97,6 +97,11 @@ internal sealed class RpcStreamSendState : IDisposable
         }
     }
 
+    // Remote cancellation runs from frame processing. Registrations can block while awaiting a
+    // response, so execute them independently of the worker that must process that response.
+    public void CancelInBackground() =>
+        _ = Task.Factory.StartNew(Cancel, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
