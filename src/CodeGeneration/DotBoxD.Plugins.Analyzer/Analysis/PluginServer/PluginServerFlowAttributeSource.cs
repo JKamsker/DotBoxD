@@ -123,6 +123,12 @@ internal static class PluginServerFlowAttributeSource
 
     private static string? AttributeLine(AttributeData attribute, bool targetReturn, bool includeExperimental)
     {
+        var codeRequirementAttribute = PluginServerCodeRequirementAttributeFormatter.Format(attribute);
+        if (codeRequirementAttribute is not null)
+        {
+            return MemberOnlyAttribute(targetReturn, codeRequirementAttribute);
+        }
+
         var platformCompatibilityAttribute =
             PluginServerPlatformCompatibilityAttributeFormatter.Format(attribute);
         if (platformCompatibilityAttribute is not null)
