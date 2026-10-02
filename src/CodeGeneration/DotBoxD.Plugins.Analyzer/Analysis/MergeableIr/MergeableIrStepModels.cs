@@ -15,6 +15,7 @@ internal sealed record MergeableIrStepModel(
     string InputType,
     string OutputType,
     string? IRFuncType,
+    string GeneratedAttributeSource,
     string ParameterSource,
     string ValueSource,
     EquatableArray<string> RequiredCapabilities,
@@ -23,6 +24,7 @@ internal sealed record MergeableIrStepModel(
 
 internal sealed record MergeableIrStepInterception(
     string AttributeSyntax,
+    string GeneratedAttributeSource,
     string ReceiverType,
     string DelegateType,
     string ReturnType,

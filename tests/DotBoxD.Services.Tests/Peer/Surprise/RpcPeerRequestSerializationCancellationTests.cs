@@ -1,6 +1,8 @@
+using System.Buffers;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Client;
 using DotBoxD.Services.Peer;
+using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Streaming.Core;
 using MessagePack;
 using Xunit;
@@ -60,6 +62,53 @@ public sealed class RpcPeerRequestSerializationCancellationTests
         Assert.Equal(0, sendsAfterCancellation);
     }
 
+    [Fact]
+    public async Task Request_serializer_fault_after_caller_cancellation_uses_cancellation_terminal_and_releases_pending_slot()
+    {
+        using var cts = new CancellationTokenSource();
+        var serializer = new CancelingThenThrowingRequestSerializer(cts);
+        var sender = new ObservingSender();
+        var streams = new RpcStreamManager(serializer, sender.SendAsync, exceptionTransformer: null);
+        var invoker = new RpcPeerOutboundInvoker(
+            serializer,
+            new RpcPeerOptions
+            {
+                MaxPendingRequests = 1,
+                RequestTimeout = Timeout,
+            },
+            ensureStarted: static () => { },
+            sender.SendAsync,
+            streams);
+
+        try
+        {
+            var canceledFailure = await Record.ExceptionAsync(
+                () => invoker
+                    .InvokeAsync<int, int>("Service", "Method", request: 1, cts.Token)
+                    .WaitAsync(Timeout));
+
+            var cancellation = Assert.IsAssignableFrom<OperationCanceledException>(canceledFailure);
+            Assert.Equal(cts.Token, cancellation.CancellationToken);
+            Assert.Equal(1, serializer.RequestSerializationCalls);
+            Assert.Equal(0, sender.SendCalls);
+
+            serializer.CancelBeforeThrow = false;
+            var ordinaryFailure = await Record.ExceptionAsync(
+                () => invoker
+                    .InvokeAsync<int, int>("Service", "Method", request: 2)
+                    .WaitAsync(Timeout));
+
+            Assert.IsType<ExpectedRequestSerializationException>(ordinaryFailure);
+            Assert.Equal(2, serializer.RequestSerializationCalls);
+            Assert.Equal(0, sender.SendCalls);
+        }
+        finally
+        {
+            await invoker.StopCancelFramesAsync();
+            streams.Stop();
+        }
+    }
+
     [MessagePackObject]
     public sealed class CancelingRequest
     {
@@ -116,6 +165,43 @@ public sealed class RpcPeerRequestSerializationCancellationTests
     {
         public ExpectedSecondSendException()
             : base("second send reached")
+        {
+        }
+    }
+
+    private sealed class CancelingThenThrowingRequestSerializer(CancellationTokenSource source) : ISerializer
+    {
+        private readonly MessagePackRpcSerializer _inner = new();
+
+        public int RequestSerializationCalls { get; private set; }
+
+        public bool CancelBeforeThrow { get; set; } = true;
+
+        public void Serialize<T>(IBufferWriter<byte> writer, T value)
+        {
+            if (typeof(T) == typeof(int))
+            {
+                RequestSerializationCalls++;
+                if (CancelBeforeThrow)
+                {
+                    source.Cancel();
+                }
+
+                throw new ExpectedRequestSerializationException();
+            }
+
+            _inner.Serialize(writer, value);
+        }
+
+        public T Deserialize<T>(ReadOnlyMemory<byte> data) => _inner.Deserialize<T>(data);
+
+        public object? Deserialize(ReadOnlyMemory<byte> data, Type type) => _inner.Deserialize(data, type);
+    }
+
+    private sealed class ExpectedRequestSerializationException : Exception
+    {
+        public ExpectedRequestSerializationException()
+            : base("request serializer fault")
         {
         }
     }

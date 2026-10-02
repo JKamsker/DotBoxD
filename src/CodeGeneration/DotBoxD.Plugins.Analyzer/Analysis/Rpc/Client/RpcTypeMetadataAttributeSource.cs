@@ -7,6 +7,12 @@ internal static class RpcTypeMetadataAttributeSource
 {
     private const string ExperimentalAttributeMetadataName = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
     private const string ObsoleteAttributeMetadataName = "System.ObsoleteAttribute";
+    private const string SupportedOSPlatformAttributeMetadataName =
+        "System.Runtime.Versioning.SupportedOSPlatformAttribute";
+    private const string UnsupportedOSPlatformAttributeMetadataName =
+        "System.Runtime.Versioning.UnsupportedOSPlatformAttribute";
+    private const string ObsoletedOSPlatformAttributeMetadataName =
+        "System.Runtime.Versioning.ObsoletedOSPlatformAttribute";
 
     public static void Append(
         StringBuilder builder,
@@ -16,6 +22,9 @@ internal static class RpcTypeMetadataAttributeSource
     {
         var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeMetadataName);
         var obsoleteAttribute = compilation.GetTypeByMetadataName(ObsoleteAttributeMetadataName);
+        var supportedOSPlatformAttribute = compilation.GetTypeByMetadataName(SupportedOSPlatformAttributeMetadataName);
+        var unsupportedOSPlatformAttribute = compilation.GetTypeByMetadataName(UnsupportedOSPlatformAttributeMetadataName);
+        var obsoletedOSPlatformAttribute = compilation.GetTypeByMetadataName(ObsoletedOSPlatformAttributeMetadataName);
         foreach (var attribute in sourceType.GetAttributes())
         {
             if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, experimentalAttribute))
@@ -32,6 +41,30 @@ internal static class RpcTypeMetadataAttributeSource
             else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoleteAttribute))
             {
                 AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
+            }
+            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, supportedOSPlatformAttribute))
+            {
+                AppendAttribute(
+                    builder,
+                    attribute,
+                    indent,
+                    "global::System.Runtime.Versioning.SupportedOSPlatformAttribute");
+            }
+            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, unsupportedOSPlatformAttribute))
+            {
+                AppendAttribute(
+                    builder,
+                    attribute,
+                    indent,
+                    "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute");
+            }
+            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoletedOSPlatformAttribute))
+            {
+                AppendAttribute(
+                    builder,
+                    attribute,
+                    indent,
+                    "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute");
             }
         }
     }
@@ -106,14 +139,14 @@ internal static class RpcTypeMetadataAttributeSource
     }
 
     private static bool HasSupportedNamedArguments(AttributeData attribute)
-        => attribute.NamedArguments.Any(static argument => argument.Key is "DiagnosticId" or "UrlFormat" or "Message");
+        => attribute.NamedArguments.Any(static argument => argument.Key is "DiagnosticId" or "UrlFormat" or "Message" or "Url");
 
     private static bool TryAppendNamedArgument(
         StringBuilder builder,
         KeyValuePair<string, TypedConstant> argument,
         ref bool needsSeparator)
     {
-        if (argument.Key is not ("DiagnosticId" or "UrlFormat" or "Message"))
+        if (argument.Key is not ("DiagnosticId" or "UrlFormat" or "Message" or "Url"))
         {
             return true;
         }

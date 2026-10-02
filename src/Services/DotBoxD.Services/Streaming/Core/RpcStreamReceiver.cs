@@ -37,19 +37,19 @@ internal sealed class RpcStreamReceiver
     {
         if (Volatile.Read(ref _completed) != 0)
         {
-            _ = streams.DisposeAsync();
+            streams.DisposeInBackground();
             return;
         }
 
         if (Interlocked.Exchange(ref _outboundStreams, streams) is { } previous)
         {
-            _ = previous.DisposeAsync();
+            previous.DisposeInBackground();
         }
 
         if (Volatile.Read(ref _completed) != 0 &&
             Interlocked.CompareExchange(ref _outboundStreams, null, streams) == streams)
         {
-            _ = streams.DisposeAsync();
+            streams.DisposeInBackground();
         }
     }
 
@@ -121,7 +121,7 @@ internal sealed class RpcStreamReceiver
 
         if (streams is not null)
         {
-            _ = streams.DisposeAsync();
+            streams.DisposeInBackground();
         }
 
         return true;
@@ -200,7 +200,7 @@ internal sealed class RpcStreamReceiver
 
         if (streams is not null)
         {
-            _ = streams.DisposeAsync();
+            streams.DisposeInBackground();
         }
 
         return true;

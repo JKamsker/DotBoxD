@@ -127,6 +127,11 @@ public sealed partial class SandboxHost
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             return new CompiledAttempt(CompiledFailureResult(plan, options, error), null);
         }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+            return new CompiledAttempt(CompiledFailureResult(plan, options, error), null);
+        }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled execution failed");

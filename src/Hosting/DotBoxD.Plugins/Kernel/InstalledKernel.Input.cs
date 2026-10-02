@@ -13,30 +13,40 @@ public sealed partial class InstalledKernel
         IPluginEventAdapter<TEvent> adapter,
         TEvent e,
         string entrypoint,
-        IReadOnlyList<Parameter> parameters)
+        IReadOnlyList<Parameter> parameters,
+        CancellationToken cancellationToken)
     {
-        lock (_lifecycleGate)
+        try
         {
-            var deferredUpdates = _liveStateSync.SynchronizeForInput();
-            return UsesReusableNoAuditInput(entrypoint)
-                ? PluginKernelInputBuilder.BuildWithReusableBuffer(
-                    adapter,
-                    e,
-                    parameters,
-                    deferredUpdates,
-                    Manifest.LiveSettings,
-                    Value,
-                    _pendingLiveUpdates.Enqueue,
-                    ref _preparedInputValues,
-                    ref _preparedInputList)
-                : PluginKernelInputBuilder.Build(
-                    adapter,
-                    e,
-                    parameters,
-                    deferredUpdates,
-                    Manifest.LiveSettings,
-                    Value,
-                    _pendingLiveUpdates.Enqueue);
+            lock (_lifecycleGate)
+            {
+                var deferredUpdates = _liveStateSync.SynchronizeForInput();
+                return UsesReusableNoAuditInput(entrypoint)
+                    ? PluginKernelInputBuilder.BuildWithReusableBuffer(
+                        adapter,
+                        e,
+                        parameters,
+                        deferredUpdates,
+                        Manifest.LiveSettings,
+                        Value,
+                        _pendingLiveUpdates.Enqueue,
+                        ref _preparedInputValues,
+                        ref _preparedInputList)
+                    : PluginKernelInputBuilder.Build(
+                        adapter,
+                        e,
+                        parameters,
+                        deferredUpdates,
+                        Manifest.LiveSettings,
+                        Value,
+                        _pendingLiveUpdates.Enqueue);
+            }
+        }
+        finally
+        {
+            // An adapter callback may cancel the caller while materializing input. Check after it
+            // completes so cancellation takes precedence over a simultaneous callback failure.
+            cancellationToken.ThrowIfCancellationRequested();
         }
     }
 

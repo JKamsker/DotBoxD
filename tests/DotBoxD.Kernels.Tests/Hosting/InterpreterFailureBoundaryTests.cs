@@ -63,6 +63,22 @@ public sealed class InterpreterFailureBoundaryTests
         AssertRunSummary(result, SandboxErrorCode.Cancelled);
     }
 
+    [Fact]
+    public async Task Interpreter_fault_after_cancelling_caller_token_is_host_failure()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var host = CreateHost(new CallerCancellingFaultingInterpreter(cancellation));
+        var plan = await PrepareAsync(host);
+
+        var result = await ExecuteAsync(host, plan, cancellation.Token);
+
+        AssertHostFailure(result);
+        Assert.DoesNotContain(
+            CallerCancellingFaultingInterpreter.SensitiveMessage,
+            result.Error!.SafeMessage,
+            StringComparison.Ordinal);
+    }
+
     private static SandboxHost CreateHost(
         ISandboxInterpreter interpreter,
         Action<SandboxAuditEvent>? observer = null)
@@ -154,6 +170,24 @@ public sealed class InterpreterFailureBoundaryTests
             cancellation.Cancel();
             return ValueTask.FromException<SandboxExecutionResult>(
                 new OperationCanceledException(cancellation.Token));
+        }
+    }
+
+    private sealed class CallerCancellingFaultingInterpreter(CancellationTokenSource cancellation)
+        : ISandboxInterpreter
+    {
+        public const string SensitiveMessage = "custom interpreter callback secret";
+
+        public ValueTask<SandboxExecutionResult> ExecuteAsync(
+            ExecutionPlan plan,
+            string entrypoint,
+            SandboxValue input,
+            SandboxExecutionOptions options,
+            CancellationToken cancellationToken)
+        {
+            cancellation.Cancel();
+            return ValueTask.FromException<SandboxExecutionResult>(
+                new InvalidOperationException(SensitiveMessage));
         }
     }
 }

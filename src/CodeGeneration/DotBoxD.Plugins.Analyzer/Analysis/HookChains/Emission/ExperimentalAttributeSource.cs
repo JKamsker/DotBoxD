@@ -23,9 +23,31 @@ internal static class ExperimentalAttributeSource
         var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var type in types)
         {
-            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes);
+            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: true);
         }
 
+        return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
+    }
+
+    public static string FromTypesWithSharedSupportedPlatform(params ITypeSymbol?[] types)
+    {
+        var diagnosticIds = new SortedSet<string>(StringComparer.Ordinal);
+        var codeRequirementAttributes = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var type in types)
+        {
+            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: false);
+        }
+
+        platformAttributes.UnionWith(SharedPlatformAttributeSource.FromTypes(types));
+        return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
+    }
+
+    private static string BuildSource(
+        SortedSet<string> diagnosticIds,
+        SortedDictionary<string, string> codeRequirementAttributes,
+        SortedSet<string> platformAttributes)
+    {
         var source = string.Empty;
         if (diagnosticIds.Count > 0)
         {
@@ -41,17 +63,18 @@ internal static class ExperimentalAttributeSource
         ITypeSymbol? type,
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
-        ISet<string> platformAttributes)
+        ISet<string> platformAttributes,
+        bool includeAvailabilityPlatforms)
     {
         switch (type)
         {
             case null:
                 return;
             case IArrayTypeSymbol array:
-                Collect(array.ElementType, diagnosticIds, codeRequirementAttributes, platformAttributes);
+                Collect(array.ElementType, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
                 return;
             case INamedTypeSymbol named:
-                CollectNamed(named, diagnosticIds, codeRequirementAttributes, platformAttributes);
+                CollectNamed(named, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
                 return;
         }
     }
@@ -60,7 +83,8 @@ internal static class ExperimentalAttributeSource
         INamedTypeSymbol named,
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
-        ISet<string> platformAttributes)
+        ISet<string> platformAttributes,
+        bool includeAvailabilityPlatforms)
     {
         foreach (var attribute in named.GetAttributes())
         {
@@ -72,7 +96,8 @@ internal static class ExperimentalAttributeSource
             }
 
             CollectCodeRequirementAttribute(attribute, codeRequirementAttributes);
-            if (PlatformCompatibilityAttributeSource(attribute) is { } source)
+            if (PlatformCompatibilityAttributeSource(attribute) is { } source &&
+                (includeAvailabilityPlatforms || !SharedPlatformAttributeSource.IsAvailabilityAttribute(attribute)))
             {
                 platformAttributes.Add(source);
             }
@@ -80,7 +105,7 @@ internal static class ExperimentalAttributeSource
 
         foreach (var argument in named.TypeArguments)
         {
-            Collect(argument, diagnosticIds, codeRequirementAttributes, platformAttributes);
+            Collect(argument, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
         }
     }
 
@@ -124,7 +149,11 @@ internal static class ExperimentalAttributeSource
         var arguments = string.Join(
             ", ",
             attribute.ConstructorArguments.Select(argument => LiteralReader.StringLiteral((string)argument.Value!)));
+        arguments += string.Concat(attribute.NamedArguments
+            .Where(static argument => argument.Key == "Url")
+            .Select(static argument => ", Url = " + LiteralReader.ObjectLiteral(argument.Value.Value)));
         return "[" + attributeType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
             "(" + arguments + ")]\n";
     }
+
 }

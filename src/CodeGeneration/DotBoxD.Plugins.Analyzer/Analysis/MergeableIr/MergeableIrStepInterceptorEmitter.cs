@@ -59,6 +59,7 @@ internal static class MergeableIrStepInterceptorEmitter
         int index)
     {
         builder.Append("        ").AppendLine(interception.AttributeSyntax);
+        AppendGeneratedAttributes(builder, interception.GeneratedAttributeSource);
         builder.Append("        public static ").Append(interception.ReturnType).Append(" Intercept_")
             .Append(index.ToString(CultureInfo.InvariantCulture))
             .AppendLine("(");
@@ -79,6 +80,7 @@ internal static class MergeableIrStepInterceptorEmitter
         }
 
         builder.Append("        ").AppendLine(interception.AttributeSyntax);
+        AppendGeneratedAttributes(builder, interception.GeneratedAttributeSource);
         builder.Append("        public static ").Append(interception.ReturnType).Append(" Intercept_")
             .Append(index.ToString(CultureInfo.InvariantCulture))
             .AppendLine("(");
@@ -103,4 +105,15 @@ internal static class MergeableIrStepInterceptorEmitter
     private static string ArgumentName(string parameterName) => "@" + parameterName;
 
     private static string Identifier(string parameterName) => "@" + parameterName;
+
+    private static void AppendGeneratedAttributes(StringBuilder builder, string attributeSource)
+    {
+        foreach (var line in attributeSource.Split('\n'))
+        {
+            if (line.Length > 0)
+            {
+                builder.Append("        ").AppendLine(line);
+            }
+        }
+    }
 }

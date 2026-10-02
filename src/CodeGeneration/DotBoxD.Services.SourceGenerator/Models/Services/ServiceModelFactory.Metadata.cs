@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
@@ -6,6 +8,43 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ServiceModelFactory
 {
+    private static string BuildTypeAttributePrefix(
+        INamedTypeSymbol interfaceSymbol,
+        string experimentalAttributePrefix,
+        CancellationToken ct)
+    {
+        var attributes = new StringBuilder(experimentalAttributePrefix);
+        foreach (var attribute in interfaceSymbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!IsPlatformCompatibilityAttribute(attribute))
+            {
+                continue;
+            }
+
+            attributes.Append("    [global::").Append(attribute.AttributeClass!.ToDisplayString()).Append('(');
+            var arguments = attribute.ConstructorArguments.Select(FormatPlatformArgument).ToList();
+            arguments.AddRange(attribute.NamedArguments.Select(argument =>
+                argument.Key + " = " + FormatPlatformArgument(argument.Value)));
+            attributes.Append(string.Join(", ", arguments)).AppendLine(")]");
+        }
+
+        return attributes.ToString();
+    }
+
+    private static bool IsPlatformCompatibilityAttribute(AttributeData attribute) =>
+        attribute.AttributeClass is { } attributeType &&
+        attributeType.ToDisplayString() is
+            "System.Runtime.Versioning.SupportedOSPlatformAttribute" or
+            "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" or
+            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" &&
+        ReturnTypeClassifier.IsTrustedFrameworkType(attributeType);
+
+    private static string FormatPlatformArgument(TypedConstant argument)
+        => argument.Value is string value
+            ? "\"" + Infrastructure.LiteralHelpers.EscapeStringLiteral(value) + "\""
+            : "null";
+
     private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
     {
         foreach (var namedArg in serviceAttribute.NamedArguments)

@@ -55,7 +55,7 @@ internal sealed class ReceivedResponse : IDisposable
         _frame.Dispose();
         if (Interlocked.Exchange(ref _outboundStreams, null) is { } streams)
         {
-            _ = streams.DisposeAsync();
+            streams.DisposeInBackground();
         }
 
         if (Interlocked.Exchange(ref _stream, null) is { } stream)
