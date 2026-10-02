@@ -4,6 +4,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionScanPolicy
 {
+    private const string EnumerableTypeName = "System.Linq.Enumerable";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ReadOnlySetInterfaceTypeName = "System.Collections.Generic.IReadOnlySet<T>";
@@ -13,7 +14,7 @@ internal static class ForbiddenCollectionScanPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
     {
-        if (method is not { IsStatic: false, MethodKind: MethodKind.Ordinary })
+        if (method.MethodKind is not MethodKind.Ordinary)
         {
             forbidden = null!;
             return false;
@@ -21,6 +22,18 @@ internal static class ForbiddenCollectionScanPolicy
 
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (IsEnumerableAny(method, typeName))
+        {
+            forbidden = "System.Linq.Enumerable.Any";
+            return true;
+        }
+
+        if (method.IsStatic)
+        {
+            forbidden = null!;
+            return false;
+        }
+
         if (IsForbiddenListScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
@@ -60,6 +73,10 @@ internal static class ForbiddenCollectionScanPolicy
         forbidden = null!;
         return false;
     }
+
+    private static bool IsEnumerableAny(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "Any" } &&
+           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenListScan(string methodName, string typeName)
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
