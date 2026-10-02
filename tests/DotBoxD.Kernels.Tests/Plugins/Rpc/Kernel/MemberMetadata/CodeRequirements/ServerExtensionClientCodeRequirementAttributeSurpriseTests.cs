@@ -12,6 +12,9 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
     private const string RequiresDynamicCode =
         "[global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute(\"Dynamic-code contract\", Url = \"https://example.invalid/dynamic-code\")]";
 
+    private const string RequiresAssemblyFiles =
+        "[global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(\"Assembly-file contract\", Url = \"https://example.invalid/assembly-files\")]";
+
     [Fact]
     public void Service_backed_client_and_receiver_extension_preserve_code_requirements()
     {
@@ -29,6 +32,11 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
             RequiresDynamicCode);
         AssertGeneratedTypeContains(
             generatedSources,
+            "EchoKernelServerExtensionClient",
+            "RestrictedServiceEchoAsync",
+            RequiresAssemblyFiles);
+        AssertGeneratedTypeContains(
+            generatedSources,
             "EchoKernelServerExtensionClientExtensions",
             "RestrictedServiceEcho",
             RequiresUnreferencedCode);
@@ -37,6 +45,11 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
             "EchoKernelServerExtensionClientExtensions",
             "RestrictedServiceEcho",
             RequiresDynamicCode);
+        AssertGeneratedTypeContains(
+            generatedSources,
+            "EchoKernelServerExtensionClientExtensions",
+            "RestrictedServiceEcho",
+            RequiresAssemblyFiles);
     }
 
     [Fact]
@@ -54,6 +67,11 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
             "EchoKernelDirectServerExtensionClientExtensions",
             "RestrictedDirectEcho",
             RequiresDynamicCode);
+        AssertGeneratedTypeContains(
+            generatedSources,
+            "EchoKernelDirectServerExtensionClientExtensions",
+            "RestrictedDirectEcho",
+            RequiresAssemblyFiles);
     }
 
     [Fact]
@@ -69,6 +87,10 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
             generatedSources,
             "PortableServiceEchoAsync",
             "RequiresDynamicCodeAttribute");
+        AssertGeneratedMethodDoesNotContain(
+            generatedSources,
+            "PortableServiceEchoAsync",
+            "RequiresAssemblyFilesAttribute");
     }
 
     private static void AssertGeneratedTypeContains(
@@ -133,6 +155,7 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
         {
             [RequiresUnreferencedCode("Trimming contract", Url = "https://example.invalid/trimming")]
             [RequiresDynamicCode("Dynamic-code contract", Url = "https://example.invalid/dynamic-code")]
+            [RequiresAssemblyFiles("Assembly-file contract", Url = "https://example.invalid/assembly-files")]
             ValueTask<int> RestrictedServiceEchoAsync(int value, CancellationToken cancellationToken = default);
         }
 
@@ -152,6 +175,10 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
             StringComparison.Ordinal)
         .Replace(
             "[RequiresDynamicCode(\"Dynamic-code contract\", Url = \"https://example.invalid/dynamic-code\")]",
+            string.Empty,
+            StringComparison.Ordinal)
+        .Replace(
+            "[RequiresAssemblyFiles(\"Assembly-file contract\", Url = \"https://example.invalid/assembly-files\")]",
             string.Empty,
             StringComparison.Ordinal)
         .Replace("RestrictedServiceEcho", "PortableServiceEcho", StringComparison.Ordinal);
@@ -183,6 +210,7 @@ public sealed class ServerExtensionClientCodeRequirementAttributeSurpriseTests
         {
             [RequiresUnreferencedCode("Trimming contract", Url = "https://example.invalid/trimming")]
             [RequiresDynamicCode("Dynamic-code contract", Url = "https://example.invalid/dynamic-code")]
+            [RequiresAssemblyFiles("Assembly-file contract", Url = "https://example.invalid/assembly-files")]
             [ServerExtensionMethod(typeof(IRemoteControl), "RestrictedDirectEcho")]
             public int RestrictedDirectEcho(int value, HookContext context) => value;
         }
