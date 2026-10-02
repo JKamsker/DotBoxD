@@ -43,6 +43,7 @@ internal static class MergeableIrStepSourceEmitter
         builder.AppendLine();
         if (model.IRFuncType is not null)
         {
+            AppendGeneratedAttributes(builder, model.GeneratedAttributeSource, "    ");
             builder.Append("    public static ").Append(model.IRFuncType).AppendLine(" CreateIRFunc()");
             builder.Append("        => ").Append(model.IRFuncType).AppendLine(".FromStep(Create());");
             builder.AppendLine();
@@ -51,6 +52,17 @@ internal static class MergeableIrStepSourceEmitter
         MergeableIrExpressionHelperEmitter.Emit(builder);
         builder.AppendLine("}");
         return builder.ToString();
+    }
+
+    private static void AppendGeneratedAttributes(StringBuilder builder, string attributeSource, string indent)
+    {
+        foreach (var line in attributeSource.Split('\n'))
+        {
+            if (line.Length > 0)
+            {
+                builder.Append(indent).AppendLine(line);
+            }
+        }
     }
 
     private static string StringArray(EquatableArray<string> values)

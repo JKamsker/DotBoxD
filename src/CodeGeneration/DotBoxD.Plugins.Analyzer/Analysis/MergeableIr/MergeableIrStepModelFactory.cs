@@ -81,6 +81,11 @@ internal static class MergeableIrStepModelFactory
 
         var outputTag = OutputTag(call.Kind, call.OutputType);
         var irFuncType = IRFuncType(call);
+        var receiverType = ReceiverType(invocation, model, cancellationToken);
+        var generatedAttributeSource = ExperimentalAttributeSource.FromTypesWithSharedSupportedPlatform(
+            receiverType,
+            call.InputType,
+            call.OutputType);
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -109,7 +114,13 @@ internal static class MergeableIrStepModelFactory
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix + className
             : DotBoxDGenerationNames.TypeNames.GlobalPrefix + ns + "." + className;
 
-        var interception = Interception(invocation, model, call, fullName, cancellationToken);
+        var interception = Interception(
+            invocation,
+            model,
+            call,
+            fullName,
+            generatedAttributeSource,
+            cancellationToken);
         return new MergeableIrStepModel(
             HintName(ns, className),
             ns,
@@ -118,6 +129,7 @@ internal static class MergeableIrStepModelFactory
             inputTag,
             outputTag,
             irFuncType,
+            generatedAttributeSource,
             $"new {DotBoxDGenerationNames.TypeNames.GlobalParameter}({LiteralReader.StringLiteral(CurrentValueName)}, {inputTypeSource})",
             value.Source,
             EquatableArray<string>.FromOwned([.. capabilities]),
@@ -130,6 +142,7 @@ internal static class MergeableIrStepModelFactory
         SemanticModel model,
         MergeableIrMarkedLoweringCall call,
         string stepFullName,
+        string generatedAttributeSource,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(invocation, cancellationToken)
@@ -146,6 +159,7 @@ internal static class MergeableIrStepModelFactory
 
         return new MergeableIrStepInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            generatedAttributeSource,
             receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             call.Parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
