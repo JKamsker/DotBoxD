@@ -32,6 +32,11 @@ internal static class EnumerableScanPolicy
             return true;
         }
 
+        if (IsBoundedSortedListContains(method, source))
+        {
+            return true;
+        }
+
         if (source?.Type is not INamedTypeSymbol type || !FrameworkCollectionIdentity.IsFrameworkType(type))
         {
             return false;
@@ -40,6 +45,10 @@ internal static class EnumerableScanPolicy
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return IsBoundedFrameworkCall(method, name);
     }
+
+    private static bool IsBoundedSortedListContains(IMethodSymbol method, IOperation? source)
+        => method.Name == "Contains" && method.Parameters.Length == 2 &&
+           source is IPropertyReferenceOperation { Property.Name: "Keys" } && IsSortedListView(source);
 
     private static bool IsSortedListView(IOperation? source)
         => source is IPropertyReferenceOperation { Property.Name: "Keys" or "Values" } property &&

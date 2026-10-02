@@ -78,7 +78,10 @@ public sealed class EnumerableBoundedCollectionTests
     [InlineData("SortedList<int, int>", "Enumerable.Any(Map.Keys)", false)]
     [InlineData("SortedList<int, int>", "Map.Values.Any()", false)]
     [InlineData("SortedList<int, int>", "Enumerable.Any(Map.Values)", false)]
+    [InlineData("SortedList<int, int>", "Enumerable.Contains(Map.Keys, 1)", false)]
+    [InlineData("SortedList<int, int>", "Enumerable.Contains(Map.Keys, 1, null)", true)]
     [InlineData("SortedList<int, int>", "Enumerable.Contains(Map.Values, 1)", true)]
+    [InlineData("SortedList<int, int>", "Enumerable.Contains(Map.Values, 1, null)", true)]
     [InlineData("SortedList<int, int>", "Map.Keys.Any(value => value == 1)", true)]
     [InlineData("SortedList<int, int>", "Map.Values.Any(value => value == 1)", true)]
     public async Task Framework_dictionary_views_preserve_bounded_calls_and_scan_diagnostics(

@@ -35,17 +35,24 @@ internal sealed class PlatformAvailability
             boundaries.Add(annotation.Boundary);
         }
 
+        // The platform analyzer combines implied iOS boundaries with any explicit
+        // MacCatalyst annotations before choosing the earliest support/removal versions.
+        if (annotations.TryGetValue("ios", out var ios))
+        {
+            if (annotations.TryGetValue("maccatalyst", out var macCatalyst))
+            {
+                macCatalyst.AddRange(ios);
+            }
+            else
+            {
+                annotations.Add("maccatalyst", ios);
+            }
+        }
+
         var normalizedPlatforms = annotations.ToDictionary(
             static pair => pair.Key,
             static pair => Normalize(pair.Value),
             StringComparer.OrdinalIgnoreCase);
-        // The platform analyzer implicitly includes MacCatalyst for iOS annotations,
-        // unless the API provides its own explicit MacCatalyst policy.
-        if (normalizedPlatforms.TryGetValue("ios", out var ios) && !normalizedPlatforms.ContainsKey("maccatalyst"))
-        {
-            normalizedPlatforms.Add("maccatalyst", ios);
-        }
-
         return new PlatformAvailability(normalizedPlatforms);
     }
 
