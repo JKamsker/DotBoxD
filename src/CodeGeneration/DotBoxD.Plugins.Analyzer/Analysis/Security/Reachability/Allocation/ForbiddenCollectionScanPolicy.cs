@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionScanPolicy
 {
+    private const string EnumerableTypeName = "System.Linq.Enumerable";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string CollectionInterfaceTypeName = "System.Collections.Generic.ICollection<T>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
@@ -21,14 +22,20 @@ internal static class ForbiddenCollectionScanPolicy
     public static bool TryGetDisplayName(IInvocationOperation invocation, Compilation compilation, out string forbidden)
     {
         var method = invocation.TargetMethod;
+        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (IsForbiddenEnumerableScan(method, typeName))
+        {
+            forbidden = $"System.Linq.Enumerable.{method.Name}";
+            return true;
+        }
+
         if (method is not { IsStatic: false, MethodKind: MethodKind.Ordinary })
         {
             forbidden = null!;
             return false;
         }
 
-        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
         if (IsForbiddenListScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
@@ -86,6 +93,11 @@ internal static class ForbiddenCollectionScanPolicy
         forbidden = null!;
         return false;
     }
+
+    private static bool IsForbiddenEnumerableScan(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
+           method.Name == "Contains" &&
+           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsForbiddenListScan(string methodName, string typeName)
         => methodName is "BinarySearch" or "Clear" or "Contains" or "IndexOf" or "Remove" &&
