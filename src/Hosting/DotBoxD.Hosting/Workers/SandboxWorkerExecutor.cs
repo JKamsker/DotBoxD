@@ -101,6 +101,13 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
                 options,
                 WorkerCancellationOrTimeoutError(cancellationToken));
         }
+        catch (Exception) when (timeout.IsCancellationRequested)
+        {
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
+                plan,
+                options,
+                WorkerCancellationOrTimeoutError(cancellationToken));
+        }
         catch (Exception)
         {
             return Execution.SandboxHost.WorkerIsolationFailedResult(
