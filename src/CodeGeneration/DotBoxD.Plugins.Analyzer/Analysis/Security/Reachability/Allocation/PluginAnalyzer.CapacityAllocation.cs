@@ -31,7 +31,7 @@ public sealed partial class PluginAnalyzer
         IInvocationOperation invocation)
     {
         if (ForbiddenCollectionScanPolicy.TryGetDisplayName(
-                invocation.TargetMethod,
+                invocation,
                 context.Compilation,
                 out var forbidden))
         {
