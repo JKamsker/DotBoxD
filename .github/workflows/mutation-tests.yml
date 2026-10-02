@@ -1,8 +1,8 @@
 name: mutation-tests
 
-# Stryker.NET mutation testing for focused security/runtime surfaces. This is intentionally
-# informational at first: it runs on schedule/manual dispatch, and on PRs only when explicitly
-# requested with the run-mutation-tests label.
+# Stryker.NET mutation testing for focused security/runtime surfaces. Per-target configs
+# define enforced score floors (zero means report-only). Runs on schedule/manual dispatch
+# and on PRs explicitly requested with the run-mutation-tests label.
 
 on:
   schedule:
@@ -58,6 +58,10 @@ jobs:
             working-directory: src/Channels/DotBoxD.Codecs.MessagePack
             config-file: ../../../.config/stryker/codecs-messagepack.json
             output-directory: ../../../artifacts/mutation/codecs-messagepack
+          - name: kernels-json
+            working-directory: src/Kernels/DotBoxD.Kernels.Serialization.Json
+            config-file: ../../../.config/stryker/kernels-json.json
+            output-directory: ../../../artifacts/mutation/kernels-json
 
     steps:
       - name: Checkout

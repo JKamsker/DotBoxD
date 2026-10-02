@@ -76,13 +76,13 @@ internal static class JsonExpressionReader
     {
         if (element.ValueKind == JsonValueKind.String)
         {
-            var name = element.GetString() ?? "";
+            var name = ReadTypeName(element, source);
             if (name.Contains('<', StringComparison.Ordinal) || name.Contains('>', StringComparison.Ordinal))
             {
                 throw Error("E-JSON-TYPE", "generic types must be JSON objects, not strings", SpanFor(source, element));
             }
 
-            return SandboxType.Scalar(name);
+            return CreateType(name, [], SpanFor(source, element));
         }
 
         RequireObject(element, "type");
@@ -90,7 +90,28 @@ internal static class JsonExpressionReader
         var arguments = element.TryGetProperty("arguments", out var args)
             ? ReadTypeArguments(args, source)
             : [];
-        return new SandboxType(ReadStringValue(Required(element, "name"), "name", source), arguments);
+        return CreateType(ReadTypeName(Required(element, "name"), source), arguments, SpanFor(source, element));
+    }
+
+    private static SandboxType CreateType(string name, IReadOnlyList<SandboxType> arguments, SourceSpan span)
+    {
+        if (StringComparer.Ordinal.Equals(name, SandboxType.RecordName) && arguments.Count == 0)
+        {
+            throw Error("E-JSON-TYPE", "record types must declare at least one field", span);
+        }
+
+        return new SandboxType(name, arguments);
+    }
+
+    private static string ReadTypeName(JsonElement element, JsonSourceMap? source)
+    {
+        var name = ReadStringValue(element, "type name", source);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw Error("E-JSON-TYPE", "type names must not be empty or whitespace", SpanFor(source, element));
+        }
+
+        return name;
     }
 
     private static CallExpression ReadCall(JsonElement element, string name, JsonSourceMap source)
