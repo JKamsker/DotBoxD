@@ -43,11 +43,13 @@ function New-CoverageBucket(
     [string] $Kind,
     [string[]] $PackagePatterns,
     [double] $LineFloor,
-    [double] $BranchFloor) {
+    [double] $BranchFloor,
+    [string[]] $FilePatterns = @()) {
     [pscustomobject] @{
         Name = $Name
         Kind = $Kind
         PackagePatterns = $PackagePatterns
+        FilePatterns = @($FilePatterns | Where-Object { $_ })
         LineFloor = $LineFloor
         BranchFloor = $BranchFloor
         ValidLines = @{}
@@ -64,12 +66,18 @@ function Add-ConfiguredBucket($Target, [string] $Kind, [string] $ContextPrefix) 
             throw "Each $ContextPrefix must define 'name'."
         }
         $context = "$ContextPrefix '$name'"
+        $filePatterns = if ($null -ne $area.PSObject.Properties["filePatterns"]) {
+            Get-RequiredStringArray $area "filePatterns" $context
+        } else {
+            @()
+        }
         $buckets.Add((New-CoverageBucket `
             $name `
             $Kind `
             (Get-RequiredStringArray $area "packagePatterns" $context) `
             (Get-RequiredDouble $area "minimumLineCoverage" $context) `
-            (Get-RequiredDouble $area "minimumBranchCoverage" $context)))
+            (Get-RequiredDouble $area "minimumBranchCoverage" $context) `
+            $filePatterns))
     }
 }
 
@@ -110,7 +118,7 @@ function Test-ShippingSourceFile([string] $file) {
         $normalized -match '(^|/)(Channels|CodeGeneration|Hosting|Kernels|Meta|Pushdown|Services)/'
 }
 
-function Test-PackagePattern([string] $name, [string[]] $patterns) {
+function Test-CoveragePattern([string] $name, [string[]] $patterns) {
     foreach ($pattern in $patterns) {
         if ($name -like $pattern) {
             return $true
@@ -182,7 +190,8 @@ foreach ($report in $reports) {
             }
 
             $matchingBuckets = @($buckets | Where-Object {
-                Test-PackagePattern $packageName $_.PackagePatterns
+                (Test-CoveragePattern $packageName $_.PackagePatterns) -and
+                    ($_.FilePatterns.Count -eq 0 -or (Test-CoveragePattern $file $_.FilePatterns))
             })
             foreach ($line in @($class.lines.line)) {
                 if ($null -eq $line) {

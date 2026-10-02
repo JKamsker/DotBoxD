@@ -5,6 +5,34 @@ namespace DotBoxD.Kernels.Tests.Fuzz.Json;
 
 public sealed class JsonBudgetSurvivorTests
 {
+    [Fact]
+    public void Null_json_is_rejected_before_budget_scanning()
+        => Assert.Equal("json", Assert.Throws<ArgumentNullException>(() => JsonImporter.Import(null!)).ParamName);
+
+    [Theory]
+    [InlineData(0xD800)]
+    [InlineData(0xDBFF)]
+    [InlineData(0xDC00)]
+    [InlineData(0xDFFF)]
+    public void Truncated_input_ending_in_a_surrogate_reports_invalid_json(int codeUnit)
+    {
+        var json = "\"" + (char)codeUnit;
+        var exception = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
+        Assert.Contains(exception.Diagnostics, d => d.Code == "E-JSON-INVALID");
+    }
+
+    [Fact]
+    public void Byte_budget_precedes_malformed_text_materialization()
+    {
+        // An unpaired low surrogate contributes a replacement character's three UTF-8
+        // bytes. It must not be counted as a pair with the preceding non-surrogate.
+        var invalid = "世" + (char)0xDC00;
+        var json = $$"""{"id":"{{invalid}}","version":"1.0.0","functions":[]}""";
+        json += new string(' ', 1_048_577 - Encoding.UTF8.GetByteCount(json));
+        var exception = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
+        Assert.Contains(exception.Diagnostics, d => d.Code == "E-JSON-LIMIT");
+    }
+
     [Theory]
     [InlineData("\u007f")]
     [InlineData("\u0080")]

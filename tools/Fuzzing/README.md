@@ -5,7 +5,8 @@ The normal test suites include deterministic property and mutation-oriented test
 - `tests/DotBoxD.Services.Tests/Fuzz`: frame parsing against an independent wire oracle,
   all 256 type tags, size/overflow boundaries, fragmented streams, every truncation of
   representative frames and envelopes, duplicate/missing/misspelled/wrong-type fields,
-  shuffled fields with nested unknown values, trailing bytes, and Unicode scalar/surrogate cases.
+  shuffled fields with nested unknown values, trailing bytes, Unicode scalar/surrogate cases,
+  single-byte sequence segments, reader depth restoration, and serializer configuration contracts.
 - `tests/DotBoxD.Kernels.Tests/Fuzz/Json`: generated expression trees, canonical export/import
   identity, input corruption, duplicate keys, and exact JSON byte/string/breadth/depth/token limits.
 
@@ -37,9 +38,27 @@ The `.config/stryker` configurations cover JSON import budgets/string safety, po
 assembly verification, RPC framing/streaming, and MessagePack envelopes. The mutation workflow
 runs weekly, manually, or on PRs bearing `run-mutation-tests`. Reports include surviving,
 uncovered, timed-out, and compile-error mutants; inspect those distinctions before interpreting
-any score. JSON and MessagePack enforce an 80% floor; the policy and protocol floors remain unchanged.
+any score. JSON and MessagePack enforce a 95% floor; the policy and protocol floors remain unchanged.
 Run mutation campaigns separately from builds/tests in the same checkout to avoid competing
 writes to build outputs. No mutants are excluded simply to make the new tests pass.
+
+## Line and branch coverage
+
+The coverage gate retains the existing global and assembly floors and adds 95% line and branch
+floors for the affected boundaries. These are explicit file scopes, not claims about repository-wide
+coverage. `filePatterns` in `.config/code-enforcer/coverage.json` narrows a bucket within its
+`packagePatterns`; omitting it preserves package-wide measurement. Empty filters and critical
+buckets matching no source lines fail validation.
+
+| Scope | Files | Line coverage | Branch coverage |
+| --- | --- | ---: | ---: |
+| JSON import/string boundaries | `JsonImportBudgetGuard`, `JsonStringSafety`, `JsonEscapedStringValidator`, `JsonExpressionReader` | 98.85% | 95.28% |
+| MessagePack envelope boundaries | `MessagePackRpcSerializer`, `RpcRequestFormatter`, `RpcResponseFormatter`, `WellFormedStringFormatter` | 100% | 99.49% |
+| RPC framing boundaries | `MessageFramer`, `MessageFrameReader`, `MessageStreamFramer` | 100% | 100% |
+
+Collect coverage with `dotnet test --collect "XPlat Code Coverage"`, as in `.github/workflows/ci.yml`,
+then run `pwsh eng/scripts/check-coverage.ps1`. The file-filter regression suite is
+`pwsh tools/Fuzzing/test-coverage-gate.ps1` and runs in PR fuzz-replay CI.
 
 ## Replay and seed corpus
 

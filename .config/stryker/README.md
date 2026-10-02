@@ -46,3 +46,10 @@ Both focused scopes now have supported `thresholds.break` ratchets of 85. The re
 protocol/framing undetected mutants are concentrated in equivalent empty-payload copies, `ConfigureAwait`
 continuation flags, defensive disposal paths, and redundant frame-minimum guards that are validated by
 later length checks. Tool crashes and invalid configs should still fail.
+
+The JSON import/string-safety and MessagePack envelope configurations enforce 95% break thresholds.
+Their `mutate` lists define explicit file scopes; these thresholds do not describe whole-assembly
+coverage. See [the fuzzing guide](../../tools/Fuzzing/README.md) for the deterministic test suites,
+mutation commands, corpus replay, and separate 95% line/branch gates. Mutation scores include
+timeouts as detected mutants, so review the killed, timed-out, surviving, and uncovered counts
+alongside the percentage.

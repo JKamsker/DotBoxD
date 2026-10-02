@@ -35,6 +35,27 @@
   ],
   "criticalAreas": [
     {
+      "name": "JSON import and string boundaries",
+      "packagePatterns": [ "DotBoxD.Kernels.Serialization.Json" ],
+      "filePatterns": [ "*/JsonImportBudgetGuard.cs", "*/JsonStringSafety.cs", "*/JsonEscapedStringValidator.cs", "*/JsonExpressionReader.cs" ],
+      "minimumLineCoverage": 95,
+      "minimumBranchCoverage": 95
+    },
+    {
+      "name": "MessagePack envelope boundaries",
+      "packagePatterns": [ "DotBoxD.Codecs.MessagePack" ],
+      "filePatterns": [ "*/MessagePackRpcSerializer.cs", "*/RpcRequestFormatter.cs", "*/RpcResponseFormatter.cs", "*/WellFormedStringFormatter.cs" ],
+      "minimumLineCoverage": 95,
+      "minimumBranchCoverage": 95
+    },
+    {
+      "name": "RPC framing boundaries",
+      "packagePatterns": [ "DotBoxD.Services" ],
+      "filePatterns": [ "*/MessageFramer.cs", "*/MessageFrameReader.cs", "*/MessageStreamFramer.cs" ],
+      "minimumLineCoverage": 95,
+      "minimumBranchCoverage": 95
+    },
+    {
       "name": "Critical verifier",
       "packagePatterns": [ "DotBoxD.Kernels.Verifier" ],
       "minimumLineCoverage": 92,

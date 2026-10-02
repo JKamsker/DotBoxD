@@ -13,6 +13,8 @@ on:
       - 'src/Channels/DotBoxD.Codecs.MessagePack/**'
       - '.github/workflows/coverage-fuzz.yml'
       - 'eng/scripts/check-fuzz-findings.sh'
+      - 'eng/scripts/check-coverage.ps1'
+      - '.config/code-enforcer/coverage.json'
 
 permissions:
   contents: read
@@ -33,6 +35,9 @@ jobs:
           dotnet-version: 10.0.x
       - name: Test findings gate
         run: bash tools/Fuzzing/test-findings-gate.sh
+      - name: Test coverage file filters
+        shell: pwsh
+        run: ./tools/Fuzzing/test-coverage-gate.ps1
       - name: Build and replay all targets without instrumentation
         shell: bash
         run: |
