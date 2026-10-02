@@ -71,7 +71,8 @@ internal static class RpcMemberMetadataGeneratorHarness
         => Assert.Contains(
             generatedSources,
             source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
-                      source.Contains(expectedSource, StringComparison.Ordinal));
+                      source.Replace("\r\n", "\n", StringComparison.Ordinal).Contains(
+                          expectedSource.Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal));
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

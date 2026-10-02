@@ -10,6 +10,35 @@ public sealed class ServiceTypePlatformCompatibilityAttributeTests
     private const string SupportedOsPlatformAttribute =
         "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(\"windows\")]";
 
+    [Theory]
+    [InlineData("[SupportedOSPlatform(\"windows7.0\")][UnsupportedOSPlatform(\"windows10.0\")]")]
+    [InlineData("[UnsupportedOSPlatform(\"windows\")][SupportedOSPlatform(\"windows10.0\")]")]
+    [InlineData("[UnsupportedOSPlatform(\"linux\", \"unavailable\")]")]
+    [InlineData("[ObsoletedOSPlatform(\"windows10.0\", \"use replacement\", Url = \"https://example.invalid/replacement\")]")]
+    public void PlatformPolicies_PreserveAllBoundariesAndMessagesOnGeneratedTypes(string annotations)
+    {
+        var source = ServiceSource.Replace("[SupportedOSPlatform(\"windows\")]", annotations, StringComparison.Ordinal);
+        var (final, runResult) = RunWithPreviewByRefLikeGenerics(source);
+        final.GetDiagnostics().Should().NotContain(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var original = final.GetTypeByMetadataName("Regress.ServiceTypePlatformCompatibility.IPlatformService")!;
+        var expected = PlatformMetadata(original);
+
+        foreach (var typeName in new[] { "PlatformServiceProxy", "IPlatformServiceAsync", "PlatformServiceDispatcher" })
+        {
+            var generatedType = final.GetSymbolsWithName(typeName).OfType<INamedTypeSymbol>().Single();
+            PlatformMetadata(generatedType).Should().Equal(expected);
+        }
+
+        runResult.Diagnostics.Should().NotContain(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    private static string?[] PlatformMetadata(INamedTypeSymbol type)
+        => type.GetAttributes()
+            .Where(attribute => attribute.AttributeClass?.ContainingNamespace.ToDisplayString() == "System.Runtime.Versioning")
+            .Select(attribute => attribute.ToString())
+            .OrderBy(attribute => attribute, StringComparer.Ordinal)
+            .ToArray();
+
     [Fact]
     public void PlatformRestrictedServices_PreservePlatformCompatibilityOnGeneratedTypes()
     {

@@ -54,4 +54,50 @@ public sealed class EnumerableBoundedCollectionTests
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedEnumerable");
         Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
     }
+
+    [Theory]
+    [InlineData("Dictionary<int, int>", "Map.Keys.Any()", false)]
+    [InlineData("Dictionary<int, int>", "Enumerable.Any(Map.Keys)", false)]
+    [InlineData("Dictionary<int, int>", "Map.Values.Any()", false)]
+    [InlineData("Dictionary<int, int>", "Enumerable.Any(Map.Values)", false)]
+    [InlineData("Dictionary<int, int>", "Enumerable.Contains(Map.Keys, 1)", false)]
+    [InlineData("Dictionary<int, int>", "Enumerable.Contains(Map.Values, 1)", true)]
+    [InlineData("Dictionary<int, int>", "Enumerable.Contains(Map.Keys, 1, null)", true)]
+    [InlineData("Dictionary<int, int>", "Map.Keys.Any(value => value == 1)", true)]
+    [InlineData("Dictionary<int, int>", "Map.Values.Any(value => value == 1)", true)]
+    [InlineData("SortedDictionary<int, int>", "Map.Keys.Any()", false)]
+    [InlineData("SortedDictionary<int, int>", "Enumerable.Any(Map.Keys)", false)]
+    [InlineData("SortedDictionary<int, int>", "Map.Values.Any()", false)]
+    [InlineData("SortedDictionary<int, int>", "Enumerable.Any(Map.Values)", false)]
+    [InlineData("SortedDictionary<int, int>", "Enumerable.Contains(Map.Keys, 1)", false)]
+    [InlineData("SortedDictionary<int, int>", "Enumerable.Contains(Map.Values, 1)", true)]
+    [InlineData("SortedDictionary<int, int>", "Enumerable.Contains(Map.Keys, 1, null)", true)]
+    [InlineData("SortedDictionary<int, int>", "Map.Keys.Any(value => value == 1)", true)]
+    [InlineData("SortedDictionary<int, int>", "Map.Values.Any(value => value == 1)", true)]
+    [InlineData("SortedList<int, int>", "Map.Keys.Any()", false)]
+    [InlineData("SortedList<int, int>", "Enumerable.Any(Map.Keys)", false)]
+    [InlineData("SortedList<int, int>", "Map.Values.Any()", false)]
+    [InlineData("SortedList<int, int>", "Enumerable.Any(Map.Values)", false)]
+    [InlineData("SortedList<int, int>", "Enumerable.Contains(Map.Values, 1)", true)]
+    [InlineData("SortedList<int, int>", "Map.Keys.Any(value => value == 1)", true)]
+    [InlineData("SortedList<int, int>", "Map.Values.Any(value => value == 1)", true)]
+    public async Task Framework_dictionary_views_preserve_bounded_calls_and_scan_diagnostics(
+        string collectionType, string expression, bool reportsScan)
+    {
+        var source = $$"""
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("bounded-dictionary-view")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly {{collectionType}} Map = new();
+                public bool ShouldHandle(string e, HookContext context) => {{expression}};
+                public void Handle(string e, HookContext context) { }
+            }
+            """;
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedDictionaryView");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
 }

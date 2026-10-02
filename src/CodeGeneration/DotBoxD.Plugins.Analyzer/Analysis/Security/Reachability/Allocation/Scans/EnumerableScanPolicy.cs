@@ -21,17 +21,18 @@ internal static class EnumerableScanPolicy
             source = conversion.Operand;
         }
 
-        return !IsBoundedCollectionCall(method, source?.Type);
+        return !IsBoundedCollectionCall(method, source);
     }
 
-    private static bool IsBoundedCollectionCall(IMethodSymbol method, ITypeSymbol? sourceType)
+    private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
     {
-        if (method.Name == "Any" && method.Parameters.Length == 1 && sourceType is IArrayTypeSymbol)
+        if (method.Name == "Any" && method.Parameters.Length == 1 &&
+            (source?.Type is IArrayTypeSymbol || IsSortedListView(source)))
         {
             return true;
         }
 
-        if (sourceType is not INamedTypeSymbol type || !FrameworkCollectionIdentity.IsFrameworkType(type))
+        if (source?.Type is not INamedTypeSymbol type || !FrameworkCollectionIdentity.IsFrameworkType(type))
         {
             return false;
         }
@@ -39,6 +40,12 @@ internal static class EnumerableScanPolicy
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return IsBoundedFrameworkCall(method, name);
     }
+
+    private static bool IsSortedListView(IOperation? source)
+        => source is IPropertyReferenceOperation { Property.Name: "Keys" or "Values" } property &&
+           FrameworkCollectionIdentity.IsFrameworkType(property.Property.ContainingType) &&
+           property.Property.ContainingType.OriginalDefinition.ToDisplayString(
+               SymbolDisplayFormat.CSharpErrorMessageFormat) == "System.Collections.Generic.SortedList<TKey, TValue>";
 
     private static bool IsBoundedFrameworkCall(IMethodSymbol method, string name)
         => method.Name switch
@@ -49,12 +56,25 @@ internal static class EnumerableScanPolicy
         };
 
     private static bool HasBoundedCount(string typeName)
+        => HasBoundedCollectionCount(typeName) || HasBoundedDictionaryViewCount(typeName);
+
+    private static bool HasBoundedCollectionCount(string typeName)
         => typeName is "System.Collections.Generic.List<T>" or "System.Collections.Generic.HashSet<T>" or
             "System.Collections.Generic.SortedSet<T>" or "System.Collections.Generic.Dictionary<TKey, TValue>" or
             "System.Collections.Generic.SortedList<TKey, TValue>" or "System.Collections.Generic.Queue<T>" or
             "System.Collections.Generic.Stack<T>" or "System.Collections.Generic.LinkedList<T>" or
             "System.Collections.Generic.SortedDictionary<TKey, TValue>";
 
+    private static bool HasBoundedDictionaryViewCount(string typeName)
+        => IsDictionaryKeyView(typeName) ||
+           typeName is "System.Collections.Generic.Dictionary<TKey, TValue>.ValueCollection" or
+               "System.Collections.Generic.SortedDictionary<TKey, TValue>.ValueCollection";
+
     private static bool HasBoundedContains(string typeName)
-        => typeName is "System.Collections.Generic.HashSet<T>" or "System.Collections.Generic.SortedSet<T>";
+        => typeName is "System.Collections.Generic.HashSet<T>" or "System.Collections.Generic.SortedSet<T>" ||
+           IsDictionaryKeyView(typeName);
+
+    private static bool IsDictionaryKeyView(string typeName)
+        => typeName is "System.Collections.Generic.Dictionary<TKey, TValue>.KeyCollection" or
+            "System.Collections.Generic.SortedDictionary<TKey, TValue>.KeyCollection";
 }

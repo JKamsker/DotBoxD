@@ -5,8 +5,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 internal static class ExperimentalAttributeSource
 {
     private const string ExperimentalAttributeName = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
-    private const string SupportedOSPlatformAttributeName =
-        "System.Runtime.Versioning.SupportedOSPlatformAttribute";
     private const string RequiresDynamicCodeAttributeName =
         "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
     private const string RequiresUnreferencedCodeAttributeName =
@@ -25,7 +23,7 @@ internal static class ExperimentalAttributeSource
         var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var type in types)
         {
-            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeSupportedPlatforms: true);
+            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: true);
         }
 
         return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
@@ -36,14 +34,12 @@ internal static class ExperimentalAttributeSource
         var diagnosticIds = new SortedSet<string>(StringComparer.Ordinal);
         var codeRequirementAttributes = new SortedDictionary<string, string>(StringComparer.Ordinal);
         var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
-        var restrictions = new List<Dictionary<string, PlatformSupport>>();
         foreach (var type in types)
         {
-            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeSupportedPlatforms: false);
-            CollectSupportedPlatformRestrictions(type, restrictions);
+            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: false);
         }
 
-        platformAttributes.UnionWith(SharedSupportedPlatformAttributes(restrictions));
+        platformAttributes.UnionWith(SharedPlatformAttributeSource.FromTypes(types));
         return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
     }
 
@@ -68,17 +64,17 @@ internal static class ExperimentalAttributeSource
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
         ISet<string> platformAttributes,
-        bool includeSupportedPlatforms)
+        bool includeAvailabilityPlatforms)
     {
         switch (type)
         {
             case null:
                 return;
             case IArrayTypeSymbol array:
-                Collect(array.ElementType, diagnosticIds, codeRequirementAttributes, platformAttributes, includeSupportedPlatforms);
+                Collect(array.ElementType, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
                 return;
             case INamedTypeSymbol named:
-                CollectNamed(named, diagnosticIds, codeRequirementAttributes, platformAttributes, includeSupportedPlatforms);
+                CollectNamed(named, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
                 return;
         }
     }
@@ -88,7 +84,7 @@ internal static class ExperimentalAttributeSource
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
         ISet<string> platformAttributes,
-        bool includeSupportedPlatforms)
+        bool includeAvailabilityPlatforms)
     {
         foreach (var attribute in named.GetAttributes())
         {
@@ -101,7 +97,7 @@ internal static class ExperimentalAttributeSource
 
             CollectCodeRequirementAttribute(attribute, codeRequirementAttributes);
             if (PlatformCompatibilityAttributeSource(attribute) is { } source &&
-                (includeSupportedPlatforms || !IsSupportedPlatformAttribute(attribute)))
+                (includeAvailabilityPlatforms || !SharedPlatformAttributeSource.IsAvailabilityAttribute(attribute)))
             {
                 platformAttributes.Add(source);
             }
@@ -109,99 +105,9 @@ internal static class ExperimentalAttributeSource
 
         foreach (var argument in named.TypeArguments)
         {
-            Collect(argument, diagnosticIds, codeRequirementAttributes, platformAttributes, includeSupportedPlatforms);
+            Collect(argument, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
         }
     }
-
-    private static void CollectSupportedPlatformRestrictions(
-        ITypeSymbol? type,
-        ICollection<Dictionary<string, PlatformSupport>> restrictions)
-    {
-        switch (type)
-        {
-            case IArrayTypeSymbol array:
-                CollectSupportedPlatformRestrictions(array.ElementType, restrictions);
-                return;
-            case INamedTypeSymbol named:
-                var supportedPlatforms = SupportedPlatforms(named);
-                if (supportedPlatforms.Count > 0)
-                {
-                    restrictions.Add(supportedPlatforms);
-                }
-
-                foreach (var argument in named.TypeArguments)
-                {
-                    CollectSupportedPlatformRestrictions(argument, restrictions);
-                }
-
-                return;
-        }
-    }
-
-    private static Dictionary<string, PlatformSupport> SupportedPlatforms(INamedTypeSymbol type)
-    {
-        var platforms = new Dictionary<string, PlatformSupport>(StringComparer.OrdinalIgnoreCase);
-        foreach (var attribute in type.GetAttributes())
-        {
-            if (!IsSupportedPlatformAttribute(attribute) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not string name)
-            {
-                continue;
-            }
-
-            var platform = new PlatformSupport(name);
-            // Repeated support annotations on one type start at the earliest version.
-            if (!platforms.TryGetValue(platform.Family, out var existing) || existing.IsMoreRestrictiveThan(platform))
-            {
-                platforms[platform.Family] = platform;
-            }
-        }
-
-        return platforms;
-    }
-
-    private static IEnumerable<string> SharedSupportedPlatformAttributes(
-        IReadOnlyList<Dictionary<string, PlatformSupport>> restrictions)
-    {
-        if (restrictions.Count == 0)
-        {
-            return Enumerable.Empty<string>();
-        }
-
-        var shared = new Dictionary<string, PlatformSupport>(restrictions[0], StringComparer.OrdinalIgnoreCase);
-        foreach (var restriction in restrictions.Skip(1))
-        {
-            foreach (var family in shared.Keys.Except(restriction.Keys, StringComparer.OrdinalIgnoreCase).ToArray())
-            {
-                shared.Remove(family);
-            }
-
-            foreach (var pair in restriction)
-            {
-                var family = pair.Key;
-                var platform = pair.Value;
-                if (shared.TryGetValue(family, out var existing) && platform.IsMoreRestrictiveThan(existing))
-                {
-                    shared[family] = platform;
-                }
-            }
-        }
-
-        if (shared.Count == 0)
-        {
-            throw new NotSupportedException("the receiver, input, and output types do not share a supported platform.");
-        }
-
-        return shared.Values
-            .OrderBy(static platform => platform.Name, StringComparer.Ordinal)
-            .Select(static platform =>
-                "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(" +
-                LiteralReader.StringLiteral(platform.Name) + ")]\n");
-    }
-
-    private static bool IsSupportedPlatformAttribute(AttributeData attribute)
-        => attribute.AttributeClass?.ToDisplayString() == SupportedOSPlatformAttributeName;
 
     private static void CollectCodeRequirementAttribute(
         AttributeData attribute,
@@ -247,26 +153,4 @@ internal static class ExperimentalAttributeSource
             "(" + arguments + ")]\n";
     }
 
-    private sealed class PlatformSupport
-    {
-        public PlatformSupport(string name)
-        {
-            var versionStart = name.TakeWhile(static character => !char.IsDigit(character)).Count();
-            var family = name.Substring(0, versionStart);
-            Family = string.Equals(family, "osx", StringComparison.OrdinalIgnoreCase) ? "macos" : family;
-            Name = Family + name.Substring(versionStart);
-            Version = versionStart == name.Length || !System.Version.TryParse(name.Substring(versionStart), out var version)
-                ? null
-                : version;
-        }
-
-        public string Family { get; }
-
-        public string Name { get; }
-
-        private Version? Version { get; }
-
-        public bool IsMoreRestrictiveThan(PlatformSupport other)
-            => Version is not null && (other.Version is null || Version > other.Version);
-    }
 }
