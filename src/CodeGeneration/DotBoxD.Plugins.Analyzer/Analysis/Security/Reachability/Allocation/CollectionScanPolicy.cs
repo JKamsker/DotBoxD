@@ -12,12 +12,16 @@ internal static class CollectionScanPolicy
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string SortedDictionaryTypeName =
+        "System.Collections.Generic.SortedDictionary<TKey, TValue>";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
-        forbidden = method.IsStatic ? null! : GetDisplayName(method, typeName)!;
+        forbidden = method.IsStatic || !FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType)
+            ? null!
+            : GetDisplayName(method, typeName)!;
         return forbidden is not null;
     }
 
@@ -36,10 +40,20 @@ internal static class CollectionScanPolicy
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
-            (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
-            _ => null
+            _ => GetSortedCollectionDisplayName(method.Name, typeName)
         };
     }
+
+    private static string? GetSortedCollectionDisplayName(string methodName, string typeName)
+        => (typeName, methodName) switch
+        {
+            (SortedDictionaryTypeName, "ContainsValue") =>
+                "System.Collections.Generic.SortedDictionary.ContainsValue",
+            (SortedListTypeName, "ContainsValue") => "System.Collections.Generic.SortedList.ContainsValue",
+            (SortedListTypeName, "IndexOfValue") => "System.Collections.Generic.SortedList.IndexOfValue",
+            (SortedListTypeName, "TrimExcess") => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null
+        };
 
     private static string? GetSetDisplayName(string methodName, string typeName)
         => typeName switch

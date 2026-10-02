@@ -40,7 +40,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             _pending.Remove(pending.MessageId, pending, consumed: false);
             ReleasePendingSlot();
-            return ToFaultedTask<TResponse>(ex);
+            return ToFaultedOrCanceledTask<TResponse>(ct, ex);
         }
 
         return SendFrameAndReadUnaryResponseAsync<TResponse>(
@@ -159,7 +159,20 @@ internal sealed partial class RpcPeerOutboundInvoker
         var requestSent = false;
         try
         {
-            await sendTask.ConfigureAwait(false);
+            try
+            {
+                await sendTask.ConfigureAwait(false);
+            }
+            catch (Exception) when (ct.IsCancellationRequested)
+            {
+                // A channel can observe caller cancellation and then report its own send
+                // failure. The caller's cancellation remains the terminal outcome while the
+                // send is in progress, and no cancel frame is sent because delivery is unknown.
+                _pending.TryCancel(messageId, pending, PendingCancellationKind.Caller);
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
+
             requestSent = true;
 
             // A synchronous send can complete the response and cancel the caller before this
@@ -224,4 +237,7 @@ internal sealed partial class RpcPeerOutboundInvoker
 
     private static Task<T> ToFaultedTask<T>(Exception error) =>
         Task.FromException<T>(error);
+
+    private static Task<T> ToFaultedOrCanceledTask<T>(CancellationToken ct, Exception error) =>
+        ct.IsCancellationRequested ? Task.FromCanceled<T>(ct) : ToFaultedTask<T>(error);
 }

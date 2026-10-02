@@ -2,6 +2,7 @@ namespace DotBoxD.Plugins.Kernel;
 
 public sealed partial class InstalledKernel
 {
+    private static readonly TimeSpan CancellationCallbackObservationTimeout = TimeSpan.FromSeconds(1);
     private readonly List<Action<InstalledKernel>> _revocationCallbacks = [];
     private int _revocationCancellationCallbackFailed;
 
@@ -23,7 +24,7 @@ public sealed partial class InstalledKernel
                 }
                 finally
                 {
-                    _revocationCompleted.TrySetResult();
+                    _revocationCancellationCallbacksCompleted.TrySetResult();
                 }
 
                 callbacks = DrainRevocationCallbacks();

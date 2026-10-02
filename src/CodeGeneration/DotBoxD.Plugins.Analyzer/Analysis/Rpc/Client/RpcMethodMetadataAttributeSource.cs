@@ -27,6 +27,14 @@ internal static class RpcMethodMetadataAttributeSource
                         "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute");
                     break;
 
+                case "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute");
+                    break;
+
                 case "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute":
                     AppendAttribute(
                         builder,

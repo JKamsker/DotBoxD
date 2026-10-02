@@ -172,6 +172,12 @@ internal static class InterpreterBindingCaller
         BindingDescriptor descriptor,
         BindingAuditInvocation auditInvocation)
     {
+        if (context.CancellationToken.IsCancellationRequested)
+        {
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
+            throw new OperationCanceledException(context.CancellationToken);
+        }
+
         var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{descriptor.Id}' failed");
         context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
         return new SandboxRuntimeException(error);
