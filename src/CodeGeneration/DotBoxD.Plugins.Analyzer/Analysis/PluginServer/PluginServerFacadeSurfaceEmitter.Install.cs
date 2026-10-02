@@ -37,9 +37,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(__request);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
-        builder.AppendLine("        var __response = await Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false) ?? throw new global::System.InvalidOperationException(\"The control service returned a null server extension response.\");");
-        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
-        builder.AppendLine("        return irInvocation.DecodeResult(lambda, __response);");
+        PluginServerWireInvocationEmitter.Append(builder, "irInvocation.DecodeResult(lambda, __response ?? throw new global::System.InvalidOperationException(\"The control service returned a null server extension response.\"))");
         builder.AppendLine("    }");
     }
 
@@ -67,9 +65,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(__request);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
-        builder.AppendLine("        var __response = await Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false) ?? throw new global::System.InvalidOperationException(\"The control service returned a null server extension response.\");");
-        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
-        builder.AppendLine("        return irInvocation.DecodeResult(captures, lambda, __response);");
+        PluginServerWireInvocationEmitter.Append(builder, "irInvocation.DecodeResult(captures, lambda, __response ?? throw new global::System.InvalidOperationException(\"The control service returned a null server extension response.\"))");
         builder.AppendLine("    }");
     }
 
