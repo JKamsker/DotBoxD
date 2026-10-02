@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
@@ -6,6 +7,46 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ServiceModelFactory
 {
+    private static string BuildTypeAttributePrefix(
+        INamedTypeSymbol interfaceSymbol,
+        string experimentalAttributePrefix,
+        CancellationToken ct)
+    {
+        var attributes = new StringBuilder(experimentalAttributePrefix);
+        foreach (var attribute in interfaceSymbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!IsSupportedOSPlatformAttribute(attribute))
+            {
+                continue;
+            }
+
+            attributes.Append("    [global::System.Runtime.Versioning.SupportedOSPlatformAttribute(");
+            AppendStringArgument(attributes, attribute.ConstructorArguments[0]);
+            attributes.AppendLine(")]");
+        }
+
+        return attributes.ToString();
+    }
+
+    private static bool IsSupportedOSPlatformAttribute(AttributeData attribute) =>
+        attribute.AttributeClass is { } attributeType &&
+        attributeType.ToDisplayString() == "System.Runtime.Versioning.SupportedOSPlatformAttribute" &&
+        attribute.ConstructorArguments.Length == 1 &&
+        ReturnTypeClassifier.IsTrustedFrameworkType(attributeType);
+
+    private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
+    {
+        if (argument.Value is string value)
+        {
+            sb.Append('"').Append(Infrastructure.LiteralHelpers.EscapeStringLiteral(value)).Append('"');
+        }
+        else
+        {
+            sb.Append("null");
+        }
+    }
+
     private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
     {
         foreach (var namedArg in serviceAttribute.NamedArguments)
