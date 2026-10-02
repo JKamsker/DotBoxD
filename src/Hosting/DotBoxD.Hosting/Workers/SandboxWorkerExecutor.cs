@@ -74,25 +74,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
                     WorkerCancellationOrTimeoutError(cancellationToken));
             }
 
-            var resultIsValid = SandboxWorkerResultValidator.Validate(plan, entrypoint, options, result, out var error);
-            if (timeout.IsCancellationRequested)
-            {
-                return Execution.SandboxHost.WorkerIsolationFailedResult(
-                    plan,
-                    options,
-                    WorkerCancellationOrTimeoutError(cancellationToken));
-            }
-
-            return resultIsValid
-                ? result with
-                {
-                    AuditEvents = result.AuditEvents.ToSequencedArray(),
-                    ExecutionDispatched = true
-                }
-                : Execution.SandboxHost.WorkerIsolationFailedResult(
-                    plan,
-                    options,
-                    error);
+            return ValidateResult(plan, entrypoint, options, result, timeout.Token, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -124,6 +106,32 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker) : I
                 options,
                 new SandboxError(SandboxErrorCode.HostFailure, "worker process execution failed"));
         }
+    }
+
+    private static SandboxExecutionResult ValidateResult(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        CancellationToken timeoutToken,
+        CancellationToken callerToken)
+    {
+        var resultIsValid = SandboxWorkerResultValidator.Validate(plan, entrypoint, options, result, out var error);
+        if (timeoutToken.IsCancellationRequested)
+        {
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
+                plan,
+                options,
+                WorkerCancellationOrTimeoutError(callerToken));
+        }
+
+        return resultIsValid
+            ? result with
+            {
+                AuditEvents = result.AuditEvents.ToSequencedArray(),
+                ExecutionDispatched = true
+            }
+            : Execution.SandboxHost.WorkerIsolationFailedResult(plan, options, error);
     }
 
     private static void ObserveLateFailure(Task? pending)

@@ -38,14 +38,20 @@ internal static class CollectionScanPolicy
             (QueueTypeName, "TrimExcess", _) => "System.Collections.Generic.Queue.TrimExcess",
             (PriorityQueueTypeName, "TrimExcess", MethodKind.Ordinary) =>
                 "System.Collections.Generic.PriorityQueue.TrimExcess",
-            (SortedDictionaryTypeName, "ContainsValue", _) =>
-                "System.Collections.Generic.SortedDictionary.ContainsValue",
-            (SortedListTypeName, "ContainsValue", _) => "System.Collections.Generic.SortedList.ContainsValue",
-            (SortedListTypeName, "IndexOfValue", _) => "System.Collections.Generic.SortedList.IndexOfValue",
-            (SortedListTypeName, "TrimExcess", _) => "System.Collections.Generic.SortedList.TrimExcess",
-            _ => null
+            _ => GetSortedCollectionDisplayName(method.Name, typeName)
         };
     }
+
+    private static string? GetSortedCollectionDisplayName(string methodName, string typeName)
+        => (typeName, methodName) switch
+        {
+            (SortedDictionaryTypeName, "ContainsValue") =>
+                "System.Collections.Generic.SortedDictionary.ContainsValue",
+            (SortedListTypeName, "ContainsValue") => "System.Collections.Generic.SortedList.ContainsValue",
+            (SortedListTypeName, "IndexOfValue") => "System.Collections.Generic.SortedList.IndexOfValue",
+            (SortedListTypeName, "TrimExcess") => "System.Collections.Generic.SortedList.TrimExcess",
+            _ => null
+        };
 
     private static string? GetSetDisplayName(string methodName, string typeName)
         => typeName switch

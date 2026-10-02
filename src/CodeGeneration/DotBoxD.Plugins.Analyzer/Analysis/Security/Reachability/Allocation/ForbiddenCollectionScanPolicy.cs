@@ -60,6 +60,27 @@ internal static class ForbiddenCollectionScanPolicy
             return true;
         }
 
+        if (TryGetSetDisplayName(method, compilation, typeName, out forbidden))
+        {
+            return true;
+        }
+
+        if (IsStackTrimExcess(method.Name, typeName))
+        {
+            forbidden = "System.Collections.Generic.Stack.TrimExcess";
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool TryGetSetDisplayName(
+        IMethodSymbol method,
+        Compilation compilation,
+        string typeName,
+        out string forbidden)
+    {
         if (IsForbiddenSetScan(method.Name, typeName))
         {
             forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.{method.Name}";
@@ -81,12 +102,6 @@ internal static class ForbiddenCollectionScanPolicy
         if (IsSetProperSubsetOf(method, compilation, typeName))
         {
             forbidden = $"System.Collections.Generic.{SetCollectionType(typeName)}.IsProperSubsetOf";
-            return true;
-        }
-
-        if (IsStackTrimExcess(method.Name, typeName))
-        {
-            forbidden = "System.Collections.Generic.Stack.TrimExcess";
             return true;
         }
 
