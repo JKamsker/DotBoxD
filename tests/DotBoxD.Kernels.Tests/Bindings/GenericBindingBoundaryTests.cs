@@ -70,10 +70,41 @@ public sealed class GenericBindingBoundaryTests
         Assert.Equal(mode, result.ActualMode);
     }
 
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public async Task Caller_cancellation_takes_precedence_over_a_binding_fault(ExecutionMode mode)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var host = SandboxHost.Create(builder =>
+        {
+            builder.AddBinding(CancelThenThrowBinding(cancellation));
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable();
+        });
+        var module = await host.ImportJsonAsync(ReturnExpressionModule(
+            """{ "call": "test.cancelThenThrow", "args": [] }""",
+            "I32"));
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await ExecuteAsync(host, plan, mode, cancellation.Token);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.Cancelled, result.Error!.Code);
+        Assert.Equal(mode, result.ActualMode);
+        Assert.Contains(result.AuditEvents, auditEvent =>
+            auditEvent.Kind == "RunSummary" &&
+            !auditEvent.Success &&
+            auditEvent.ErrorCode == SandboxErrorCode.Cancelled);
+        Assert.DoesNotContain(result.AuditEvents, auditEvent =>
+            auditEvent.Kind == "RunSummary" &&
+            auditEvent.ErrorCode == SandboxErrorCode.BindingFailure);
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteAsync(
         SandboxHost host,
         ExecutionPlan plan,
-        ExecutionMode mode)
+        ExecutionMode mode,
+        CancellationToken cancellationToken = default)
         => await host.ExecuteAsync(
             plan,
             "main",
@@ -82,7 +113,8 @@ public sealed class GenericBindingBoundaryTests
             {
                 Mode = mode,
                 AllowFallbackToInterpreter = false
-            });
+            },
+            cancellationToken);
 
     private static BindingDescriptor SlowBinding()
         => new(
@@ -115,6 +147,24 @@ public sealed class GenericBindingBoundaryTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => throw new OperationCanceledException(),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
+
+    private static BindingDescriptor CancelThenThrowBinding(CancellationTokenSource cancellation)
+        => new(
+            "test.cancelThenThrow",
+            SemVersion.One,
+            [],
+            SandboxType.I32,
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) =>
+            {
+                cancellation.Cancel();
+                throw new InvalidOperationException();
+            },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string ReturnExpressionModule(string expression, string returnType)
