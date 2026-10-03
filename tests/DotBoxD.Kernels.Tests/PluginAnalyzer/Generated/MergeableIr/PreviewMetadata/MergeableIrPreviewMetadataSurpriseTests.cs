@@ -81,4 +81,53 @@ public sealed partial class MergeableIrStepGeneratorTests
             generated,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Generator_preserves_parameterless_preview_feature_ir_body_payload_contract()
+    {
+        var result = RunGenerator(
+            """
+            using System;
+            using System.Runtime.Versioning;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [RequiresPreviewFeatures]
+            public sealed record PreviewEvent(int Value);
+
+            public sealed class StepPipeline<T>
+            {
+                public StepPipeline<T> Where(
+                    Func<T, bool> predicate,
+                    [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null)
+                    => this;
+            }
+
+            public static class Usage
+            {
+                public static StepPipeline<PreviewEvent> Configure(StepPipeline<PreviewEvent> pipeline)
+                    => pipeline.Where(item => item.Value >= 4);
+            }
+            """,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        var allDiagnostics = result.Diagnostics
+            .Concat(generatorDiagnostics)
+            .Concat(outputCompilation.GetDiagnostics())
+            .ToArray();
+        var focusedDiagnostics = allDiagnostics
+            .Where(diagnostic => diagnostic.Id.StartsWith("DBXK", StringComparison.Ordinal) &&
+                diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.GetMessage().Contains("preview", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.Empty(focusedDiagnostics);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]\n" +
+            "    public static global::DotBoxD.Abstractions.IRFunc<global::Sample.PreviewEvent, bool> CreateIRFunc()",
+            GeneratedSource(result),
+            StringComparison.Ordinal);
+    }
 }

@@ -152,8 +152,18 @@ internal static class ExperimentalAttributeSource
 
     private static void CollectPreviewFeatureAttribute(AttributeData attribute, ISet<string> attributes)
     {
-        if (attribute.AttributeClass?.ToDisplayString() != RequiresPreviewFeaturesAttributeName ||
-            attribute.ConstructorArguments.Length != 1 ||
+        if (attribute.AttributeClass?.ToDisplayString() != RequiresPreviewFeaturesAttributeName)
+        {
+            return;
+        }
+
+        if (attribute.ConstructorArguments.Length == 0)
+        {
+            attributes.Add("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]\n");
+            return;
+        }
+
+        if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string message)
         {
             return;
