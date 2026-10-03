@@ -29,6 +29,9 @@ if ($requiredNames.Count -eq 0) {
 }
 
 $defaultMinimums = @{
+    PluginConnectionHostLifetimeTests = 5
+    MemberPlatformMetadataParityTests = 6
+    ForeignMemberAttributeIdentityTests = 11
     SafeFileSystemTests = 8
     SafeFileSystemWriteTests = 11
     SafeFileSystemReparsePointTests = 4

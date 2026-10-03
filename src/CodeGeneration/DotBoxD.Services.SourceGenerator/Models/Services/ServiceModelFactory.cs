@@ -92,7 +92,8 @@ internal static partial class ServiceModelFactory
 
         foreach (var propertySymbol in members.Properties)
         {
-            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
+            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, context.SemanticModel.Compilation,
+                    ct, out var property, out var propertyLocation))
             {
                 continue;
             }
@@ -192,6 +193,7 @@ internal static partial class ServiceModelFactory
             var method = MethodModelFactory.Build(
                 buildContext.DisplayName,
                 methodSymbol,
+                compilation,
                 cancellationTokenSymbol,
                 rpcStreamHandleSymbol,
                 validationCache,

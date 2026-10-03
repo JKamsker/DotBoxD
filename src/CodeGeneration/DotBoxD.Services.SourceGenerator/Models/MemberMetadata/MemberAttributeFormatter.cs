@@ -14,20 +14,26 @@ internal static class MemberAttributeFormatter
     private const string RequiresUnreferencedCodeAttribute =
         "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
 
-    public static string BuildPrefix(ISymbol symbol, CancellationToken ct)
+    public static string BuildPrefix(ISymbol symbol, Compilation compilation, CancellationToken ct)
     {
         var attributes = new StringBuilder();
         foreach (var attr in symbol.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-            var attributeType = attr.AttributeClass?.ToDisplayString();
+            if (attr.AttributeClass is not { } type ||
+                !SymbolEqualityComparer.Default.Equals(type, compilation.GetTypeByMetadataName(type.ToDisplayString())))
+            {
+                continue;
+            }
+
+            var attributeType = type.ToDisplayString();
             if (attributeType == "System.ObsoleteAttribute")
             {
                 AppendObsoleteAttribute(attributes, attr);
             }
-            else if (IsSupportedOSPlatformAttribute(attr))
+            else if (PlatformAttributeFormatter.IsSupported(attr))
             {
-                AppendSupportedOSPlatformAttribute(attributes, attr);
+                PlatformAttributeFormatter.Append(attributes, attr);
             }
             else if (attributeType is RequiresAssemblyFilesAttribute or
                 RequiresDynamicCodeAttribute or
@@ -80,19 +86,6 @@ internal static class MemberAttributeFormatter
         }
 
         return hasArguments;
-    }
-
-    private static bool IsSupportedOSPlatformAttribute(AttributeData attr) =>
-        attr.AttributeClass is { } attributeType &&
-        attributeType.ToDisplayString() == "System.Runtime.Versioning.SupportedOSPlatformAttribute" &&
-        attr.ConstructorArguments.Length == 1 &&
-        ReturnTypeClassifier.IsTrustedFrameworkType(attributeType);
-
-    private static void AppendSupportedOSPlatformAttribute(StringBuilder sb, AttributeData attr)
-    {
-        sb.Append("[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(");
-        AppendStringArgument(sb, attr.ConstructorArguments[0]);
-        sb.AppendLine(")]");
     }
 
     private static void AppendCodeRequirementAttribute(
