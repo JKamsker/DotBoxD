@@ -20,6 +20,7 @@ internal static partial class MethodModelFactory
     public static MethodModel Build(
         string displayName,
         IMethodSymbol methodSymbol,
+        Compilation compilation,
         INamedTypeSymbol? cancellationTokenSymbol,
         INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
@@ -112,7 +113,7 @@ internal static partial class MethodModelFactory
             ReturnKind: returnKind,
             DeclaredReturnType: declaredReturn.Type,
             UnwrappedReturnType: unwrappedReturnType,
-            MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, ct) +
+            MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, compilation, ct) +
                 BuildMemberAttributePrefix(methodSymbol, ct),
             ReturnRefKindKeyword: ReturnRefKindKeyword(methodSymbol.RefKind),
             ReturnAttributePrefix: BuildReturnFlowAttributePrefix(methodSymbol, ct),

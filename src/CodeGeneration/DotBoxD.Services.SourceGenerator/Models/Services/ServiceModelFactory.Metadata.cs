@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -17,33 +16,17 @@ internal static partial class ServiceModelFactory
         foreach (var attribute in interfaceSymbol.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-            if (!IsPlatformCompatibilityAttribute(attribute))
+            if (!PlatformAttributeFormatter.IsSupported(attribute))
             {
                 continue;
             }
 
-            attributes.Append("    [global::").Append(attribute.AttributeClass!.ToDisplayString()).Append('(');
-            var arguments = attribute.ConstructorArguments.Select(FormatPlatformArgument).ToList();
-            arguments.AddRange(attribute.NamedArguments.Select(argument =>
-                argument.Key + " = " + FormatPlatformArgument(argument.Value)));
-            attributes.Append(string.Join(", ", arguments)).AppendLine(")]");
+            attributes.Append("    ");
+            PlatformAttributeFormatter.Append(attributes, attribute);
         }
 
         return attributes.ToString();
     }
-
-    private static bool IsPlatformCompatibilityAttribute(AttributeData attribute) =>
-        attribute.AttributeClass is { } attributeType &&
-        attributeType.ToDisplayString() is
-            "System.Runtime.Versioning.SupportedOSPlatformAttribute" or
-            "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" or
-            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" &&
-        ReturnTypeClassifier.IsTrustedFrameworkType(attributeType);
-
-    private static string FormatPlatformArgument(TypedConstant argument)
-        => argument.Value is string value
-            ? "\"" + Infrastructure.LiteralHelpers.EscapeStringLiteral(value) + "\""
-            : "null";
 
     private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
     {

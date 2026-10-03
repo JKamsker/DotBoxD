@@ -371,6 +371,7 @@ jobs:
               "WorkerPlanCacheReuseTests",
               "WorkerPlanCacheAllocationTests",
               "WorkerHostLifetimeTests",
+              "PluginConnectionHostLifetimeTests",
               "WorkerHostCreationDisposalTests",
               "ConfiguredWorkerLifetimeTests",
               "ConfiguredWorkerPendingCallTests",
@@ -717,6 +718,8 @@ jobs:
             -Configuration Release `
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
+              "MemberPlatformMetadataParityTests",
+              "ForeignMemberAttributeIdentityTests",
               "UnsupportedShapeCoverageTests",
               "UnsupportedDtoConstructibilityTests",
               "ExplicitDtoUnionSignatureTests",
