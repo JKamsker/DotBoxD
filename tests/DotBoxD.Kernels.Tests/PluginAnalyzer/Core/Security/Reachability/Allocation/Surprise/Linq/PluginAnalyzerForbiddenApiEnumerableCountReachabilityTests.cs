@@ -27,7 +27,7 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableCountReachabilityTests
     public async Task Does_not_report_bounded_list_count_control()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("return Retained.Count > 0;"),
+            Source("return Enumerable.Count(Retained) > 0;"),
             "DotBoxDPluginAnalyzerEnumerableCountBoundedControlTest");
 
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
