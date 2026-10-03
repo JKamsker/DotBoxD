@@ -73,16 +73,19 @@ jobs:
           echo "Release version: ${ver}"
 
       - name: Restore
-        run: dotnet restore DotBoxD.Packages.slnx
+        run: dotnet restore DotBoxD.Packages.slnx -p:DotBoxDValidatePackages=true
 
       - name: Build
         run: dotnet build DotBoxD.Packages.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Pack
         run: >-
-          dotnet pack DotBoxD.Packages.slnx -c Release --no-build
+          dotnet pack DotBoxD.Packages.slnx -p:DotBoxDValidatePackages=true -c Release --no-build
           -o artifacts/packages
           -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Check dependency licenses and generate SBOM
+        run: python3 eng/supply-chain/release_inventory.py
 
       - name: Check package metadata
         shell: pwsh
@@ -102,6 +105,7 @@ jobs:
           path: |
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
+            artifacts/packages/sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
 
@@ -126,6 +130,13 @@ jobs:
           subject-path: |
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
+            artifacts/packages/sbom.cdx.json
+
+      - name: Attest dependency SBOM
+        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3
+        with:
+          subject-path: artifacts/packages/*.nupkg
+          sbom-path: artifacts/packages/sbom.cdx.json
 
   publish:
     name: Publish to NuGet.org
@@ -136,6 +147,7 @@ jobs:
     if: github.event_name == 'push' && github.repository == 'JKamsker/DotBoxD' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -148,18 +160,15 @@ jobs:
           name: packages
           path: artifacts/packages
 
-      # NuGet API key is fetched from Bitwarden Secrets Manager (same setup as the original
-      # ShaRPC repo). The repo provides the BW_ACCESS_TOKEN secret; the access token only
-      # lives on the canonical JKamsker/DotBoxD repo, so forks/PRs cannot publish.
-      - name: Fetch NuGet API key from Bitwarden
-        uses: bitwarden/sm-action@14f92f1d294ae3c2b6a3845d389cd2c318b0dfd8 # v2.2.0
+      - name: Obtain short-lived NuGet publishing key
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: nuget-login
         with:
-          access_token: ${{ secrets.BW_ACCESS_TOKEN }}
-          base_url: https://vault.bitwarden.eu
-          secrets: |
-            265b2fb6-2cf0-4859-9bc8-b24c00ab4378 > NUGET_API_KEY
+          user: Weirdo
 
       - name: Push to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >-
           dotnet nuget push "artifacts/packages/*.nupkg"
           --api-key "$NUGET_API_KEY"
@@ -189,3 +198,4 @@ jobs:
           files: |
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
+            artifacts/packages/sbom.cdx.json

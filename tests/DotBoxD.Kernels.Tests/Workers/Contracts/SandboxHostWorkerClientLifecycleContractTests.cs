@@ -35,9 +35,10 @@ public sealed class SandboxHostWorkerClientLifecycleContractTests
                     Options()));
 
             await factoryEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var disposeTask = Task.Run(worker.Dispose);
+            // Dispose returns while Lazy's factory is blocked. Complete it before releasing the
+            // factory so this asserts dispose-during-construction, independent of task scheduling.
+            worker.Dispose();
             releaseFactory.SetResult();
-            await disposeTask;
 
             var executionException = await Record.ExceptionAsync(
                 async () => await execution.WaitAsync(TimeSpan.FromSeconds(5)));

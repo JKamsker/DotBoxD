@@ -16,10 +16,10 @@ The communication substrate is deliberately separated from Services and Kernels:
 - **Codecs** - wire serialization behind a codec abstraction:
   - `DotBoxD.Codecs.MessagePack` - compact binary with hardened DotBoxD envelope formatters.
 
-All of these target **netstandard2.1**. The current wire does **not** negotiate protocol version,
-framing limits, codec, or contracts: both peers must be configured compatibly before connecting. Use
-`RpcContractManifest.Fingerprint` in an application-level readiness exchange when deployments need an
-explicit contract check.
+All of these target **netstandard2.1**. Raw legacy connections require compatible configuration.
+Hosts can opt into `RpcProtocolNegotiation` before starting a channel to agree wire version, codec,
+feature bits, frame limits and an optional contract fingerprint. See the
+[compatibility model](/reference/compatibility/) and [secure composition](/security/transport/).
 
 ## Why the stack is transport/codec-neutral (and when to pick each transport)
 
@@ -64,10 +64,8 @@ Grounded aspects:
   "client = get-only / server = provide-only" asymmetry is peer configuration, not a channel or
   transport property - see [peer-model](https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/design/peer-model.md).
 - **Adding a transport = implement three interfaces, change zero contracts.** The
-  [WebSocket guide](/channels/websocket-setup/) is proof by construction: it is not a shipped
-  package but a walkthrough that implements `ITransport`, `IServerTransport`, and `IRpcChannel` - the
-  same `[RpcService]` interfaces and generated proxies then run over a transport the framework never
-  shipped.
+  [WebSocket status page](/channels/websocket-setup/) describes an application-owned extension;
+  no WebSocket transport package or maintained copy-and-paste implementation ships.
 - **Codec neutrality is the same trick applied to bytes.** `RpcPeer`/`RpcHost` take an `ISerializer`;
   swapping codecs is passing a different one. The
   [MessagePack codec](https://github.com/JKamsker/DotBoxD/blob/main/src/Channels/DotBoxD.Codecs.MessagePack/MessagePackRpcSerializer.cs)
@@ -82,7 +80,7 @@ Grounded aspects:
 |---|---|---|
 | **Named pipes** (`DotBoxD.Transports.NamedPipes`) | Same machine, cross-process IPC | Separate package so TCP-only hosts take no pipe dependency; duplex, so one pipe can both serve and call. See [named-pipe transport](/channels/named-pipe-transport/). |
 | **TCP** (`DotBoxD.Transports.Tcp`) | Cross-host / over the network | Default [quick-start](/channels/quick-start/) transport; faces untrusted networks, so `TcpConnection` ships a slow-loris defense (`DefaultFrameReadIdleTimeout`, 30s). |
-| **WebSocket** (you implement it) | Browser clients, Unity WebGL, or HTTP-based connectivity | Not shipped - implement the three interfaces from the [WebSocket guide](/channels/websocket-setup/). |
+| **WebSocket** (you implement it) | Browser clients, Unity WebGL, or HTTP-based connectivity | Not shipped; see the [extension requirements](/channels/websocket-setup/). |
 | **In-process** (`InMemoryRpcChannel`) | Tests and benchmarks, no OS transport | Shipped in `DotBoxD.Services.Testing`, with `FaultInjectingRpcChannel` for deterministic failures. |
 
 Backpressure and the near-zero-allocation `ValueTask<T>` path are peer options, orthogonal to the

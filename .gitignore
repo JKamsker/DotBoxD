@@ -14,3 +14,6 @@ error.log
 
 # DocFX API metadata (generated into docs-site/src/content/docs/api, ignored there)
 docfx.probe.json
+
+# Python release inventory tests
+__pycache__/

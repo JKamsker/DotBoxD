@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\tools\DotBoxD.Cli\DotBoxD.Cli.csproj" />
     <ProjectReference Include="..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
     <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting.Http\DotBoxD.Hosting.Http.csproj" />
     <ProjectReference Include="..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />

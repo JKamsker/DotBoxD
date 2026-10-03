@@ -1,0 +1,7 @@
+<Project>
+  <!-- No stable DotBoxD version exists yet. Pin the latest shipped pre-1.0 baseline;
+       replace with the last stable release when 1.0 ships. Never derive this from latest. -->
+  <PropertyGroup>
+    <DotBoxDPackageBaselineVersion>0.1.0-ci.5510</DotBoxDPackageBaselineVersion>
+  </PropertyGroup>
+</Project>

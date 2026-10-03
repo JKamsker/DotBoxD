@@ -2,6 +2,14 @@
 
 ## [Unreleased] - DotBoxD
 
+- Add optional wire negotiation with golden legacy framing compatibility and explicit support policy.
+- Add signed plugin artifacts, publisher trust policies and capability upgrade diffs over public primitives.
+- Add opt-in execution recording, offline replay, capability/IR inspection and local `dotboxd` tools.
+- Verify authenticated TLS stream composition; remove the unshipped WebSocket walkthrough.
+- Gate releases on transitive auditing, binary package compatibility and dependency licenses; publish
+  an attested CycloneDX SBOM and use short-lived NuGet OIDC publishing credentials.
+
+
 This release establishes **DotBoxD**, a single contract-first .NET extension runtime spanning
 Services, Kernels, and Pushdown.
 

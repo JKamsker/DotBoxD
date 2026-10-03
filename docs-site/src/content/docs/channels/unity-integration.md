@@ -37,7 +37,7 @@ AOT path; Unity projects must keep an IL2CPP batch build in their own supported 
 - **Source Generators**: Compile-time proxy generation
 - **Shared Contracts**: Same C# interfaces on client and server
 - **MessagePack**: Fast binary serialization with Unity support
-- **Transport Agnostic**: TCP, WebSocket, or custom transports
+- **Transport Agnostic**: shipped native TCP/named pipes, or application-owned custom transports
 
 ### Architecture
 
@@ -1230,31 +1230,10 @@ private void LogRpcCall(string method, object request = null)
 
 ### Custom Transport
 
-Implement your own transport for platforms like Steam or Epic:
-
-```csharp
-public class SteamTransport : ITransport
-{
-    private CSteamID _serverId;
-    private SteamConnection _connection;
-
-    public IRpcChannel Connection => _connection;
-    public bool IsConnected => _connection?.IsConnected ?? false;
-
-    public async Task ConnectAsync(CancellationToken ct = default)
-    {
-        // Implement Steam networking connection
-        var result = await SteamNetworking.ConnectP2P(_serverId);
-        _connection = new SteamConnection(result);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        _connection?.Dispose();
-        return default;
-    }
-}
-```
+Steam, Epic and WebGL/WebSocket transports are **not shipped or verified**. Implement the public
+`IRpcChannel` contract in application code and validate it for the target platform. Native TCP does
+not work in browser WebGL. The [WebSocket status page](/channels/websocket-setup/) describes adapter
+requirements; no copy-and-paste custom transport is maintained here.
 
 ### Multiple Services
 
