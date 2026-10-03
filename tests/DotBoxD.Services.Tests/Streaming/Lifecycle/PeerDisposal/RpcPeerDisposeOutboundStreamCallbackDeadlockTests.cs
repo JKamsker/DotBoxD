@@ -92,7 +92,11 @@ public sealed class RpcPeerDisposeOutboundStreamCallbackDeadlockTests
             set => throw new NotSupportedException();
         }
 
-        public void AllowCallbackToReturn() => _callbackMayReturn.TrySetResult();
+        public void AllowCallbackToReturn()
+        {
+            _callbackMayReturn.TrySetResult();
+            _disposal.TrySetResult(Task.CompletedTask);
+        }
 
         public void SetDisposal(Task disposal) => _disposal.TrySetResult(disposal);
 

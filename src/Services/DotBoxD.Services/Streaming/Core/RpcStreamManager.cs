@@ -108,7 +108,7 @@ internal sealed partial class RpcStreamManager
         }
         foreach (var pair in _senders)
         {
-            RemoveOutbound(pair.Value);
+            RemoveOutbound(pair.Value, disposeInBackground: true);
         }
         _pendingCredits.Clear();
         _reservedOutbound.Clear();
