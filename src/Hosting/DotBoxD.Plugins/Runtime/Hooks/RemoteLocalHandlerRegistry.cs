@@ -181,7 +181,16 @@ public sealed class RemoteLocalHandlerRegistry
                 $"No remote local handler is registered for subscription '{subscriptionId}'.");
         }
 
-        await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+        try
+        {
+            await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested || context.CancellationToken.IsCancellationRequested)
+        {
+            ThrowIfDispatchCanceled(context, cancellationToken);
+            throw;
+        }
+
         ThrowIfDispatchCanceled(context, cancellationToken);
     }
 
