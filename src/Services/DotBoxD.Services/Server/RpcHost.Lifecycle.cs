@@ -165,7 +165,7 @@ public sealed partial class RpcHost
     private async Task StopCoreAsync(CancellationTokenSource cts, Task? acceptTask, CancellationToken ct)
     {
         var completed = false;
-        var cancellationStarted = false;
+        Task? cancellation = null;
         var stopListenerBeforeCancel = acceptTask is not null && ct.IsCancellationRequested;
         try
         {
@@ -174,8 +174,8 @@ public sealed partial class RpcHost
                 await Task.Yield();
                 await StopListenerOnceAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            RpcHostCancellation.TryCancel(cts);
-            cancellationStarted = true;
+            cancellation = RpcHostCancellation.TryCancelAsync(cts);
+            await RpcHostCancellation.WaitForCancellationRequestAsync(cts, cancellation).ConfigureAwait(false);
             if (acceptTask is not null)
             {
                 await ObserveAcceptShutdownAsync(acceptTask).ConfigureAwait(false);
@@ -191,9 +191,9 @@ public sealed partial class RpcHost
         }
         finally
         {
-            if (cancellationStarted)
+            if (cancellation is not null)
             {
-                RpcHostCancellation.Dispose(cts);
+                RpcHostCancellation.DisposeAfterCancellation(cts, cancellation);
             }
             CompleteStop(cts, completed);
         }
