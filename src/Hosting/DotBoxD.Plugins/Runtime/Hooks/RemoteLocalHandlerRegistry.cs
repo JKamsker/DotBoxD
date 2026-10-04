@@ -17,18 +17,12 @@ public delegate ValueTask<byte[]> RemoteLocalResultRequest(
     CancellationToken cancellationToken);
 
 /// <summary>
-/// Client-side registry for remote <c>RunLocal</c> terminals. A remote
-/// <c>server.Hooks.On&lt;TEvent&gt;().Where(..).Select(..).RunLocal(λ)</c> chain lowers only its
-/// <c>Where</c>/<c>Select</c> stages to verified IR that filters and projects server-side; the projected
-/// value is pushed back over the control-plane callback per passing event. This registry holds the native
-/// <c>RunLocal</c> delegate (real host C#, never lowered), keyed by the subscription id returned at install
-/// time, and decodes each pushed payload back to the projected CLR type before invoking that delegate.
+/// Client-side registry for native remote <c>RunLocal</c> terminals. The server lowers filters and projections,
+/// then calls back with each matching value; this registry decodes that value before invoking the native delegate.
 /// </summary>
 /// <remarks>
-/// The decode mirrors the server-extension request/response path in reverse: the same
-/// <see cref="KernelRpcBinaryCodec"/>/<see cref="KernelRpcValueConverter"/>/<see cref="KernelRpcMarshaller"/>
-/// converters carry the value, so the supported projection types are exactly the wire-eligible set
-/// (bool, int, long, double, string, enums, lists/arrays, and DTO records).
+/// Decoding mirrors the server-extension request/response path through
+/// <see cref="KernelRpcBinaryCodec"/>, <see cref="KernelRpcValueConverter"/>, and <see cref="KernelRpcMarshaller"/>.
 /// </remarks>
 public sealed class RemoteLocalHandlerRegistry
 {
@@ -188,7 +182,6 @@ public sealed class RemoteLocalHandlerRegistry
         catch (Exception) when (cancellationToken.IsCancellationRequested || context.CancellationToken.IsCancellationRequested)
         {
             ThrowIfDispatchCanceled(context, cancellationToken);
-            throw;
         }
 
         ThrowIfDispatchCanceled(context, cancellationToken);
