@@ -39,7 +39,7 @@ internal static class MergeableIrStepGenerator
             .Combine(steps.Select(static (step, _) => step.Interception).Collect())
             .Select(static (pair, _) => new MergeableIrStepInterceptorOutput(
                 pair.Right,
-                pair.Left.GetTypeByMetadataName(InterceptorContainerMetadataName) is not null));
+                pair.Left.Assembly.GetTypeByMetadataName(InterceptorContainerMetadataName) is not null));
 
         GeneratorGuard.RegisterOutput(
             context,
@@ -47,7 +47,7 @@ internal static class MergeableIrStepGenerator
             "mergeable IR step interceptor output",
             static (sourceContext, output) =>
             {
-                if (output.HasContainerCollision)
+                if (output.HasContainerCollision && !output.Interceptions.IsDefaultOrEmpty)
                 {
                     sourceContext.ReportDiagnostic(Diagnostic.Create(
                         PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
