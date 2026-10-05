@@ -14,6 +14,17 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableAllReachabilityTests
     }
 
     [Fact]
+    public async Task Reports_array_predicate_scan_in_reachable_event_handler()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("return Enumerable.All(new[] { e.Length }, static _ => true);"),
+            "DotBoxDPluginAnalyzerEnumerableAllArrayReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.All", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Reports_direct_list_contains_scan_control()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
