@@ -24,13 +24,14 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableLongCountReachabilityTes
     }
 
     [Fact]
-    public async Task Does_not_report_bounded_list_long_count_control()
+    public async Task Reports_retained_list_long_count_scan_in_reachable_event_handler()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
             Source("return Enumerable.LongCount(Retained) > 0;"),
-            "DotBoxDPluginAnalyzerEnumerableLongCountBoundedLongCountControlReachabilityTest");
+            "DotBoxDPluginAnalyzerEnumerableLongCountReachabilityControlTest");
 
-        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.LongCount", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     private static string Source(string returnStatement)
