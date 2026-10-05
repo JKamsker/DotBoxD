@@ -262,6 +262,11 @@ public sealed partial class RpcHost
             disposeTask = _disposeTask;
         }
 
+        if (_disposalContext.IsDisposingListener)
+        {
+            return default;
+        }
+
         if (disposalCompletion is not null)
         {
             _ = CompleteDisposeAsync(disposalCompletion);
@@ -289,7 +294,7 @@ public sealed partial class RpcHost
             () => StopAsync(),
             _peers.CloseAllAsync,
             _peers.AwaitCleanupAsync,
-            () => _listener.DisposeAsync().AsTask()).ConfigureAwait(false);
+            () => _disposalContext.DisposeListenerAsync(_listener)).ConfigureAwait(false);
     }
 
     private readonly record struct StartRecovery(CancellationTokenSource Cts, bool DisposeCts, Exception? Failure);

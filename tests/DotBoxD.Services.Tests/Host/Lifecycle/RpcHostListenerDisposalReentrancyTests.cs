@@ -10,7 +10,7 @@ public sealed class RpcHostListenerDisposalReentrancyTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task DisposeAsync_WhenListenerDisposalReenters_OnlyDisposesListenerOnce()
+    public async Task DisposeAsync_WhenListenerDisposalAwaitsReentry_DoesNotDeadlock()
     {
         var transport = new ReentrantDisposalServerTransport();
         var host = RpcHost.Listen(transport, new MessagePackRpcSerializer());
@@ -18,15 +18,23 @@ public sealed class RpcHostListenerDisposalReentrancyTests
 
         var firstDispose = host.DisposeAsync().AsTask();
 
+        await transport.ListenerDisposalEntered.WaitAsync(Timeout);
+
+        var concurrentDispose = host.DisposeAsync().AsTask();
+        Assert.Same(firstDispose, concurrentDispose);
+        Assert.False(concurrentDispose.IsCompleted);
+
+        transport.CompleteListenerDisposal();
         await firstDispose.WaitAsync(Timeout);
-        await transport.ReentrantDispose.WaitAsync(Timeout);
 
         Assert.Equal(1, transport.DisposeCallCount);
     }
 
     private sealed class ReentrantDisposalServerTransport : IServerTransport
     {
-        private readonly TaskCompletionSource<Task> _reentrantDispose =
+        private readonly TaskCompletionSource _listenerDisposalEntered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _listenerDisposalCompletion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _disposeCallCount;
 
@@ -34,7 +42,9 @@ public sealed class RpcHostListenerDisposalReentrancyTests
 
         public int DisposeCallCount => Volatile.Read(ref _disposeCallCount);
 
-        public Task ReentrantDispose => _reentrantDispose.Task.Unwrap();
+        public Task ListenerDisposalEntered => _listenerDisposalEntered.Task;
+
+        public void CompleteListenerDisposal() => _listenerDisposalCompletion.TrySetResult();
 
         public Task StartAsync(CancellationToken ct = default) => Task.CompletedTask;
 
@@ -43,15 +53,14 @@ public sealed class RpcHostListenerDisposalReentrancyTests
 
         public Task StopAsync(CancellationToken ct = default) => Task.CompletedTask;
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (Interlocked.Increment(ref _disposeCallCount) == 1)
             {
-                var reentrantDispose = Host!.DisposeAsync().AsTask();
-                _reentrantDispose.TrySetResult(reentrantDispose);
+                await Host!.DisposeAsync();
+                _listenerDisposalEntered.TrySetResult();
+                await _listenerDisposalCompletion.Task;
             }
-
-            return default;
         }
     }
 }
