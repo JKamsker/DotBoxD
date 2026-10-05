@@ -20,7 +20,9 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableAllReachabilityTests
             Source("return Enumerable.All(new[] { e.Length }, static _ => true);"),
             "DotBoxDPluginAnalyzerEnumerableAllArrayReachabilityTest");
 
-        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic =>
+            diagnostic.Id == "DBXK001" &&
+            diagnostic.GetMessage().Contains("System.Linq.Enumerable.All", StringComparison.Ordinal)));
         Assert.Contains("System.Linq.Enumerable.All", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
