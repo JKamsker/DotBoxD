@@ -23,6 +23,16 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableLongCountReachabilityTes
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Does_not_report_bounded_list_long_count_control()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("return Enumerable.LongCount(Retained) > 0;"),
+            "DotBoxDPluginAnalyzerEnumerableLongCountBoundedLongCountControlReachabilityTest");
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
     private static string Source(string returnStatement)
         => $$"""
             #nullable enable

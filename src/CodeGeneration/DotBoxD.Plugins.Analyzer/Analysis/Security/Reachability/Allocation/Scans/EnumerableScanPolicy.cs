@@ -9,7 +9,7 @@ internal static class EnumerableScanPolicy
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
-            method.Name is not ("Contains" or "Any") ||
+            method.Name is not ("Contains" or "Any" or "LongCount") ||
             typeName != "System.Linq.Enumerable")
         {
             return false;
@@ -31,7 +31,7 @@ internal static class EnumerableScanPolicy
             return false;
         }
 
-        if (method.Name == "Any" && method.Parameters.Length == 1 &&
+        if (method.Name is "Any" or "LongCount" && method.Parameters.Length == 1 &&
             (source?.Type is IArrayTypeSymbol || IsSortedListView(source)))
         {
             return true;
@@ -79,6 +79,8 @@ internal static class EnumerableScanPolicy
         => method.Name switch
         {
             "Any" when method.Parameters.Length == 1 =>
+                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
+            "LongCount" when method.Parameters.Length == 1 =>
                 HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             _ => false
