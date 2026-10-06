@@ -14,7 +14,7 @@ public sealed class SubscriptionDeliveryFaultCancellationPrecedenceSurpriseTests
         using var cancellation = new CancellationTokenSource();
         using var server = PluginServer.Create(onSubscriptionFault: fault => faultReported.TrySetResult(fault));
 
-        server.Subscriptions.On<SubscriptionSignal>()
+        var pipeline = server.Subscriptions.On<SubscriptionSignal>()
             .RunLocal((_, _) =>
             {
                 cancellation.Cancel();
@@ -25,12 +25,9 @@ public sealed class SubscriptionDeliveryFaultCancellationPrecedenceSurpriseTests
         server.Subscriptions.Publish(new SubscriptionSignal(), cancellation.Token);
 
         await handlerInvoked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await pipeline.LastQueuedDelivery!.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(cancellation.IsCancellationRequested);
-
-        var timeout = Task.Delay(TimeSpan.FromMilliseconds(200));
-        var completed = await Task.WhenAny(faultReported.Task, timeout);
-
-        Assert.Same(timeout, completed);
+        Assert.False(faultReported.Task.IsCompleted);
     }
 
     [Fact]
