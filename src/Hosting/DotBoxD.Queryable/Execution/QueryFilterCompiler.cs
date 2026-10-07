@@ -6,9 +6,9 @@ namespace DotBoxD.Queryable.Execution;
 
 /// <summary>
 /// Compiles a portable <see cref="QueryFilter"/> into a delegate for the hot-path tier. The compiled tree
-/// calls the very same <see cref="MemberValueReader"/> and <see cref="QueryValueComparer"/> primitives the
-/// interpreter uses, so a promoted query produces identical results — only the per-node tree walk and kind
-/// switch are removed. Use it to promote frequently-evaluated filters; the interpreter remains the cold,
+/// specializes declared member paths and compatible scalar comparisons, falling back to the
+/// <see cref="MemberValueReader"/> and <see cref="QueryValueComparer"/> primitives for other shapes.
+/// Use it to promote frequently-evaluated filters; the interpreter remains the cold,
 /// limit-checked default.
 /// </summary>
 public static class QueryFilterCompiler
@@ -29,11 +29,11 @@ public static class QueryFilterCompiler
         ArgumentNullException.ThrowIfNull(reader);
         QueryFilterInvariants.RequireValidShape(filter);
         var parameter = Expression.Parameter(typeof(object), "e");
-        var body = Build(filter, parameter, Expression.Constant(reader));
+        var body = Build(filter, parameter, reader);
         return Expression.Lambda<Func<object, bool>>(body, parameter).Compile();
     }
 
-    private static Expression Build(QueryFilter filter, ParameterExpression target, Expression reader)
+    private static Expression Build(QueryFilter filter, ParameterExpression target, MemberValueReader reader)
     {
         var kind = QueryFilterInvariants.RequireKnownKind(filter);
         return kind switch
@@ -51,7 +51,7 @@ public static class QueryFilterCompiler
     private static Expression Fold(
         IReadOnlyList<QueryFilter> children,
         ParameterExpression target,
-        Expression reader,
+        MemberValueReader reader,
         Func<Expression, Expression, Expression> combine,
         bool identity)
     {
@@ -65,21 +65,28 @@ public static class QueryFilterCompiler
         return accumulator ?? Expression.Constant(identity);
     }
 
-    private static Expression Read(QueryFilter filter, ParameterExpression target, Expression reader)
-        => Expression.Call(reader, ReadMethod, target, Expression.Constant(filter.Field));
+    private static Expression Read(QueryFilter filter, ParameterExpression target, MemberValueReader reader)
+        => Expression.Call(Expression.Constant(reader), ReadMethod, target, Expression.Constant(filter.Field));
 
-    private static Expression CompareExpression(QueryFilter filter, ParameterExpression target, Expression reader)
-        => Expression.Call(
-            CompareMethod,
-            Read(filter, target, reader),
-            Expression.Constant(filter.Operator),
-            Expression.Constant(QueryFilterInvariants.CompareValue(filter)),
-            Expression.Constant(filter.IgnoreCase));
+    private static Expression CompareExpression(QueryFilter filter, ParameterExpression target, MemberValueReader reader)
+    {
+        var expected = QueryFilterInvariants.CompareValue(filter);
+        Expression Compare(Expression actual) => QueryScalarCompiler.TryBuild(actual, filter.Operator, expected, filter.IgnoreCase)
+            ?? Expression.Call(CompareMethod, Expression.Convert(actual, typeof(object)), Expression.Constant(filter.Operator),
+                Expression.Constant(expected), Expression.Constant(filter.IgnoreCase));
+        var fallback = Compare(Read(filter, target, reader));
+        return QueryMemberCompiler.TryBuild(reader, filter.Field, target, Compare, fallback) ?? fallback;
+    }
 
-    private static Expression InExpression(QueryFilter filter, ParameterExpression target, Expression reader)
-        => Expression.Call(
-            IsAnyEqualMethod,
-            Read(filter, target, reader),
-            Expression.Constant(filter.Values, typeof(IReadOnlyList<QueryValue>)),
-            Expression.Constant(filter.IgnoreCase));
+    private static Expression InExpression(QueryFilter filter, ParameterExpression target, MemberValueReader reader)
+    {
+        var lookup = QueryMembershipLookup.TryCreate(filter);
+        Expression Compare(Expression actual) => lookup is null
+            ? Expression.Call(IsAnyEqualMethod, Expression.Convert(actual, typeof(object)),
+                Expression.Constant(filter.Values, typeof(IReadOnlyList<QueryValue>)), Expression.Constant(filter.IgnoreCase))
+            : Expression.Call(Expression.Constant(lookup), nameof(QueryMembershipLookup.Contains), Type.EmptyTypes,
+                Expression.Convert(actual, typeof(object)));
+        var fallback = Compare(Read(filter, target, reader));
+        return QueryMemberCompiler.TryBuild(reader, filter.Field, target, Compare, fallback) ?? fallback;
+    }
 }

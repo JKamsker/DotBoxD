@@ -161,6 +161,6 @@ public sealed record QueryFilter
                 ?? throw new ArgumentException("QueryFilter In nodes require Values to contain only non-null QueryValue elements.", nameof(values));
         }
 
-        return Array.AsReadOnly(snapshot);
+        return new QueryValueSnapshot(snapshot);
     }
 }
