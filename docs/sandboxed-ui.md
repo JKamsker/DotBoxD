@@ -187,6 +187,14 @@ Each discard has independent storage, including repeated discards of different s
 Compound numeric assignments support identity and widening conversions; compound assignments
 requiring a narrowing conversion fail with `DBXU001` during generation.
 Static field/property writes fail with `DBXU001` rather than silently dropping setter or field effects.
+Local list/map mutation requires a newly constructed, unaliased local used through direct collection
+operations. Copying or passing that mutable local, including through a read-only view or DTO, and
+enumerating it are unsupported because kernel collections have value semantics. Read-only aliases
+without mutation and ordinary DTO locals remain supported. `using` declarations are unsupported
+in every scope: plugin `Dispose` methods cannot silently disappear or execute inside the host.
+These unsupported forms report `DBXU001` with the explicit remote/host-binding alternative.
+Distinct locals in a handler must use unique names, including in separate blocks or foreach loops;
+reusing a name receives `DBXU001` because kernel storage is scoped to the entire function.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the

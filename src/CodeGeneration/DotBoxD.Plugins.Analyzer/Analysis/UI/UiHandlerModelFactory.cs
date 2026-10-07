@@ -85,6 +85,8 @@ internal static class UiHandlerModelFactory
         RequireLocalSignature(method);
         var output = ScalarTag(method.ReturnType);
         var input = method.Parameters.Length == 0 ? null : ScalarTag(method.Parameters[0].Type);
+        UiLocalReferenceValidator.Validate(syntax, model, token);
+        UiLocalStorageValidator.Validate(syntax, model, token);
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var lowerer = new DotBoxDRpcJsonLowerer(model, capabilities, effects, token);
