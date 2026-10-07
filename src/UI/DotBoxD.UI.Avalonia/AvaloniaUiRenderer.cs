@@ -15,6 +15,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
 {
     private readonly Dictionary<int, Control> _controls = [];
     private readonly Dictionary<int, UiKeyedRows> _lists = [];
+    private readonly Dictionary<(int Node, UiPropertyId Property), UiPropertyValue> _deferred = [];
     private readonly UiInputQueue _queue;
     private readonly UiControlInput _input;
     private Control? _root;
@@ -34,6 +35,20 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     public int Updates { get; private set; }
 
     public ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken) => _queue.ReadAsync(cancellationToken);
+
+    public async ValueTask AcknowledgeAsync(UiInput input, CancellationToken cancellationToken)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_queue.Acknowledge(input))
+            {
+                var value = _deferred.Remove((input.NodeId, input.PropertyId), out var deferred)
+                    ? deferred : new UiPropertyValue(input.NodeId, input.PropertyId, input.Value!);
+                Apply([value]);
+            }
+        }, DispatcherPriority.Normal, cancellationToken);
+    }
 
     public async ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
     {
@@ -82,6 +97,8 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
             // Set ranges/layout before values, avoiding toolkit coercion against old maxima.
             foreach (var change in changes.OrderBy(c => c.PropertyId == UiPropertyId.Value ? 1 : 0))
             {
+                if (_queue.HasPending(change.NodeId, change.PropertyId))
+                { _deferred[(change.NodeId, change.PropertyId)] = change; continue; }
                 if (change.PropertyId == UiPropertyId.Items)
                 { _lists[change.NodeId].Update(change.Value.Items); }
                 else
@@ -130,6 +147,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
             foreach (var control in _controls.Values)
             { UiControlFactory.Detach(control); }
             _lists.Clear();
+            _deferred.Clear();
             _controls.Clear();
             _root = null;
         });

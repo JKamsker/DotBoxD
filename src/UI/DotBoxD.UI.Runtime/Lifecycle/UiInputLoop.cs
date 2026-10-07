@@ -26,7 +26,7 @@ internal static class UiInputLoop
                     { session.RecordInputError("UI remote input concurrency limit exceeded."); }
                 }
                 else
-                { await ApplyLocalAsync(session, input, token).ConfigureAwait(false); }
+                { await ApplyLocalAsync(session, source, input, token).ConfigureAwait(false); }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -36,13 +36,17 @@ internal static class UiInputLoop
         }
     }
 
-    private static async Task ApplyLocalAsync(UiSession session, UiInput input, CancellationToken token)
+    private static async Task ApplyLocalAsync(UiSession session, IUiInputSource source, UiInput input, CancellationToken token)
     {
+        if (input.EventId == 0 && input.NodeId > 0 && input.Value is not null)
+        {
+            await session.ProcessInputAsync(input, source, token).ConfigureAwait(false);
+            return;
+        }
         try
         { await ApplyAsync(session, input, token).ConfigureAwait(false); }
         catch (UiValidationException error)
         {
-            await session.RestoreInputAsync(input, token).ConfigureAwait(false);
             session.RecordInputError(error.Message);
         }
     }

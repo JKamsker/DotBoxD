@@ -40,7 +40,8 @@ internal static class RpcJsonExpressionStatementLowerer
                     lowerer.LowerExpressionWithPrelude(assignment.Right, output),
                     target.Identifier.ValueText)
                 : LowerCompound(lowerer, assignment, target, output);
-            output.Add(DotBoxDRpcJsonLowerer.SetStatement(target.Identifier.ValueText, value));
+            output.Add(DotBoxDRpcJsonLowerer.SetStatement(
+                lowerer.IsDiscardWriteTarget(target) ? lowerer.NextDiscardLocal() : target.Identifier.ValueText, value));
             return true;
         }
 
@@ -141,7 +142,8 @@ internal static class RpcJsonExpressionStatementLowerer
         return DotBoxDRpcJsonLowerer.BinaryJson(
             op,
             DotBoxDRpcJsonLowerer.Var(target.Identifier.ValueText),
-            lowerer.LowerExpressionWithPrelude(assignment.Right, output));
+            lowerer.LowerRequiredExpressionWithPrelude(
+                assignment.Right, lowerer.TypeOf(target), $"Compound assignment to '{target}'", output));
     }
 
     private static string LowerStringConcatAssignment(

@@ -43,12 +43,21 @@ public sealed class UiSession : IAsyncDisposable
     public string? LastInputError => Volatile.Read(ref _lastInputError);
     internal void RecordInputError(string message) => Volatile.Write(ref _lastInputError, message);
 
-    internal ValueTask<bool> RestoreInputAsync(UiInput input, CancellationToken token)
+    internal ValueTask<bool> ProcessInputAsync(UiInput input, IUiInputSource source, CancellationToken token)
         => LockedAsync(async () =>
         {
-            if (!_inputs.ContainsKey((input.NodeId, input.PropertyId)))
-            { return false; }
-            await _renderer.UpdateAsync([_bindings.GetCurrent(input.NodeId, input.PropertyId)], token).ConfigureAwait(false);
+            string? error = null;
+            try
+            { await SetInputCoreAsync(input.NodeId, input.PropertyId, input.Value!, token).ConfigureAwait(false); }
+            catch (UiValidationException rejected)
+            {
+                error = rejected.Message;
+                if (_inputs.ContainsKey((input.NodeId, input.PropertyId)))
+                { await _renderer.UpdateAsync([_bindings.GetCurrent(input.NodeId, input.PropertyId)], token).ConfigureAwait(false); }
+            }
+            await UiRendererOwner.AcknowledgeAsync(source, input, token).ConfigureAwait(false);
+            if (error is not null)
+            { RecordInputError(error); }
             return true;
         }, token);
 
@@ -72,15 +81,16 @@ public sealed class UiSession : IAsyncDisposable
 
     public ValueTask<UiSnapshot> SetInputAsync(
         int nodeId, UiPropertyId propertyId, UiValue value, CancellationToken cancellationToken = default)
-        => LockedAsync(async () =>
-        {
-            if (!_inputs.TryGetValue((nodeId, propertyId), out var slot))
-            {
-                throw new UiValidationException("Input must address a declared two-way property.");
-            }
+        => LockedAsync(() => SetInputCoreAsync(nodeId, propertyId, value, cancellationToken), cancellationToken);
 
-            return await CommitAsync([new UiStateValue(slot, value)], cancellationToken).ConfigureAwait(false);
-        }, cancellationToken);
+    private ValueTask<UiSnapshot> SetInputCoreAsync(int nodeId, UiPropertyId propertyId, UiValue value, CancellationToken token)
+    {
+        if (!_inputs.TryGetValue((nodeId, propertyId), out var slot))
+        {
+            throw new UiValidationException("Input must address a declared two-way property.");
+        }
+        return CommitAsync([new UiStateValue(slot, value)], token);
+    }
 
     /// <summary>
     /// Executes a declared local/remote event. Remote transport faults and host deadlines disconnect

@@ -4,6 +4,13 @@ namespace DotBoxD.UI.Runtime;
 public interface IUiInputSource
 {
     ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Completes a native property input after its authoritative update or rejection correction.
+    /// Receives the original input instance under the session gate; must not reenter the session.
+    /// Forwarding sources must forward this callback and preserve input instances.
+    /// </summary>
+    ValueTask AcknowledgeAsync(UiInput input, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 /// <summary>Exactly one event ID or registered two-way node/property/value input.</summary>

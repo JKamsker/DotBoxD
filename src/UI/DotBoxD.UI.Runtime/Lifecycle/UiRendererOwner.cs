@@ -23,6 +23,18 @@ internal sealed class UiRendererOwner(IUiRenderer renderer) : IAsyncDisposable
 
     public ValueTask DisposeAsync()
         => Interlocked.Exchange(ref _renderer, null)?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    public static async ValueTask AcknowledgeAsync(IUiInputSource source, UiInput input, CancellationToken token)
+    {
+        try
+        {
+            await source.AcknowledgeAsync(input, token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new UiRendererException(ex);
+        }
+    }
 }
 
 internal sealed class UiRendererException(Exception inner) : Exception("Trusted UI renderer failed; session disconnected.", inner);

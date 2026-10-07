@@ -9,6 +9,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal bool IsLocalWriteTarget(IdentifierNameSyntax target)
         => ModelFor(target).GetSymbolInfo(target, _cancellationToken).Symbol is ILocalSymbol or IParameterSymbol or IDiscardSymbol;
 
+    internal bool IsDiscardWriteTarget(IdentifierNameSyntax target)
+        => ModelFor(target).GetSymbolInfo(target, _cancellationToken).Symbol is IDiscardSymbol;
+
     internal string IncrementStatement(IdentifierNameSyntax target, SyntaxKind kind)
     {
         if (!IsLocalWriteTarget(target))

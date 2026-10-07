@@ -30,7 +30,10 @@ if ($requiredNames.Count -eq 0) {
 
 $defaultMinimums = @{
     Nonlocal_handler_writes_fail_closed_at_compile_time = 6
-    Local_parameter_and_discard_writes_keep_their_execution_semantics = 3
+    Local_parameter_and_discard_writes_keep_their_execution_semantics = 6
+    Narrowing_compound_handler_writes_fail_closed_at_compile_time = 5
+    Widening_compound_handler_writes_preserve_numeric_execution = 5
+    Earlier_input_echoes_preserve_newer_native_edits = 4
     Connection_close_and_host_shutdown_release_idle_sessions = 3
     Renderer_failure_closes_admission_before_queued_operations_can_enter = 4
     Canonical_kernel_expansion_obeys_the_independent_byte_limit = 3

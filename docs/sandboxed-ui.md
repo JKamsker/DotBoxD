@@ -137,7 +137,7 @@ If an update fails after commit, the session closes admission before releasing i
 then disconnects and disposes its renderer; a disconnected
 session cannot be used to read or mutate the partially rendered UI. Renderer adapters must marshal
 to the toolkit UI thread, dispose subscriptions/controls, and queue semantic input without
-synchronously reentering the session from Materialize/Update/Dispose callbacks.
+synchronously reentering the session from Materialize/Update/Acknowledge/Dispose callbacks.
 
 ## Quotas, cancellation, and connection ownership
 
@@ -183,6 +183,9 @@ local signatures, file-local containers and unlowerable library calls fail close
 block bodies share return-conversion checks: built-in numeric widening is supported; user-defined
 implicit scalar conversions are rejected during generation.
 Assignments and increments may mutate locals and parameters; discard assignments are supported.
+Each discard has independent storage, including repeated discards of different scalar types.
+Compound numeric assignments support identity and widening conversions; compound assignments
+requiring a narrowing conversion fail with `DBXU001` during generation.
 Static field/property writes fail with `DBXU001` rather than silently dropping setter or field effects.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
@@ -208,9 +211,19 @@ connects renderers implementing `IUiInputSource` to the session. Input queues an
 bounded; overflow disconnects and releases the session. Remote events do not block local typing;
 rejected local edits (such as an overlong paste) and stale remote input are visible through
 `UiSession.LastInputError` without closing the session. A rejected edit leaves host state unchanged
-and restores the edited control to its authoritative value before reporting the error. Subsequent
-valid input can proceed. Renderer update batches may therefore include an authoritative input
-correction even when the state value has not changed.
+and restores the edited control to its authoritative value before reporting the error when there
+is no newer native edit pending. Subsequent valid input can proceed. Older accepted updates and
+rejection corrections cannot overwrite newer queued edits. Renderer update batches may therefore
+include an authoritative input correction even when the state value has not changed.
+
+`IUiInputSource.AcknowledgeAsync` is a public optional completion callback with a no-op default.
+The session calls it with the original native property input after its update or rejection
+correction, while holding the state gate. Avalonia uses this receipt to defer property echoes until
+the newest native edit completes, then applies the latest authoritative value. Forwarding adapters
+must preserve input instances and forward acknowledgement to their underlying source. Handwritten
+input pumps can use the same public callback after `SetInputAsync` and their rejection correction.
+Acknowledgement must not reenter the session; callback failure disconnects before releasing
+admission, just like an update failure. This host-only primitive adds no worker protocol fields.
 
 `CaptureAsync(PixelSize, Vector)` measures/arranges the root and returns a host-owned
 `RenderTargetBitmap` for CPU/offscreen composition. The embedding host disposes it and decides how
@@ -234,6 +247,6 @@ dotnet run --project benchmarks/DotBoxD.Kernels.Benchmarks -c Release -- --filte
 ```
 
 `UiAvaloniaBenchmarks` adds real 100/1,000-node Avalonia installation/materialization, repeated
-state-only renderer allocation measurements and keyed row reorder updates. Use the filter
+state-only renderer allocation measurements, native text input round trips and keyed row reorder updates. Use the filter
 `*UiAvaloniaBenchmarks*` with the same benchmark command. Measurements establish regression
 coverage; this change makes no claim of improved throughput or allocation counts.

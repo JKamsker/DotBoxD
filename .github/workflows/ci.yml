@@ -342,6 +342,7 @@ jobs:
             -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests",
               "Sparse_and_state_bound_grid_rows_have_matching_definitions",
               "Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers",
+              "Earlier_input_echoes_preserve_newer_native_edits",
               "Connection_close_and_host_shutdown_release_idle_sessions",
               "Connection_owner_observes_async_session_cleanup_failures")
 
@@ -458,6 +459,9 @@ jobs:
               "Built_in_numeric_return_conversions_execute_for_expression_and_block_bodies",
               "Nonlocal_handler_writes_fail_closed_at_compile_time",
               "Local_parameter_and_discard_writes_keep_their_execution_semantics",
+              "Narrowing_compound_handler_writes_fail_closed_at_compile_time",
+              "Widening_compound_handler_writes_preserve_numeric_execution",
+              "Input_acknowledgement_failure_closes_queued_admission_and_releases_renderer",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",
