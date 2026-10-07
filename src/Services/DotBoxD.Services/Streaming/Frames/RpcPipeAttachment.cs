@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
@@ -46,7 +45,8 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
 
                     while (!remaining.IsEmpty)
                     {
-                        var chunk = GetNextChunk(remaining);
+                        // Coalesce only bytes already returned by this read; never wait to fill a frame.
+                        var chunk = remaining.Slice(0, Math.Min(remaining.Length, ChunkSize));
                         var length = chunk.Length;
                         await streams.SendStreamItemAsync(Handle.StreamId, chunk, ct).ConfigureAwait(false);
                         remaining = remaining.Slice(length);
@@ -73,19 +73,6 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
         {
             await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
         }
-    }
-
-    private static ReadOnlyMemory<byte> GetNextChunk(ReadOnlySequence<byte> remaining)
-    {
-        foreach (var segment in remaining)
-        {
-            if (!segment.IsEmpty)
-            {
-                return segment.Slice(0, Math.Min(segment.Length, ChunkSize));
-            }
-        }
-
-        throw new InvalidOperationException("Nonempty pipe buffer contained no bytes.");
     }
 
     private protected override async ValueTask DisposeSourceCoreAsync()

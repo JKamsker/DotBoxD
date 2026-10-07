@@ -19,9 +19,28 @@ public sealed class RpcPipeChunkProgressTests
     [InlineData("Async", true, false)]
     [InlineData("Async", true, true)]
     public async Task Partial_segment_failure_preserves_only_unsent_bytes(string failure, bool firstChunkSent, bool owned)
+        => await AssertFailure(failure, firstChunkSent, owned, [2 * PipeChunkingFixture.ChunkSize + 7]);
+
+    [Theory]
+    [InlineData("Credit", false, false)]
+    [InlineData("Credit", true, false)]
+    [InlineData("Sync", false, false)]
+    [InlineData("Sync", true, false)]
+    [InlineData("Async", false, false)]
+    [InlineData("Async", true, false)]
+    [InlineData("Credit", false, true)]
+    [InlineData("Credit", true, true)]
+    [InlineData("Sync", false, true)]
+    [InlineData("Sync", true, true)]
+    [InlineData("Async", false, true)]
+    [InlineData("Async", true, true)]
+    public async Task Coalesced_frame_failure_preserves_only_unsent_bytes(string failure, bool firstChunkSent, bool owned)
+        => await AssertFailure(failure, firstChunkSent, owned, Enumerable.Repeat(4096, 33).ToArray());
+
+    private static async Task AssertFailure(string failure, bool firstChunkSent, bool owned, int[] lengths)
     {
         var credits = failure == "Credit" ? firstChunkSent ? 1 : 0 : RpcStreamManager.WindowSize;
-        await using var fixture = await PipeChunkingFixture.Create([2 * PipeChunkingFixture.ChunkSize + 7], owned, credits: credits);
+        await using var fixture = await PipeChunkingFixture.Create(lengths, owned, credits: credits);
         fixture.ReplenishCredit = false;
         fixture.FailAt = failure == "Credit" ? 0 : firstChunkSent ? 2 : 1;
         fixture.DeferFailure = failure == "Async";

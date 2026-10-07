@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using DotBoxD.Services.Buffers;
 
@@ -55,6 +56,30 @@ internal static class RpcRawFrame
             WritePrefix(writer, messageId, type);
             BinaryPrimitives.WriteInt32LittleEndian(writer.GetSpan(sizeof(int)), value);
             writer.Advance(sizeof(int));
+            Complete(writer);
+            return writer;
+        }
+        catch
+        {
+            writer.Dispose();
+            throw;
+        }
+    }
+
+    public static PooledBufferWriter RentFrame(int messageId, MessageType type, ReadOnlySequence<byte> payload)
+    {
+        if (payload.IsSingleSegment)
+        {
+            return RentFrame(messageId, type, payload.FirstSpan);
+        }
+
+        var length = checked((int)payload.Length);
+        var writer = PooledBufferWriter.Rent(checked(MessageFramer.HeaderSize + length));
+        try
+        {
+            WritePrefix(writer, messageId, type);
+            payload.CopyTo(writer.GetSpan(length));
+            writer.Advance(length);
             Complete(writer);
             return writer;
         }

@@ -1,3 +1,4 @@
+using System.Buffers;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Protocol;
@@ -12,6 +13,14 @@ internal sealed partial class RpcStreamManager
         var state = GetSender(streamId);
         await state.WaitForCreditAsync(ct).ConfigureAwait(false);
         var frame = RpcRawFrame.RentFrame(streamId, MessageType.StreamItem, payload.Span);
+        await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
+    }
+
+    public async Task SendStreamItemAsync(int streamId, ReadOnlySequence<byte> payload, CancellationToken ct)
+    {
+        var state = GetSender(streamId);
+        await state.WaitForCreditAsync(ct).ConfigureAwait(false);
+        var frame = RpcRawFrame.RentFrame(streamId, MessageType.StreamItem, payload);
         await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
     }
 

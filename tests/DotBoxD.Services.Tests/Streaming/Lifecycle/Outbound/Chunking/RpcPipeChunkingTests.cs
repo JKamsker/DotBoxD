@@ -37,7 +37,7 @@ public sealed class RpcPipeChunkingTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task Mixed_segments_preserve_boundaries_and_writer_completion(bool owned, bool writerCompleted)
+    public async Task Mixed_segments_coalesce_available_bytes_and_preserve_writer_completion(bool owned, bool writerCompleted)
     {
         int[] lengths = [1, 65537, 0, 7, 131072];
         await using var fixture = await PipeChunkingFixture.Create(lengths, owned, writerCompleted);
@@ -51,7 +51,27 @@ public sealed class RpcPipeChunkingTests
         await pump.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(lengths.Sum(), fixture.BytesSent);
-        Assert.Equal(new[] { 1, 65536, 1, 7, 65536, 65536 }, fixture.SentLengths);
+        Assert.Equal(new[] { 65536, 65536, 65536, 9 }, fixture.SentLengths);
         await fixture.AssertRemaining(fixture.Expected.Length);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Short_buffer_is_sent_before_writer_completes(bool owned)
+    {
+        await using var fixture = await PipeChunkingFixture.Create([1, 7], owned, writerCompleted: false);
+        var pump = fixture.Pump();
+        try
+        {
+            Assert.Equal(8, fixture.BytesSent);
+            Assert.Equal(new[] { 8 }, fixture.SentLengths);
+            Assert.False(pump.IsCompleted);
+        }
+        finally
+        {
+            await fixture.CompleteWriter();
+            await pump.WaitAsync(TimeSpan.FromSeconds(5));
+        }
     }
 }
