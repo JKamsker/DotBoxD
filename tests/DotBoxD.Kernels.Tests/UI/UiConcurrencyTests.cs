@@ -5,6 +5,22 @@ namespace DotBoxD.Kernels.Tests.UI;
 public sealed class UiConcurrencyTests
 {
     [Fact]
+    public async Task Remote_deadline_disconnects_noncooperative_transport_and_disposes_renderer()
+    {
+        using var sandbox = UiTestFixture.Sandbox();
+        var never = new TaskCompletionSource<UiStatePatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var remote = new TestUiTransport((_, _) => new ValueTask<UiStatePatch>(never.Task));
+        var renderer = new RecordingUiRenderer();
+        await using var session = await UiTestFixture.Host(sandbox, new UiPolicy { RemoteEventTimeout = TimeSpan.FromMilliseconds(200) })
+            .InstallAsync(UiTestFixture.Counter(), renderer, remote);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.DispatchAsync(2).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.True(session.IsDisconnected);
+        Assert.Equal(1, renderer.Disposals);
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await session.SnapshotAsync());
+        Assert.Equal(1, remote.Calls);
+    }
+
+    [Fact]
     public async Task Caller_cancellation_leaves_the_session_usable_and_releases_remote_admission()
     {
         using var sandbox = UiTestFixture.Sandbox();

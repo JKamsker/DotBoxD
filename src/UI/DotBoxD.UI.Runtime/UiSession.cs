@@ -65,6 +65,10 @@ public sealed class UiSession : IAsyncDisposable
             return await CommitAsync([new UiStateValue(slot, value)], cancellationToken).ConfigureAwait(false);
         }, cancellationToken);
 
+    /// <summary>
+    /// Executes a declared local/remote event. Remote transport faults and host deadlines disconnect
+    /// the session; caller cancellation cancels only that dispatch. Teardown invalidates late replies.
+    /// </summary>
     public async ValueTask<UiSnapshot> DispatchAsync(int eventId, CancellationToken cancellationToken = default)
     {
         var dispatch = await LockedAsync(async () =>

@@ -384,6 +384,8 @@ function AssertSymbolPackage(
 }
 
 $expectedIds = [string[]] @(
+    "DotBoxD.UI",
+    "DotBoxD.UI.Runtime",
     "DotBoxD.Kernels",
     "DotBoxD.Kernels.Validation",
     "DotBoxD.Kernels.Runtime",

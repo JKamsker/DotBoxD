@@ -18,6 +18,10 @@ public sealed record UiPolicy
     public int MaxEvents { get; init; } = 256;
     public int MaxPatchSlots { get; init; } = 128;
     public int MaxInFlightRemoteEvents { get; init; } = 4;
+    /// <summary>
+    /// Deadline for a remote dispatch. Exceeding it disconnects/releases the session so an
+    /// unresponsive transport cannot accumulate timed-out work. Caller cancellation affects one call.
+    /// </summary>
     public TimeSpan RemoteEventTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     public void Validate()

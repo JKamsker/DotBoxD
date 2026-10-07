@@ -42,8 +42,10 @@ try
     }
 
     await session.SetInputAsync(4, UiPropertyId.Text, UiValue.FromString("ap"), token);
+    var updatesBeforeSearch = renderer.Updates;
     var search = await session.DispatchAsync(2, token);
-    if (search.State.Single(s => s.SlotId == 3).Value.Text != "apple, apricot" || renderer.Materializations != 1)
+    if (search.State.Single(s => s.SlotId == 3).Value.Text != "apple, apricot" || renderer.Materializations != 1 ||
+        renderer.Updates != updatesBeforeSearch + 1)
     {
         throw new InvalidOperationException("Remote search or incremental rendering failed.");
     }
