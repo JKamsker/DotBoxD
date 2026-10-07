@@ -105,8 +105,9 @@ the existing JSON importer. It does not authorize kernels: that happens at insta
 Hand-written packages go through the same boundary before materialization.
 
 `Export` sorts definition collections and properties by stable IDs, preserves child order,
-and normalizes kernel JSON through the existing importer/exporter. `ComputeHash` hashes this
-canonical UTF-8 with SHA-256. Equivalent definition ordering and kernel whitespace produce the
+and normalizes kernel JSON through the existing importer/exporter. Import and export revalidate
+the normalized package, including kernel byte limits when canonicalization adds optional fields.
+`ComputeHash` hashes this canonical UTF-8 with SHA-256. Equivalent definition ordering and kernel whitespace produce the
 same hash; child order and initial state remain significant. This is format-v1 identity, not a
 promise that future schema versions use identical bytes.
 

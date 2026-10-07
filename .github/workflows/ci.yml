@@ -432,6 +432,8 @@ jobs:
               "JsonApiSurfaceTests",
               "UiPackageValidationTests",
               "UiPackageJsonTests",
+              "Canonical_kernel_expansion_obeys_the_independent_byte_limit",
+              "Canonical_kernel_at_the_exact_byte_limit_roundtrips_and_revalidates",
               "UiSessionTests",
               "UiConcurrencyTests",
               "UiLifecycleTests",

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using DotBoxD.UI;
 
@@ -5,6 +6,49 @@ namespace DotBoxD.Kernels.Tests.UI;
 
 public sealed class UiPackageJsonTests
 {
+    private const string CompactKernel = """
+        {"id":"compact","version":"1.0.0","functions":[{"id":"main","visibility":"entrypoint",
+        "parameters":[],"returnType":"I32","body":[{"op":"return","value":{"i32":1}}]}]}
+        """;
+
+    [Theory]
+    [InlineData("Import")]
+    [InlineData("Export")]
+    [InlineData("Hash")]
+    public void Canonical_kernel_expansion_obeys_the_independent_byte_limit(string operation)
+    {
+        var package = CompactPackage();
+        var policy = new UiPolicy { MaxKernelBytes = Encoding.UTF8.GetByteCount(CompactKernel) };
+        UiPackageValidator.Validate(package, policy);
+        var canonicalJson = UiPackageJson.Export(package, new UiPolicy());
+        var wire = JsonNode.Parse(canonicalJson)!;
+        Assert.True(Encoding.UTF8.GetByteCount(wire["kernels"]![0]!["moduleJson"]!.GetValue<string>()) > policy.MaxKernelBytes);
+        wire["kernels"]![0]!["moduleJson"] = CompactKernel;
+        var error = Assert.Throws<UiValidationException>(() => operation switch
+        {
+            "Import" => UiPackageJson.Import(wire.ToJsonString(), policy).Kernels[0].ModuleJson,
+            "Export" => UiPackageJson.Export(package, policy),
+            _ => UiPackageJson.ComputeHash(package, policy)
+        });
+        Assert.Contains("kernel", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Canonical_kernel_at_the_exact_byte_limit_roundtrips_and_revalidates()
+    {
+        var package = CompactPackage();
+        var canonical = UiPackageJson.Import(UiPackageJson.Export(package, new UiPolicy()), new UiPolicy());
+        var policy = new UiPolicy { MaxKernelBytes = Encoding.UTF8.GetByteCount(canonical.Kernels[0].ModuleJson) };
+        var json = UiPackageJson.Export(package, policy);
+        var imported = UiPackageJson.Import(json, policy);
+        UiPackageValidator.Validate(imported, policy);
+        Assert.Equal(json, UiPackageJson.Export(imported, policy));
+        Assert.Equal(UiPackageJson.ComputeHash(package, policy), UiPackageJson.ComputeHash(imported, policy));
+    }
+
+    private static UiPackage CompactPackage() => new(1, 1,
+        [new UiNode(1, UiPrimitive.Text, [], [])], [], [new UiKernel(1, CompactKernel, "main")], [], []);
+
     [Fact]
     public void Package_roundtrip_and_canonical_hash_ignore_definition_order_and_kernel_whitespace()
     {

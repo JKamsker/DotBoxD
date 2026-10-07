@@ -30,7 +30,7 @@ public static class UiPackageJson
             var package = JsonSerializer.Deserialize(json, UiJsonContext.Default.UiPackage)
                 ?? throw new UiValidationException("UI package must be an object.");
             UiPackageValidator.Validate(package, policy);
-            return NormalizeKernels(package);
+            return NormalizeKernels(package, policy);
         }
         catch (JsonException ex)
         {
@@ -45,7 +45,7 @@ public static class UiPackageJson
     public static string Export(UiPackage package, UiPolicy policy)
     {
         UiPackageValidator.Validate(package, policy);
-        var normalized = NormalizeKernels(package) with
+        var normalized = NormalizeKernels(package, policy) with
         {
             Nodes = [.. package.Nodes.OrderBy(n => n.Id).Select(n => n with
             {
@@ -67,12 +67,16 @@ public static class UiPackageJson
     public static string ComputeHash(UiPackage package, UiPolicy policy)
         => Convert.ToHexStringLower(SHA256.HashData(StrictUtf8.GetBytes(Export(package, policy))));
 
-    private static UiPackage NormalizeKernels(UiPackage package)
-        => package with
+    private static UiPackage NormalizeKernels(UiPackage package, UiPolicy policy)
+    {
+        var normalized = package with
         {
             Kernels = [.. package.Kernels.OrderBy(k => k.Id).Select(k => k with
             {
                 ModuleJson = JsonExporter.Export(JsonImporter.Import(k.ModuleJson))
             })]
         };
+        UiPackageValidator.Validate(normalized, policy);
+        return normalized;
+    }
 }
