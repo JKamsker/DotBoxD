@@ -208,6 +208,10 @@ assignments, on decimal, `DateTime`/`DateTimeOffset` and cancellation tokens rec
 not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
 Boolean and string scalar operations remain available. Ordered comparisons on `ulong`-backed enums
 receive `DBXU001` because their I64 wire values use signed ordering; enum equality remains supported.
+Local handlers and their annotated helpers cannot read `[LiveSetting]` properties: UI kernels do
+not declare RPC live-setting parameters. Such reads receive `DBXU001`; pass the value through a
+UI state/input slot or keep the read in an explicit remote handler. Ordinary scalar parameters
+remain supported even when their names match a live-setting property.
 Local DTO construction requires source-visible plain fields/auto-properties, positional records or
 constructors that only assign unchanged parameters to matching named fields of the same type on
 `this`. Positional record members must retain their synthesized parameter storage.

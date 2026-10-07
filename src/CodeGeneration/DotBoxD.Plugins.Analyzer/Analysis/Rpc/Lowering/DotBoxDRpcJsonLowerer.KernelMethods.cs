@@ -55,7 +55,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             ReserveGeneratedLocal,
             _serverContextParameterName,
             _serverContextType,
-            _validateRecordCreation);
+            _validateRecordCreation,
+            _allowLiveSettings);
         var lowered = lowerer.LowerExpression(body);
         Allocates |= lowerer.Allocates;
 
