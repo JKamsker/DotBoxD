@@ -10,6 +10,8 @@ public sealed record UiPolicy
     public int MaxNodes { get; init; } = 2_000;
     public int MaxDepth { get; init; } = 64;
     public int MaxChildren { get; init; } = 1_000;
+    public int MaxItems { get; init; } = 1_000;
+    public int MaxInputEventsPerSecond { get; init; } = 1_000;
     public int MaxStateSlots { get; init; } = 256;
     public int MaxStateBytes { get; init; } = 1024 * 1024;
     public int MaxStringLength { get; init; } = 16_384;
@@ -27,7 +29,7 @@ public sealed record UiPolicy
     public void Validate()
     {
         foreach (var limit in new[] { MaxPackageBytes, MaxNodes, MaxDepth, MaxChildren, MaxStateSlots,
-            MaxStateBytes, MaxStringLength, MaxKernels, MaxKernelBytes, MaxEvents, MaxPatchSlots, MaxInFlightRemoteEvents })
+            MaxStateBytes, MaxStringLength, MaxItems, MaxInputEventsPerSecond, MaxKernels, MaxKernelBytes, MaxEvents, MaxPatchSlots, MaxInFlightRemoteEvents })
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
         }

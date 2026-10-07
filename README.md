@@ -185,7 +185,7 @@ three trust postures, and the capabilities/bindings model.
 | RPC & Unity: typed calls between processes | [Tutorial 1: your first Service](https://dotboxd.kamsker.at/tutorials/first-service/) |
 | Plugin author: react to events, ship batches | [Event pipelines walkthrough](https://dotboxd.kamsker.at/tutorials/event-pipeline-runlocal/) · [Pushdown walkthrough](https://dotboxd.kamsker.at/tutorials/pushdown-server-extension/) |
 | Host integrator: expose bindings, set policy | [Host bindings](https://dotboxd.kamsker.at/concepts/host-bindings/) · [Kernel runtime](https://dotboxd.kamsker.at/concepts/runtime/) |
-| Contribute plugin UI through validated data and kernels | [Sandboxed UI foundation](docs/sandboxed-ui.md) · [Headless process sample](samples/SandboxedUi/README.md) |
+| Contribute plugin UI through validated data and kernels | [Sandboxed UI components and runtime](docs/sandboxed-ui.md) · [Avalonia process sample](samples/SandboxedUi/README.md) |
 | See everything working together | [GameServer walkthrough](https://dotboxd.kamsker.at/examples/gameserver-walkthrough/) |
 | Review the security model | [Sandbox caveats](https://dotboxd.kamsker.at/security/sandbox-caveats/) |
 

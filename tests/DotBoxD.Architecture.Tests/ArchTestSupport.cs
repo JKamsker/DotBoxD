@@ -11,6 +11,7 @@ internal static class ArchTestSupport
     /// <summary>Simple names of every shipping (src/) assembly. Reflection guards run over this set.</summary>
     public static readonly string[] ShippingAssemblyNames =
     [
+        "DotBoxD.UI.Avalonia",
         "DotBoxD.UI",
         "DotBoxD.UI.Runtime",
         "DotBoxD.Kernels",

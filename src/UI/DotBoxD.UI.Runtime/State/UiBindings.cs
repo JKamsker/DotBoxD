@@ -37,7 +37,9 @@ internal sealed class UiBindings(UiPackage package, UiPolicy policy, UiKernelRun
             }
         }
 
-        return values.ToImmutable();
+        var result = values.ToImmutable();
+        UiMaterializationValidator.Validate(_nodes.Length, result, policy);
+        return result;
     }
 
     public ImmutableArray<UiPropertyValue> Changes(ImmutableArray<UiPropertyValue> next)

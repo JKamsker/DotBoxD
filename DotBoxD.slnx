@@ -68,11 +68,13 @@
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
   <Folder Name="/src/UI/">
+    <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
     <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
+    <Project Path="tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj" />
     <Project Path="tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj" />
     <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
     <Project Path="tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj" />

@@ -5,7 +5,7 @@ using DotBoxD.Kernels.Serialization.Json;
 
 namespace DotBoxD.UI.Runtime;
 
-internal sealed class UiKernelRunner(SandboxHost host)
+internal sealed class UiKernelRunner(SandboxHost host, SandboxExecutionOptions options)
 {
     private readonly Dictionary<int, PreparedKernel> _kernels = [];
 
@@ -55,7 +55,7 @@ internal sealed class UiKernelRunner(SandboxHost host)
             kernel.Plan,
             kernel.Definition.Entrypoint,
             input,
-            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted },
+            options,
             cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {

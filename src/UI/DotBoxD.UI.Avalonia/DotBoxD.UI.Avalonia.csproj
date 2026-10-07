@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Trusted Avalonia rendering and bounded semantic input for sandbox UI packages.</Description>
+    <PackageTags>dotboxd;sandbox;ui;avalonia</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+</Project>

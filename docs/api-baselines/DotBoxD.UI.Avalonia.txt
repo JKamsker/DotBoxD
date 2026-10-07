@@ -1,0 +1,15 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.UI.Avalonia
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public async ValueTask DisposeAsync()
+public async ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
+public async ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
+public async ValueTask<RenderTargetBitmap> CaptureAsync(PixelSize pixels, Vector dpi, CancellationToken cancellationToken = default)
+public AvaloniaUiRenderer(int inputCapacity = 128)
+public bool IsDisposed => Volatile.Read(ref _disposed)
+public Control? Root { get { Dispatcher.UIThread.VerifyAccess(); return _root; } }
+public int Materializations { get; private set; }
+public int Updates { get; private set; }
+public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
+public ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken) => _queue.ReadAsync(cancellationToken)

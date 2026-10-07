@@ -2,6 +2,7 @@ using DotBoxD.Pushdown.Services;
 using DotBoxD.Services.Peer;
 using DotBoxD.Transports.NamedPipes;
 using DotBoxD.UI;
+using DotBoxD.UI.Authoring;
 using Examples.SandboxedUi.Contracts;
 using Examples.SandboxedUi.Plugin;
 
@@ -13,11 +14,12 @@ await Task.Delay(Timeout.InfiniteTimeSpan);
 
 namespace Examples.SandboxedUi.Plugin
 {
-    internal sealed class UiPlugin : IUiPlugin
+    internal sealed partial class UiPlugin : IUiPlugin
     {
         public ValueTask<string> GetPackageAsync(CancellationToken cancellationToken = default)
             => ValueTask.FromResult(UiPackageJson.Export(CounterComponent.Package(), new UiPolicy()));
 
+        [UiRemoteHandler(7)]
         public ValueTask<SearchReply> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

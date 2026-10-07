@@ -35,6 +35,14 @@ public sealed class UiSession : IAsyncDisposable
             .Select(p => ((n.Id, p.Id), p.StateSlotId))).ToDictionary(p => p.Item1, p => p.StateSlotId);
     }
 
+    internal void StartInput(IUiInputSource source)
+        => _ = UiInputLoop.RunAsync(this, source, _policy,
+            _events.Values.Where(e => e.Target == UiEventTarget.Remote).Select(e => e.Id).ToHashSet(), _lifetime.Token);
+
+    private string? _lastInputError;
+    public string? LastInputError => Volatile.Read(ref _lastInputError);
+    internal void RecordInputError(string message) => Volatile.Write(ref _lastInputError, message);
+
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsDisconnected => Volatile.Read(ref _closed) != 0;
 

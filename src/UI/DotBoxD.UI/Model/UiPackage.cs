@@ -26,7 +26,8 @@ public enum UiPrimitive
     CheckBox = 7,
     ProgressBar = 8,
     ScrollViewer = 9,
-    Items = 10
+    Items = 10,
+    Slider = 11
 }
 
 public enum UiPropertyId
@@ -36,7 +37,14 @@ public enum UiPropertyId
     Visible = 3,
     Value = 4,
     Maximum = 5,
-    Checked = 6
+    Checked = 6,
+    Items = 7,
+    Horizontal = 8,
+    Spacing = 9,
+    Columns = 10,
+    Row = 11,
+    Column = 12,
+    Padding = 13
 }
 
 public sealed record UiNode(

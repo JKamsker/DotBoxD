@@ -120,6 +120,7 @@ jobs:
           - os: ubuntu-latest
             suite: integration-smoke
             projects: |
+              tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -151,6 +152,7 @@ jobs:
           - os: windows-latest
             suite: integration-smoke
             projects: |
+              tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -330,6 +332,15 @@ jobs:
       - name: Build
         run: dotnet build DotBoxD.slnx -c Release --no-restore
 
+      - name: Avalonia required input and lifecycle tests
+        shell: pwsh
+        run: |
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj `
+            -Configuration Release `
+            -NoBuild `
+            -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests")
+
       - name: Security-boundary required tests
         shell: pwsh
         run: |
@@ -422,6 +433,8 @@ jobs:
               "UiSessionTests",
               "UiConcurrencyTests",
               "UiLifecycleTests",
+              "UiAuthoringTests",
+              "UiCollectionTests",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

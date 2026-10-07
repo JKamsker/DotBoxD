@@ -44,7 +44,8 @@ internal static class UiPropertyValidator
     {
         if (property.TwoWay && (property.StateSlotId == 0 ||
             !((primitive == UiPrimitive.TextBox && property.Id == UiPropertyId.Text) ||
-              (primitive == UiPrimitive.CheckBox && property.Id == UiPropertyId.Checked))))
+              (primitive == UiPrimitive.CheckBox && property.Id == UiPropertyId.Checked) ||
+              (primitive == UiPrimitive.Slider && property.Id == UiPropertyId.Value))))
         {
             throw new UiValidationException("Two-way bindings require a supported input property and state slot.");
         }

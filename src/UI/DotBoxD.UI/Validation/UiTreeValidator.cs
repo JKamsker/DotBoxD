@@ -16,6 +16,7 @@ internal static class UiTreeValidator
             }
 
             ValidateNode(node, state, kernels, policy);
+            RequireRowDepth(node, next.Depth, policy);
             foreach (var child in node.Children)
             {
                 pending.Push((child, next.Depth + 1));
@@ -28,6 +29,12 @@ internal static class UiTreeValidator
         }
     }
 
+    private static void RequireRowDepth(UiNode node, int depth, UiPolicy policy)
+    {
+        if (node.Primitive == UiPrimitive.Items && node.Properties.Any(p => p.Id == UiPropertyId.Items) && depth >= policy.MaxDepth)
+        { throw new UiValidationException("Keyed item rows require one additional depth level."); }
+    }
+
     private static void ValidateNode(UiNode node, Dictionary<int, UiStateSlot> state,
         Dictionary<int, UiKernel> kernels, UiPolicy policy)
     {
@@ -37,6 +44,8 @@ internal static class UiTreeValidator
             throw new UiValidationException("UI primitive does not support these children.");
         }
 
+        if (node.Primitive == UiPrimitive.Items && !node.Children.IsEmpty && node.Properties.Any(p => p.Id == UiPropertyId.Items))
+        { throw new UiValidationException("Keyed items cannot also contain static children."); }
         var properties = new HashSet<UiPropertyId>();
         foreach (var property in node.Properties)
         {
@@ -48,7 +57,7 @@ internal static class UiTreeValidator
     {
         if (!policy.AllowedPrimitives.Contains(node.Primitive) || !Enum.IsDefined(node.Primitive) ||
             node.Children.IsDefault || node.Children.Length > policy.MaxChildren ||
-            node.Properties.IsDefault || node.Properties.Length > 6)
+            node.Properties.IsDefault || node.Properties.Length > Enum.GetValues<UiPropertyId>().Length)
         {
             throw new UiValidationException("Unsupported primitive or node structural limit exceeded.");
         }

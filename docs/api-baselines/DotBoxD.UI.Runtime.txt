@@ -6,11 +6,14 @@ public async ValueTask<UiSession> InstallAsync( UiPackage package, IUiRenderer r
 public async ValueTask<UiSnapshot> DispatchAsync(int eventId, CancellationToken cancellationToken = default)
 public bool IsDisconnected => Volatile.Read(ref _closed) != 0
 public Guid Id { get; } = Guid.NewGuid()
+public interface IUiInputSource
 public interface IUiRemoteTransport
 public interface IUiRenderer : IAsyncDisposable
 public sealed class UiHost
 public sealed class UiSession : IAsyncDisposable
-public UiHost(SandboxHost kernels, SandboxPolicy kernelPolicy, UiPolicy? policy = null)
+public sealed record UiInput(int EventId = 0, int NodeId = 0, UiPropertyId PropertyId = default, UiValue? Value = null)
+public string? LastInputError => Volatile.Read(ref _lastInputError)
+public UiHost(SandboxHost kernels, SandboxPolicy kernelPolicy, UiPolicy? policy = null, SandboxExecutionOptions? execution = null)
 public ValueTask DisposeAsync()
 public ValueTask<UiSnapshot> ApplyPatchAsync(UiStatePatch patch, CancellationToken cancellationToken = default)
 public ValueTask<UiSnapshot> SetInputAsync( int nodeId, UiPropertyId propertyId, UiValue value, CancellationToken cancellationToken = default)

@@ -120,6 +120,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
     private string LowerInvocation(InvocationExpressionSyntax invocation)
     {
+        if (TryLowerInvariantInt32Text(invocation) is { } text)
+        { return text; }
         if (TryLowerServiceHandleInvocation(invocation) is { } serviceHandleCall)
         {
             return serviceHandleCall;

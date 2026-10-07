@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="../../src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
+    <PackageReference Include="Avalonia.Headless" />
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="MessagePack" ExcludeAssets="analyzers" />
     <PackageReference Include="MessagePackAnalyzer" ExcludeAssets="all" PrivateAssets="all" />

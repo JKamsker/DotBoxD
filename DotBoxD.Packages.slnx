@@ -50,6 +50,7 @@
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
   <Folder Name="/src/UI/">
+    <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
     <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
   </Folder>

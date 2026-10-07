@@ -1,32 +1,44 @@
-using System.Collections.Immutable;
 using DotBoxD.UI;
+using DotBoxD.UI.Authoring;
+using Examples.SandboxedUi.Contracts;
 
 namespace Examples.SandboxedUi.Plugin;
 
-/// <summary>Hand-written public primitives; reusable C# composition needs no host-side plugin class.</summary>
-internal static class CounterComponent
+internal sealed partial class CounterComponent : IUiComponent
 {
-    public static UiPackage Package() => new(1, 1,
-        [new UiNode(1, UiPrimitive.Stack, [2, 3, 4, 5, 6], []), .. Counter(), .. Search()],
-        [new UiStateSlot(1, UiValue.FromInt32(0)), new UiStateSlot(2, UiValue.FromString("")),
-         new UiStateSlot(3, UiValue.FromString(""))],
-        [new UiKernel(1, Module("I32", """{"op":"add","left":{"var":"count"},"right":{"i32":1}}"""), "main", 1),
-         new UiKernel(2, Module("String", """{"call":"int32.toStringInvariant","args":[{"var":"count"}]}"""), "main", 1)],
-        [new UiEvent(1, 3, UiEventKind.Click, UiEventTarget.LocalKernel, KernelId: 1, OutputSlotId: 1),
-         new UiEvent(2, 5, UiEventKind.Click, UiEventTarget.Remote, RemoteEndpointId: 7)], [7]);
+    public static UiPackage Package()
+    {
+        var builder = new UiBuilder();
+        return builder.Build(new CounterComponent().Render(builder));
+    }
 
-    private static ImmutableArray<UiNode> Counter() =>
-        [new UiNode(2, UiPrimitive.Text, [], [new UiProperty(UiPropertyId.Text, BindingKernelId: 2)]),
-         new UiNode(3, UiPrimitive.Button, [], [new UiProperty(UiPropertyId.Text, UiValue.FromString("Increment"))])];
+    public UiElement Render(UiBuilder builder)
+    {
+        var count = builder.State(0);
+        var query = builder.State("");
+        var results = builder.State("");
+        var score = builder.State(0);
+        var increment = builder.Kernel(IncrementUiKernel(), count);
+        var label = builder.Kernel(LabelUiKernel(), count);
+        var readScore = builder.Kernel(ReadScoreUiKernel());
+        return builder.Border(builder.Stack(
+            builder.Text(label), builder.Button("Increment", increment, count),
+            new SearchComponent(query, results).Render(builder),
+            builder.Button("Read game score", readScore, score)));
+    }
 
-    private static ImmutableArray<UiNode> Search() =>
-        [new UiNode(4, UiPrimitive.TextBox, [], [new UiProperty(UiPropertyId.Text, StateSlotId: 2, TwoWay: true)]),
-         new UiNode(5, UiPrimitive.Button, [], [new UiProperty(UiPropertyId.Text, UiValue.FromString("Search"))]),
-         new UiNode(6, UiPrimitive.Text, [], [new UiProperty(UiPropertyId.Text, StateSlotId: 3)])];
+    [UiLocalHandler]
+    private static int Increment(int count) => count + 1;
 
-    private static string Module(string output, string expression) => $$"""
-        {"id":"counter","version":"1.0.0","targetSandboxVersion":"1.0.0","capabilityRequests":[],
-        "functions":[{"id":"main","visibility":"entrypoint","parameters":[{"name":"count","type":"I32"}],
-        "returnType":"{{output}}","body":[{"op":"return","value":{{expression}}}]}]}
-        """;
+    [UiLocalHandler]
+    private static string Label(int count) => count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    [UiLocalHandler]
+    private static int ReadScore() => GameBindings.ReadScore();
+}
+
+internal sealed class SearchComponent(UiState<string> query, UiState<string> results) : IUiComponent
+{
+    public UiElement Render(UiBuilder builder) => builder.Stack(builder.TextBox(query),
+        builder.RemoteButton("Search", UiPlugin.SearchAsyncUiEndpoint), builder.Text(results));
 }

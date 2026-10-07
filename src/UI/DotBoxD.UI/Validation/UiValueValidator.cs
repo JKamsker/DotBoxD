@@ -20,7 +20,8 @@ public static class UiValueValidator
         }
 
         RequireWellFormedText(value.Text);
-        return value.Kind == UiValueKind.String ? Encoding.UTF8.GetByteCount(value.Text) + 8 : 8;
+        var listBytes = UiListValidator.Validate(value, policy);
+        return listBytes + (value.Kind == UiValueKind.String ? Encoding.UTF8.GetByteCount(value.Text) + 8 : 8);
     }
 
     private static void RequireUnusedDefaults(UiValue value)
@@ -61,10 +62,25 @@ public static class UiValueValidator
             UiPropertyId.Visible => UiValueKind.Boolean,
             UiPropertyId.Text => TextKind(primitive),
             UiPropertyId.Checked => RequirePrimitive(primitive, UiPrimitive.CheckBox, UiValueKind.Boolean),
-            UiPropertyId.Value => RequirePrimitive(primitive, UiPrimitive.ProgressBar, UiValueKind.Number),
-            UiPropertyId.Maximum => RequirePrimitive(primitive, UiPrimitive.ProgressBar, UiValueKind.Number),
-            _ => throw new UiValidationException("Unsupported property for UI primitive.")
+            UiPropertyId.Value => RangeKind(primitive),
+            UiPropertyId.Maximum => RangeKind(primitive),
+            UiPropertyId.Items => RequirePrimitive(primitive, UiPrimitive.Items, UiValueKind.Items),
+            _ => LayoutKind(primitive, property)
         };
+
+    private static UiValueKind LayoutKind(UiPrimitive primitive, UiPropertyId property) => property switch
+    {
+        UiPropertyId.Horizontal => RequirePrimitive(primitive, UiPrimitive.Stack, UiValueKind.Boolean),
+        UiPropertyId.Spacing => RequirePrimitive(primitive, UiPrimitive.Stack, UiValueKind.Number),
+        UiPropertyId.Columns => RequirePrimitive(primitive, UiPrimitive.Grid, UiValueKind.Int32),
+        UiPropertyId.Row or UiPropertyId.Column => UiValueKind.Int32,
+        UiPropertyId.Padding => RequirePrimitive(primitive, UiPrimitive.Border, UiValueKind.Number),
+        _ => throw new UiValidationException("Unsupported property for UI primitive.")
+    };
+
+    private static UiValueKind RangeKind(UiPrimitive primitive)
+        => primitive is UiPrimitive.ProgressBar or UiPrimitive.Slider
+            ? UiValueKind.Number : throw new UiValidationException("Unsupported value property.");
 
     private static UiValueKind TextKind(UiPrimitive primitive)
         => primitive is UiPrimitive.Text or UiPrimitive.Button or UiPrimitive.TextBox or UiPrimitive.CheckBox
