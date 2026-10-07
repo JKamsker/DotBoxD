@@ -93,6 +93,7 @@ internal static class UiHandlerModelFactory
             validateRecordCreation: (creation, type) => UiRecordConstructionValidator.Validate(creation, type, model.Compilation, token),
             allowLiveSettings: false,
             validateInvocation: calledMethod => UiInvocationValidator.Validate(calledMethod, model.Compilation));
+        lowerer.ReserveUserNames(syntax);
         var body = syntax.Body is { } block ? lowerer.LowerBody(block, method.ReturnType)
             : lowerer.LowerExpressionBody(syntax.ExpressionBody?.Expression ??
                 throw new NotSupportedException("a local method body is required"), returnsVoid: false, method.ReturnType);

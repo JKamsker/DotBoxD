@@ -39,12 +39,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return sourceType is null ? lowered : ApplyNumericConversion(sourceType, targetType, lowered);
     }
 
-    private void RejectUserDefinedConversion(ExpressionSyntax expression, ITypeSymbol? targetType = null)
+    internal void RejectUserDefinedConversion(ExpressionSyntax expression, ITypeSymbol? targetType = null, string? description = null)
     {
         var model = ModelFor(expression);
         if (model.GetConversion(expression, _cancellationToken).IsUserDefined ||
             targetType is not null && model.ClassifyConversion(expression, targetType).IsUserDefined)
         {
+            if (description is not null)
+            { throw UnsupportedConversion(description); }
             throw new NotSupportedException(
                 "User-defined conversions are unsupported in local kernels; operate on supported scalar fields explicitly or use a remote handler.");
         }

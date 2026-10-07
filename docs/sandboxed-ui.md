@@ -213,6 +213,10 @@ assignments, on decimal, `DateTime`/`DateTimeOffset` and cancellation tokens rec
 not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
 Boolean and string scalar operations remain available. Ordered comparisons on `ulong`-backed enums
 receive `DBXU001` because their I64 wire values use signed ordering; enum equality remains supported.
+Addition/subtraction on byte/sbyte/short/ushort/uint-backed enums receives `DBXU001`: it requires
+an underlying-width conversion that ordinary kernel arithmetic does not preserve. Enum comparison
+and supported signed scalar-width enum arithmetic remain available under ordinary kernel policy.
+Generated temporaries reserve the complete handler signature, including unused parameter names.
 Local handlers and their annotated helpers cannot read `[LiveSetting]` properties: UI kernels do
 not declare RPC live-setting parameters. Such reads receive `DBXU001`; pass the value through a
 UI state/input slot or keep the read in an explicit remote handler. Ordinary scalar parameters

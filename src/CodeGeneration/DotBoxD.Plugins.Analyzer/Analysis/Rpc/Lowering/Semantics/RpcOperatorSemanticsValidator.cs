@@ -13,6 +13,7 @@ internal static class RpcOperatorSemanticsValidator
         ValidateWireOperand(left);
         ValidateWireOperand(right);
         ValidateUnsignedEnumOrdering(binary.Kind(), left, right);
+        ValidateEnumArithmetic(binary.Kind(), left, right);
         if (binary.Kind() is SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression)
         {
             ValidateReferenceOperand(left);
@@ -32,6 +33,9 @@ internal static class RpcOperatorSemanticsValidator
     {
         ValidateWireOperand(model.GetTypeInfo(assignment.Left, cancellationToken).Type);
         ValidateWireOperand(model.GetTypeInfo(assignment.Right, cancellationToken).Type);
+        ValidateEnumArithmetic(assignment.Kind(),
+            model.GetTypeInfo(assignment.Left, cancellationToken).Type,
+            model.GetTypeInfo(assignment.Right, cancellationToken).Type);
         if (model.GetSymbolInfo(assignment, cancellationToken).Symbol is
             IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator } method &&
             !IsSupportedBinaryOperator(assignment.Kind(), method.ContainingType))
@@ -51,6 +55,28 @@ internal static class RpcOperatorSemanticsValidator
             throw new NotSupportedException("This user-defined unary operator is unsupported; operate on supported scalar fields explicitly or use a remote handler.");
         }
     }
+
+    private static void ValidateEnumArithmetic(SyntaxKind kind, ITypeSymbol? left, ITypeSymbol? right)
+    {
+        if (kind is SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
+            SyntaxKind.AddAssignmentExpression or SyntaxKind.SubtractAssignmentExpression &&
+            (RequiresEnumWidthConversion(left) || RequiresEnumWidthConversion(right)))
+        {
+            throw new NotSupportedException(
+                "Arithmetic on enums backed by byte, sbyte, short, ushort or uint requires an underlying-width conversion that kernel arithmetic cannot preserve; use supported signed scalar arithmetic or a remote handler.");
+        }
+    }
+
+    private static bool RequiresEnumWidthConversion(ITypeSymbol? type)
+        => type is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Enum,
+            EnumUnderlyingType:
+            {
+                SpecialType: SpecialType.System_Byte or SpecialType.System_SByte or
+                SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_UInt32
+            }
+        };
 
     private static void ValidateUnsignedEnumOrdering(SyntaxKind kind, ITypeSymbol? left, ITypeSymbol? right)
     {
