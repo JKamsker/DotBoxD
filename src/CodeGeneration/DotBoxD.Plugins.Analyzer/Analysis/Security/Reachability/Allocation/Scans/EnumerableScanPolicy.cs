@@ -42,6 +42,11 @@ internal static class EnumerableScanPolicy
             return true;
         }
 
+        if (source?.Type is IArrayTypeSymbol)
+        {
+            return IsBoundedFrameworkCall(method, source, string.Empty);
+        }
+
         if (source?.Type is not INamedTypeSymbol type || !FrameworkCollectionIdentity.IsFrameworkType(type))
         {
             return false;
@@ -81,8 +86,30 @@ internal static class EnumerableScanPolicy
             "Any" when method.Parameters.Length == 1 =>
                 HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
+            "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
             _ => false
         };
+
+    private static bool HasNoPredicate(IMethodSymbol method)
+        => method.Parameters.All(static parameter => parameter.Type.TypeKind != TypeKind.Delegate);
+
+    private static bool HasCompatibleIndexedFastPath(IMethodSymbol method, IOperation? source)
+        => source?.Type switch
+        {
+            IArrayTypeSymbol array => SymbolEqualityComparer.Default.Equals(array.ElementType, method.TypeArguments[0]),
+            INamedTypeSymbol type => ImplementsCompatibleList(type, method.TypeArguments[0]),
+            _ => false,
+        };
+
+    private static bool ImplementsCompatibleList(INamedTypeSymbol type, ITypeSymbol elementType)
+        => IsCompatibleList(type, elementType) ||
+           type.AllInterfaces.Any(interfaceType => IsCompatibleList(interfaceType, elementType));
+
+    private static bool IsCompatibleList(INamedTypeSymbol type, ITypeSymbol elementType)
+        => FrameworkCollectionIdentity.IsFrameworkType(type) &&
+           type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ==
+               "System.Collections.Generic.IList<T>" &&
+           SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], elementType);
 
     private static bool HasBoundedCount(string typeName)
         => HasBoundedCollectionCount(typeName) || HasBoundedDictionaryViewCount(typeName);
