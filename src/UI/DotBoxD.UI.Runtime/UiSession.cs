@@ -43,6 +43,15 @@ public sealed class UiSession : IAsyncDisposable
     public string? LastInputError => Volatile.Read(ref _lastInputError);
     internal void RecordInputError(string message) => Volatile.Write(ref _lastInputError, message);
 
+    internal ValueTask<bool> RestoreInputAsync(UiInput input, CancellationToken token)
+        => LockedAsync(async () =>
+        {
+            if (!_inputs.ContainsKey((input.NodeId, input.PropertyId)))
+            { return false; }
+            await _renderer.UpdateAsync([_bindings.GetCurrent(input.NodeId, input.PropertyId)], token).ConfigureAwait(false);
+            return true;
+        }, token);
+
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsDisconnected => Volatile.Read(ref _closed) != 0;
 

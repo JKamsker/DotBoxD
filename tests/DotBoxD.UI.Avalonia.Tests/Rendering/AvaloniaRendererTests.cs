@@ -129,6 +129,28 @@ public sealed class AvaloniaRendererTests
         Assert.True(renderer.IsDisposed);
     }
 
+    [AvaloniaFact]
+    public async Task Sparse_and_state_bound_grid_rows_have_matching_definitions()
+    {
+        var b = new UiBuilder();
+        var row = b.State(3);
+        var first = b.Element(UiPrimitive.Text, [UiLiteral.Text("first").Property(UiPropertyId.Text),
+            UiLiteral.Integer(0).Property(UiPropertyId.Row)]);
+        var second = b.Element(UiPrimitive.Text, [UiLiteral.Text("second").Property(UiPropertyId.Text),
+            ((UiBinding<int>)row).Property(UiPropertyId.Row)]);
+        var renderer = new AvaloniaUiRenderer();
+        using var sandbox = SandboxHost.Create(h => h.AddDefaultPureBindings());
+        await using var session = await Host(sandbox).InstallAsync(b.Build(b.Grid(1, first, second)), renderer);
+        var grid = Assert.IsType<Grid>(renderer.Root);
+        Assert.Equal(4, grid.RowDefinitions.Count);
+        Assert.Equal(3, Grid.GetRow(grid.Children[1]));
+        await session.ApplyPatchAsync(new UiStatePatch(session.Id, 0, [new(row.Id, UiValue.FromInt32(5))]));
+        Assert.Equal(6, grid.RowDefinitions.Count);
+        await session.ApplyPatchAsync(new UiStatePatch(session.Id, 1, [new(row.Id, UiValue.FromInt32(1))]));
+        Assert.Equal(2, grid.RowDefinitions.Count);
+        Assert.Same(grid, renderer.Root);
+    }
+
     private static UiHost Host(SandboxHost sandbox) => new(sandbox, SandboxPolicyBuilder.Create().Build());
     private static async Task WaitAsync(UiSession session, Func<UiSnapshot, bool> condition)
     {

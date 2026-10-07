@@ -29,6 +29,8 @@ if ($requiredNames.Count -eq 0) {
 }
 
 $defaultMinimums = @{
+    File_local_handler_containers_have_actionable_diagnostics = 2
+    Null_items_properties_report_validation_errors_for_objects_and_wire = 2
     PluginConnectionHostLifetimeTests = 5
     MemberPlatformMetadataParityTests = 6
     ForeignMemberAttributeIdentityTests = 11

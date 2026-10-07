@@ -44,13 +44,14 @@ internal static class UiTreeValidator
             throw new UiValidationException("UI primitive does not support these children.");
         }
 
-        if (node.Primitive == UiPrimitive.Items && !node.Children.IsEmpty && node.Properties.Any(p => p.Id == UiPropertyId.Items))
-        { throw new UiValidationException("Keyed items cannot also contain static children."); }
         var properties = new HashSet<UiPropertyId>();
         foreach (var property in node.Properties)
         {
             UiPropertyValidator.Validate(property, node.Primitive, properties, state, kernels, policy);
         }
+
+        if (node.Primitive == UiPrimitive.Items && !node.Children.IsEmpty && properties.Contains(UiPropertyId.Items))
+        { throw new UiValidationException("Keyed items cannot also contain static children."); }
     }
 
     private static void RequireNodeShape(UiNode node, UiPolicy policy)

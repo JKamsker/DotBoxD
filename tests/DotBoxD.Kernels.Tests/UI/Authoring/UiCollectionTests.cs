@@ -117,6 +117,34 @@ public sealed class UiCollectionTests
         Assert.Equal(UiPropertyId.Text, Assert.Single(node.Properties).Id);
     }
 
+    [Fact]
+    public async Task Keyed_rows_obey_the_independent_child_limit_before_install()
+    {
+        var b = new UiBuilder();
+        var rows = b.State(System.Collections.Immutable.ImmutableArray.Create(new UiListItem("a", "A"), new UiListItem("b", "B")));
+        using var sandbox = UiTestFixture.Sandbox();
+        var renderer = new RecordingUiRenderer();
+        await Assert.ThrowsAsync<UiValidationException>(() => UiTestFixture.Host(sandbox,
+            new UiPolicy { MaxChildren = 1, MaxItems = 10, MaxNodes = 10 }).InstallAsync(b.Build(b.Items(rows)), renderer).AsTask());
+        Assert.Equal(0, renderer.Materializations);
+        Assert.Equal(1, renderer.Disposals);
+    }
+
+    [Fact]
+    public async Task Keyed_rows_obey_the_independent_child_limit_before_patch_commit()
+    {
+        var b = new UiBuilder();
+        var rows = b.State(System.Collections.Immutable.ImmutableArray.Create(new UiListItem("a", "A")));
+        using var sandbox = UiTestFixture.Sandbox();
+        var renderer = new RecordingUiRenderer();
+        await using var session = await UiTestFixture.Host(sandbox,
+            new UiPolicy { MaxChildren = 1, MaxItems = 10, MaxNodes = 10 }).InstallAsync(b.Build(b.Items(rows)), renderer);
+        await Assert.ThrowsAsync<UiValidationException>(() => session.ApplyPatchAsync(new UiStatePatch(session.Id, 0,
+            [new(rows.Id, UiValue.FromItems([new("a", "A"), new("b", "B")]))])).AsTask());
+        Assert.Equal(0, (await session.SnapshotAsync()).Version);
+        Assert.Empty(renderer.Updates);
+    }
+
     private sealed class LabelComponent(string text) : IUiComponent
     {
         public UiElement Render(UiBuilder builder) => builder.Text(text);

@@ -67,8 +67,14 @@ internal static class UiControlProperties
         grid.ColumnDefinitions.Clear();
         for (var i = 0; i < columns; i++)
         { grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); }
-        grid.RowDefinitions.Clear();
-        for (var i = 0; i < Math.Max(1, (grid.Children.Count + columns - 1) / columns); i++)
+    }
+
+    public static void RefreshRows(Grid grid)
+    {
+        var count = grid.Children.Select(Grid.GetRow).DefaultIfEmpty(0).Max() + 1;
+        while (grid.RowDefinitions.Count > count)
+        { grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1); }
+        while (grid.RowDefinitions.Count < count)
         { grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); }
     }
 

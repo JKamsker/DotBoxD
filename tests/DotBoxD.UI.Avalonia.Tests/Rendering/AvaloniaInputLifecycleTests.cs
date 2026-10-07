@@ -89,6 +89,7 @@ public sealed class AvaloniaInputLifecycleTests
         var rejected = await session.SnapshotAsync(timeout.Token);
         Assert.Equal(0, rejected.Version);
         Assert.Equal("", rejected.State[0].Value.Text);
+        Assert.Equal("", box.Text);
         Assert.False(session.IsDisconnected);
         Assert.False(renderer.IsDisposed);
         box.Text = "valid";

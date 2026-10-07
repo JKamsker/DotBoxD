@@ -121,6 +121,18 @@ public sealed class UiAuthoringTests
         Assert.All(steps.SelectMany(s => s.Outputs), o => Assert.Contains(o.Reason, new[] { IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached }));
     }
 
+    [Theory]
+    [InlineData("UiLocalHandler")]
+    [InlineData("UiRemoteHandler(7)")]
+    public void File_local_handler_containers_have_actionable_diagnostics(string attribute)
+    {
+        var result = Generate("using DotBoxD.UI.Authoring; file static partial class Handlers { [" +
+            attribute + "] public static int Increment(int value) => value + 1; }");
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXU001"));
+        Assert.Contains("file-local", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Empty(result.Result.GeneratedTrees);
+    }
+
     private static UiPackage Package(string source)
     {
         var result = Generate(source);

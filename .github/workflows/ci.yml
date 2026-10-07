@@ -339,7 +339,9 @@ jobs:
             -Project tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj `
             -Configuration Release `
             -NoBuild `
-            -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests")
+            -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests",
+              "Sparse_and_state_bound_grid_rows_have_matching_definitions",
+              "Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers")
 
       - name: Security-boundary required tests
         shell: pwsh
@@ -435,6 +437,10 @@ jobs:
               "UiLifecycleTests",
               "UiAuthoringTests",
               "UiCollectionTests",
+              "Keyed_rows_obey_the_independent_child_limit_before_install",
+              "Keyed_rows_obey_the_independent_child_limit_before_patch_commit",
+              "Null_items_properties_report_validation_errors_for_objects_and_wire",
+              "File_local_handler_containers_have_actionable_diagnostics",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

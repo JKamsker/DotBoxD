@@ -51,6 +51,8 @@ internal static class UiHandlerModelFactory
 
     private static void RequireContainer(IMethodSymbol method)
     {
+        if (method.ContainingType.IsFileLocal)
+        { throw new NotSupportedException("file-local types cannot receive generated members in a separate source file; use a non-file-local partial type"); }
         if (method.ContainingType.ContainingType is not null || method.ContainingType.IsGenericType ||
             method.ContainingType.DeclaringSyntaxReferences.Any(r =>
                 r.GetSyntax() is not TypeDeclarationSyntax type || !type.Modifiers.Any(SyntaxKind.PartialKeyword)))

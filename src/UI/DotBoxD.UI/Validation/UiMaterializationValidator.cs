@@ -12,7 +12,11 @@ public static class UiMaterializationValidator
         {
             UiValueValidator.Validate(property.Value, policy);
             if (property.PropertyId == UiPropertyId.Items)
-            { count += property.Value.Items.Length; }
+            {
+                if (property.Value.Items.Length > policy.MaxChildren)
+                { throw new UiValidationException("Keyed UI rows exceed the host child limit."); }
+                count += property.Value.Items.Length;
+            }
             RequireLayoutRange(property);
         }
 

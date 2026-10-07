@@ -4,6 +4,26 @@ namespace DotBoxD.Kernels.Tests.UI;
 
 public sealed class UiPackageValidationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Null_items_properties_report_validation_errors_for_objects_and_wire(bool wire)
+    {
+        var policy = new UiPolicy();
+        var package = new UiPackage(1, 1, [new UiNode(1, UiPrimitive.Items, [2], []),
+            new UiNode(2, UiPrimitive.Text, [], [])], [], [], [], []);
+        if (wire)
+        {
+            var json = UiPackageJson.Export(package, policy).Replace("\"properties\":[]", "\"properties\":[null]", StringComparison.Ordinal);
+            Assert.Throws<UiValidationException>(() => UiPackageJson.Import(json, policy));
+        }
+        else
+        {
+            var malformed = package with { Nodes = package.Nodes.SetItem(0, package.Nodes[0] with { Properties = [null!] }) };
+            Assert.Throws<UiValidationException>(() => UiPackageValidator.Validate(malformed, policy));
+        }
+    }
+
     public static IEnumerable<object[]> MalformedPackages()
     {
         var p = UiTestFixture.Counter();

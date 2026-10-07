@@ -173,7 +173,7 @@ statement bodies, including structured control flow and explicitly attributed ho
 Use `value.ToString(CultureInfo.InvariantCulture)` for invariant Int32 text. Other unsupported
 operations produce error `DBXU001` at the method, suggesting explicit remote RPC or a host binding.
 There is no automatic remote fallback. Overloads, captures, instance handlers, generic/ref/async
-local signatures and unlowerable library calls fail closed.
+local signatures, file-local containers and unlowerable library calls fail closed.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the
@@ -195,8 +195,10 @@ then use normal Avalonia input routing into the semantic input queue. `UiHost` a
 connects renderers implementing `IUiInputSource` to the session. Input queues and rate limits are
 bounded; overflow disconnects and releases the session. Remote events do not block local typing;
 rejected local edits (such as an overlong paste) and stale remote input are visible through
-`UiSession.LastInputError` without closing the session. A rejected edit leaves host state unchanged,
-and subsequent valid input can proceed.
+`UiSession.LastInputError` without closing the session. A rejected edit leaves host state unchanged
+and restores the edited control to its authoritative value before reporting the error. Subsequent
+valid input can proceed. Renderer update batches may therefore include an authoritative input
+correction even when the state value has not changed.
 
 `CaptureAsync(PixelSize, Vector)` measures/arranges the root and returns a host-owned
 `RenderTargetBitmap` for CPU/offscreen composition. The embedding host disposes it and decides how

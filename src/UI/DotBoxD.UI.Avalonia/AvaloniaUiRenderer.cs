@@ -87,6 +87,11 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
                 else
                 { UiControlProperties.Apply(_controls[change.NodeId], change.PropertyId, change.Value); }
             }
+            if (changes.Any(c => c.PropertyId is UiPropertyId.Row or UiPropertyId.Columns))
+            {
+                foreach (var control in _controls.Values.OfType<Grid>())
+                { UiControlProperties.RefreshRows(control); }
+            }
         }
         finally { _input.Applying = false; }
     }

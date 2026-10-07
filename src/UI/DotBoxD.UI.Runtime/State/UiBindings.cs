@@ -57,6 +57,8 @@ internal sealed class UiBindings(UiPackage package, UiPolicy policy, UiKernelRun
     }
 
     public void Commit(ImmutableArray<UiPropertyValue> next) => _current = next;
+    public UiPropertyValue GetCurrent(int nodeId, UiPropertyId propertyId)
+        => _current.Single(p => p.NodeId == nodeId && p.PropertyId == propertyId);
     public void Clear()
     {
         _nodes = [];

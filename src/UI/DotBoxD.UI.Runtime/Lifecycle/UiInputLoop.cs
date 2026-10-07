@@ -40,7 +40,11 @@ internal static class UiInputLoop
     {
         try
         { await ApplyAsync(session, input, token).ConfigureAwait(false); }
-        catch (UiValidationException error) { session.RecordInputError(error.Message); }
+        catch (UiValidationException error)
+        {
+            await session.RestoreInputAsync(input, token).ConfigureAwait(false);
+            session.RecordInputError(error.Message);
+        }
     }
 
     private static async Task ObserveRemoteAsync(UiSession session, ValueTask<UiSnapshot> operation, UiInputConcurrency pending, CancellationToken token)
