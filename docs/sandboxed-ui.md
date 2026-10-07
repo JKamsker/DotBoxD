@@ -201,9 +201,16 @@ Boolean and string value comparisons remain supported. Short-circuit operands th
 generated argument temporaries, including annotated helper calls, receive `DBXU001`; use explicit
 `if` statements to guard those calls. Simple arithmetic operands retain normal `&&`/`||` semantics.
 Eager binary operands, including string concatenation, retain left-to-right evaluation when later
-calls need generated temporaries. An earlier failure prevents later host calls. Runtime decimal,
-`DateTime`/`DateTimeOffset` and cancellation-token equality receives `DBXU001`: their wire representations do not
-preserve CLR equality. Comparisons of supported numeric, Boolean and string scalars remain available.
+calls need generated temporaries. Map assignments likewise evaluate the key before RHS helper
+arguments. An earlier failure prevents later host calls. Runtime operators on decimal,
+`DateTime`/`DateTimeOffset` and cancellation tokens receive `DBXU001`: their wire representations do
+not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
+Boolean and string scalar operations remain available.
+Local DTO construction requires source-visible plain fields/auto-properties, positional records or
+constructors that only assign unchanged parameters of the same type. Constructor effects or
+transformations, custom accessors, field/property initializers, computed properties and inheritance
+receive `DBXU001`; keep those operations in an explicit remote handler. This check also applies to
+construction inside annotated helpers. Ordinary stored DTOs remain supported in both kernel modes.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the

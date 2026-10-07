@@ -31,6 +31,11 @@ internal static class UiBooleanGeneratorFixture
         using DotBoxD.UI.Authoring;
         public sealed record ValueRecord(int Value);
         public readonly record struct ValueStruct(int Value);
+        public readonly record struct OperatorValue(int Value)
+        {
+            public static int operator +(OperatorValue left, OperatorValue right) => left.Value + right.Value;
+            public static int operator -(OperatorValue value) => -value.Value;
+        }
         public static partial class Counter
         {
             [KernelMethod] public static bool Positive(int x) => x > 0;

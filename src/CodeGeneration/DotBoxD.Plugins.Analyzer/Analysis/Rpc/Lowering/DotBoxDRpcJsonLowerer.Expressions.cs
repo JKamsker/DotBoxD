@@ -69,13 +69,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         };
 
     private string LowerUnary(PrefixUnaryExpressionSyntax unary)
-        => unary.Kind() switch
+    {
+        RpcOperatorSemanticsValidator.ValidateUnary(unary, ModelFor(unary), _cancellationToken);
+        return unary.Kind() switch
         {
             SyntaxKind.LogicalNotExpression => Obj(("unary", Str("not")), ("operand", LowerExpression(unary.Operand))),
             SyntaxKind.UnaryMinusExpression => Obj(("unary", Str("-")), ("operand", LowerExpression(unary.Operand))),
             SyntaxKind.UnaryPlusExpression => LowerExpression(unary.Operand),
             _ => throw new NotSupportedException($"Server extension unary '{unary.Kind()}' is not supported.")
         };
+    }
 
     private string LowerBinary(BinaryExpressionSyntax binary)
         => LowerBinary(binary, LowerExpression);
@@ -83,7 +86,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string LowerBinary(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
     {
         ValidateBinarySingleSemantics(binary);
-        RpcBinaryEqualityValidator.Validate(binary, ModelFor(binary), _cancellationToken);
+        RpcOperatorSemanticsValidator.Validate(binary, ModelFor(binary), _cancellationToken);
 
         if (binary.Kind() == SyntaxKind.AddExpression)
         {

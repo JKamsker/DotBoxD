@@ -17,6 +17,8 @@ public sealed class UiOperandOrderTests
     [InlineData("=> Identity(Next()) - Identity(Next());", false, 2, ExecutionMode.Compiled)]
     [InlineData("=> Next().ToString(CultureInfo.InvariantCulture) + Text(Next());", true, 2, ExecutionMode.Interpreted)]
     [InlineData("=> Next().ToString(CultureInfo.InvariantCulture) + Text(Next());", true, 2, ExecutionMode.Compiled)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[Next()] = Identity(Next()); return map[1]; }", false, 2, ExecutionMode.Interpreted)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[Next()] = Identity(Next()); return map[1]; }", false, 2, ExecutionMode.Compiled)]
     public async Task Eager_operands_preserve_native_host_call_order_in_both_kernel_modes(
         string body, bool text, int calls, ExecutionMode mode)
     {
@@ -31,11 +33,12 @@ public sealed class UiOperandOrderTests
     }
 
     [Theory]
-    [InlineData(ExecutionMode.Interpreted)]
-    [InlineData(ExecutionMode.Compiled)]
-    public async Task Earlier_operand_failure_prevents_later_host_calls(ExecutionMode mode)
+    [InlineData("=> 10 / value + Identity(Next());", ExecutionMode.Interpreted)]
+    [InlineData("=> 10 / value + Identity(Next());", ExecutionMode.Compiled)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[10 / value] = Identity(Next()); return value; }", ExecutionMode.Interpreted)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[10 / value] = Identity(Next()); return value; }", ExecutionMode.Compiled)]
+    public async Task Earlier_operand_failure_prevents_later_host_calls(string body, ExecutionMode mode)
     {
-        const string body = "=> 10 / value + Identity(Next());";
         Assert.IsType<DivideByZeroException>(Assert.Throws<TargetInvocationException>(
             () => UiOperandOrderFixture.Native(body)).InnerException);
         var (binding, counter) = UiOperandOrderFixture.NextBinding();

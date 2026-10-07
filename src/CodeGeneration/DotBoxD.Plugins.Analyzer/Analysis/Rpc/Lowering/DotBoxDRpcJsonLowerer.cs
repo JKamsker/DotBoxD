@@ -23,6 +23,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly IReadOnlyDictionary<string, RpcInlinedBinding>? _inlinedBindings;
     private readonly IReadOnlyCollection<string>? _inlineStack;
     private readonly Func<string, string>? _reserveGeneratedName;
+    private readonly Action<BaseObjectCreationExpressionSyntax, INamedTypeSymbol>? _validateRecordCreation;
     private readonly string? _serverContextParameterName;
     private readonly ITypeSymbol? _serverContextType;
     private readonly ServerContextHostBindingResolver _serverContextHostBindings;
