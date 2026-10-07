@@ -456,6 +456,8 @@ jobs:
               "Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation",
               "User_defined_scalar_return_conversions_fail_closed_for_expression_and_block_bodies",
               "Built_in_numeric_return_conversions_execute_for_expression_and_block_bodies",
+              "Nonlocal_handler_writes_fail_closed_at_compile_time",
+              "Local_parameter_and_discard_writes_keep_their_execution_semantics",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

@@ -31,7 +31,7 @@ internal static class RpcJsonExpressionStatementLowerer
             return false;
         }
 
-        if (assignment.Left is IdentifierNameSyntax target)
+        if (assignment.Left is IdentifierNameSyntax target && lowerer.IsLocalWriteTarget(target))
         {
             var value = assignment.Kind() == SyntaxKind.SimpleAssignmentExpression
                 ? lowerer.ApplyRequiredAssignmentConversion(

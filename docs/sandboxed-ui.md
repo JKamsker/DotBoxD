@@ -182,6 +182,8 @@ There is no automatic remote fallback. Overloads, captures, instance handlers, g
 local signatures, file-local containers and unlowerable library calls fail closed. Expression and
 block bodies share return-conversion checks: built-in numeric widening is supported; user-defined
 implicit scalar conversions are rejected during generation.
+Assignments and increments may mutate locals and parameters; discard assignments are supported.
+Static field/property writes fail with `DBXU001` rather than silently dropping setter or field effects.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the
