@@ -484,6 +484,8 @@ jobs:
               "Source_visible_fields_preserve_execution_in_both_kernel_modes",
               "Live_settings_fail_closed_in_UI_handlers_and_inlined_helpers",
               "Parameters_named_like_live_settings_preserve_both_kernel_modes",
+              "Unsupported_host_receivers_and_scoped_handles_fail_closed",
+              "Explicit_host_arguments_preserve_capture_and_both_kernel_modes",
               "Both_kernel_modes_use_ordinary_validation_and_metering",
               "Nontrivial_DTO_construction_and_accessors_fail_closed",
               "Plain_stored_DTOs_preserve_native_execution_in_both_modes",

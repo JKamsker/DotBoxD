@@ -18,6 +18,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 {
     private readonly SemanticModel _model;
     private readonly bool _allowLiveSettings;
+    private readonly Action<IMethodSymbol>? _validateInvocation;
     private readonly ICollection<string> _capabilities;
     private readonly ICollection<string> _effects;
     private readonly CancellationToken _cancellationToken;

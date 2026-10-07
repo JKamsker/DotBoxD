@@ -91,7 +91,8 @@ internal static class UiHandlerModelFactory
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var lowerer = new DotBoxDRpcJsonLowerer(model, capabilities, effects, token,
             validateRecordCreation: (creation, type) => UiRecordConstructionValidator.Validate(creation, type, model.Compilation, token),
-            allowLiveSettings: false);
+            allowLiveSettings: false,
+            validateInvocation: calledMethod => UiInvocationValidator.Validate(calledMethod, model.Compilation));
         var body = syntax.Body is { } block ? lowerer.LowerBody(block, method.ReturnType)
             : lowerer.LowerExpressionBody(syntax.ExpressionBody?.Expression ??
                 throw new NotSupportedException("a local method body is required"), returnsVoid: false, method.ReturnType);

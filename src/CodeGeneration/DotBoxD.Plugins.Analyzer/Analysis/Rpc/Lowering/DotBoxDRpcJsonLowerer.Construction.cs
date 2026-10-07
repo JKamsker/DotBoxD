@@ -17,10 +17,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         string? serverContextParameterName = null,
         ITypeSymbol? serverContextType = null,
         Action<BaseObjectCreationExpressionSyntax, INamedTypeSymbol>? validateRecordCreation = null,
-        bool allowLiveSettings = true)
+        bool allowLiveSettings = true,
+        Action<IMethodSymbol>? validateInvocation = null)
     {
         _model = model;
         _allowLiveSettings = allowLiveSettings;
+        _validateInvocation = validateInvocation;
         _capabilities = capabilities;
         _effects = effects;
         _cancellationToken = cancellationToken;

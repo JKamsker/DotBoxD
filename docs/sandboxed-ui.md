@@ -175,7 +175,12 @@ Reference the optional `DotBoxD.Plugins.Analyzer` as an analyzer to use `[UiLoca
 methods of a top-level non-generic partial class/struct. Each method accepts zero or one
 int/bool/double/string parameter and returns one scalar. The generated `MethodUiKernel()` returns
 a public `UiKernelDefinition<TInput,TOutput>`. The existing RPC C# lowerer handles expressions and
-statement bodies, including structured control flow and explicitly attributed host bindings.
+statement bodies, including structured control flow and explicitly attributed static host bindings
+with explicit value arguments. Instance binding receivers (`IncludeReceiver`/`HostBindingObject`)
+and scoped RPC service-handle accessors receive `DBXU001`, including inside annotated helpers:
+UI lowering cannot preserve those RPC receiver/capture conventions. Capture a scalar key in a
+local and pass it to a static binding, pass stored DTO data as an explicit argument, or use a remote
+handler. Handwritten kernel definitions can express any normally validated public binding signature.
 Use `value.ToString(CultureInfo.InvariantCulture)` for invariant Int32 text. Other unsupported
 operations produce error `DBXU001` at the method, suggesting explicit remote RPC or a host binding.
 There is no automatic remote fallback. Overloads, captures, instance handlers, generic/ref/async

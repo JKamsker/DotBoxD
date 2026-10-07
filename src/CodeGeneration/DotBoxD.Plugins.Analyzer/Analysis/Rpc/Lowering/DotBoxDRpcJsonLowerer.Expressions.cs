@@ -124,6 +124,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
     private string LowerInvocation(InvocationExpressionSyntax invocation)
     {
+        var symbolInfo = _model.GetSymbolInfo(invocation, _cancellationToken);
+        if (symbolInfo.Symbol is IMethodSymbol calledMethod)
+        { _validateInvocation?.Invoke(calledMethod); }
         if (TryLowerInvariantInt32Text(invocation) is { } text)
         { return text; }
         if (TryLowerServiceHandleInvocation(invocation) is { } serviceHandleCall)
@@ -135,7 +138,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return mapCall;
         }
 
-        var symbolInfo = _model.GetSymbolInfo(invocation, _cancellationToken);
         if (symbolInfo.Symbol is IMethodSymbol method &&
             DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is { } binding)
         {
@@ -277,7 +279,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return null;
     }
 
-    private static bool HasRpcServiceAttribute(ITypeSymbol type)
+    internal static bool HasRpcServiceAttribute(ITypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {
