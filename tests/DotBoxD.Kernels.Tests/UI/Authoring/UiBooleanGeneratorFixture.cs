@@ -24,11 +24,13 @@ internal static class UiBooleanGeneratorFixture
         Assert.Equal(expected, (await session.DispatchAsync(1)).State.Single(s => s.SlotId == 2).Value.Boolean);
     }
 
-    private static string Handler(string body) => """
+    internal static string Handler(string body) => """
         using System.Collections.Generic;
         using DotBoxD.Abstractions;
         using DotBoxD.UI;
         using DotBoxD.UI.Authoring;
+        public enum UnsignedValue : ulong { Zero = 0, Below = 0x7FFFFFFFFFFFFFFFUL, Above = 0x8000000000000000UL, Max = ulong.MaxValue }
+        public enum SignedValue : long { Negative = -1, Zero = 0, Max = long.MaxValue }
         public sealed record ValueRecord(int Value);
         public readonly record struct ValueStruct(int Value);
         public readonly record struct OperatorValue(int Value)

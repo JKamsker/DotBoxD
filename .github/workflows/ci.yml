@@ -476,6 +476,8 @@ jobs:
               "Failed_collection_receivers_prevent_index_host_calls",
               "Decimal_wire_equality_fails_closed_at_compile_time",
               "Framework_wire_comparisons_without_scalar_identity_fail_closed",
+              "Unsigned_enum_ordering_fails_closed_at_compile_time",
+              "Enum_equality_and_signed_ordering_preserve_both_kernel_modes",
               "Both_kernel_modes_use_ordinary_validation_and_metering",
               "Nontrivial_DTO_construction_and_accessors_fail_closed",
               "Plain_stored_DTOs_preserve_native_execution_in_both_modes",

@@ -205,7 +205,8 @@ calls need generated temporaries. Collection reads and ContainsKey evaluate thei
 index/key temporaries. Map assignments likewise evaluate the key before RHS helper arguments. An earlier failure prevents later host calls. Runtime operators, including compound
 assignments, on decimal, `DateTime`/`DateTimeOffset` and cancellation tokens receive `DBXU001`: their wire representations do
 not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
-Boolean and string scalar operations remain available.
+Boolean and string scalar operations remain available. Ordered comparisons on `ulong`-backed enums
+receive `DBXU001` because their I64 wire values use signed ordering; enum equality remains supported.
 Local DTO construction requires source-visible plain fields/auto-properties, positional records or
 constructors that only assign unchanged parameters to matching named fields of the same type on
 `this`. Positional record members must retain their synthesized parameter storage.

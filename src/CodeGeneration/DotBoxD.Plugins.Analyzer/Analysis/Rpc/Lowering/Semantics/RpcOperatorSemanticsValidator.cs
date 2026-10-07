@@ -12,6 +12,7 @@ internal static class RpcOperatorSemanticsValidator
         var right = model.GetTypeInfo(binary.Right, cancellationToken).Type;
         ValidateWireOperand(left);
         ValidateWireOperand(right);
+        ValidateUnsignedEnumOrdering(binary.Kind(), left, right);
         if (binary.Kind() is SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression)
         {
             ValidateReferenceOperand(left);
@@ -51,6 +52,22 @@ internal static class RpcOperatorSemanticsValidator
         }
     }
 
+    private static void ValidateUnsignedEnumOrdering(SyntaxKind kind, ITypeSymbol? left, ITypeSymbol? right)
+    {
+        if (IsRelational(kind) && (IsUnsigned64Enum(left) || IsUnsigned64Enum(right)))
+        {
+            throw new NotSupportedException(
+                "Ordering ulong-backed enums is unsupported because their I64 wire representation has signed ordering; use a supported signed scalar or a remote handler.");
+        }
+    }
+
+    private static bool IsUnsigned64Enum(ITypeSymbol? type)
+        => type is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Enum,
+            EnumUnderlyingType: { SpecialType: SpecialType.System_UInt64 }
+        };
+
     private static void ValidateReferenceOperand(ITypeSymbol? type)
     {
         if (type is { IsReferenceType: true, SpecialType: not SpecialType.System_String })
@@ -76,8 +93,11 @@ internal static class RpcOperatorSemanticsValidator
            IsComparison(kind) && IsScalarFrameworkValue(type);
 
     private static bool IsComparison(SyntaxKind kind)
-        => kind is SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or SyntaxKind.LessThanExpression
-            or SyntaxKind.LessThanOrEqualExpression or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression;
+        => kind is SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression || IsRelational(kind);
+
+    private static bool IsRelational(SyntaxKind kind)
+        => kind is SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
+            or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression;
 
     private static bool IsScalarFrameworkValue(ITypeSymbol type)
         => DotBoxDRpcTypeMapper.IsGuid(type) || DotBoxDRpcTypeMapper.IsDateOnlyWireType(type) ||
