@@ -97,10 +97,7 @@ internal static class MemberAttributeFormatter
         string attributeType)
     {
         var hasMessage = attr.ConstructorArguments.Length == 1;
-        var supportsParameterlessForm = attributeType is
-            RequiresAssemblyFilesAttribute or RequiresPreviewFeaturesAttribute;
-        if (!hasMessage &&
-            (!supportsParameterlessForm || attr.ConstructorArguments.Length != 0))
+        if (!HasSupportedCodeRequirementConstructor(attr, attributeType))
         {
             return;
         }
@@ -131,6 +128,19 @@ internal static class MemberAttributeFormatter
         }
 
         sb.AppendLine("]");
+    }
+
+    private static bool HasSupportedCodeRequirementConstructor(
+        AttributeData attr,
+        string attributeType)
+    {
+        if (attr.ConstructorArguments.Length == 1)
+        {
+            return true;
+        }
+
+        return attr.ConstructorArguments.Length == 0 &&
+            attributeType is RequiresAssemblyFilesAttribute or RequiresPreviewFeaturesAttribute;
     }
 
     private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
