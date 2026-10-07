@@ -1,0 +1,23 @@
+Query specialization: median [min, max] of five samples; allocations exclude setup/promotion.
+Damage/False/interpreted                              179.7 ns/op [176.8, 199.8]       24.0 B/op
+Damage/False/compiled                                   4.4 ns/op [4.3, 4.4]        0.0 B/op
+Damage/False/publish/1                                 87.0 ns/op [78.5, 110.5]        0.0 B/op
+Damage/False/publish/100                             4139.3 ns/op [4110.0, 5271.6]        0.0 B/op
+Damage/False/publish/1000                           57288.5 ns/op [50608.8, 70677.4]        0.0 B/op
+Damage/True/interpreted                               182.2 ns/op [177.2, 184.2]       24.0 B/op
+Damage/True/compiled                                    4.4 ns/op [4.3, 4.4]        0.0 B/op
+Damage/True/publish/1                                  97.6 ns/op [95.7, 99.8]        0.0 B/op
+Damage/True/publish/100                              5296.1 ns/op [5267.5, 5305.2]        0.0 B/op
+Damage/True/publish/1000                            60684.7 ns/op [60381.0, 61579.4]        0.0 B/op
+Nested.Damage/False/interpreted                       286.5 ns/op [283.2, 288.0]       24.0 B/op
+Nested.Damage/False/compiled                            4.5 ns/op [4.5, 4.8]        0.0 B/op
+Nested.Damage/False/publish/1                          82.9 ns/op [81.6, 85.3]        0.0 B/op
+Nested.Damage/False/publish/100                      4070.7 ns/op [4046.5, 4093.9]        0.0 B/op
+Nested.Damage/False/publish/1000                    50483.4 ns/op [50441.1, 52112.5]        0.0 B/op
+Nested.Damage/True/interpreted                        281.6 ns/op [280.9, 285.3]       24.0 B/op
+Nested.Damage/True/compiled                             4.5 ns/op [4.5, 4.6]        0.0 B/op
+Nested.Damage/True/publish/1                           97.9 ns/op [96.6, 99.7]        0.0 B/op
+Nested.Damage/True/publish/100                       5355.5 ns/op [5353.8, 5483.5]        0.0 B/op
+Nested.Damage/True/publish/1000                     66427.0 ns/op [65658.8, 92933.4]        0.0 B/op
+runtime-root/compiled/control                         105.3 ns/op [103.8, 106.7]       24.0 B/op
+predicate checksum: 2600000

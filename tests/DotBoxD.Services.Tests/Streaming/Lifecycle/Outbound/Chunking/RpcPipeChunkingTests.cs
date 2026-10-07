@@ -74,4 +74,20 @@ public sealed class RpcPipeChunkingTests
             await pump.WaitAsync(TimeSpan.FromSeconds(5));
         }
     }
+
+    [Theory]
+    [InlineData(256, 16)]
+    [InlineData(1024, 16)]
+    [InlineData(4096, 16)]
+    [InlineData(16384, 64)]
+    [InlineData(65536, 16)]
+    public async Task Coalescing_threshold_preserves_large_segment_controls(int segmentSize, int frames)
+    {
+        const int bytes = 1024 * 1024;
+        await using var fixture = await PipeChunkingFixture.Create(Enumerable.Repeat(segmentSize, bytes / segmentSize).ToArray(), owned: false);
+        await fixture.Pump().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(bytes, fixture.BytesSent);
+        Assert.Equal(frames, fixture.SentLengths.Count);
+        await fixture.AssertRemaining(bytes);
+    }
 }
