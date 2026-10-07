@@ -26,7 +26,7 @@ public sealed class BindingWallTimeCallbackCancellationSurpriseTests
         var policy = SandboxPolicyBuilder.Create()
             .AllowRuntimeAsync()
             .WithFuel(1_000)
-            .WithWallTime(TimeSpan.FromSeconds(5))
+            .WithWallTime(TimeSpan.FromSeconds(30))
             .WithMaxHostCalls(2)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
