@@ -34,6 +34,7 @@ internal static class UiBooleanGeneratorFixture
         public readonly record struct OperatorValue(int Value)
         {
             public static int operator +(OperatorValue left, OperatorValue right) => left.Value + right.Value;
+            public static OperatorValue operator *(OperatorValue left, OperatorValue right) => new(left.Value * right.Value);
             public static int operator -(OperatorValue value) => -value.Value;
         }
         public static partial class Counter

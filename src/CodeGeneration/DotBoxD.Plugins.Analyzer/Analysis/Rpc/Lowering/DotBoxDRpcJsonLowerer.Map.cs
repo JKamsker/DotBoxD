@@ -42,14 +42,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return null;
         }
 
-        return Call(
-            "map.get",
-            null,
-            LowerExpression(element.Expression),
-            LowerRequiredExpression(
-                element.ArgumentList.Arguments[0].Expression,
-                mapTypes.Key,
-                "Server extension map key"));
+        return LowerReceiverCall("map.get", element.Expression,
+            element.ArgumentList.Arguments[0].Expression, mapTypes.Key, "Server extension map key");
     }
 
     /// <summary>
@@ -79,14 +73,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 return null;
             }
 
-            return Call(
-                "map.containsKey",
-                null,
-                LowerExpression(member.Expression),
-                LowerRequiredExpression(
-                    invocation.ArgumentList.Arguments[0].Expression,
-                    mapTypes.Key,
-                    "Server extension map key"));
+            return LowerReceiverCall("map.containsKey", member.Expression,
+                invocation.ArgumentList.Arguments[0].Expression, mapTypes.Key, "Server extension map key");
         }
 
         throw new NotSupportedException(

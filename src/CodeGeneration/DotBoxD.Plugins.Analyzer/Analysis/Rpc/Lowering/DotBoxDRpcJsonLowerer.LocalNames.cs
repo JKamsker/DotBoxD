@@ -20,17 +20,38 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                     "Short-circuit operands requiring generated argument temporaries are unsupported; use explicit if statements to guard the call.");
             }
 
-            var local = ReserveGeneratedLocal("__sir_left");
-            AddExpressionPrelude(SetStatement(local, left));
-            left = Var(local);
-            foreach (var statement in prelude)
-            {
-                AddExpressionPrelude(statement);
-            }
+            left = PreserveEarlierOperand(left, prelude);
         }
 
         return concatenate ? Call("string.concatBudgeted", null, left, right)
             : BinaryJson(JsonBinaryOperator(binary), left, right);
+    }
+
+    private string LowerReceiverCall(
+        string bindingId, ExpressionSyntax receiver, ExpressionSyntax argument, ITypeSymbol argumentType, string description)
+    {
+        var earlier = LowerExpression(receiver);
+        var prelude = new List<string>();
+        var later = LowerOperandWithPrelude(argument,
+            expression => LowerRequiredExpression(expression, argumentType, description), prelude);
+        return Call(bindingId, null, PreserveEarlierOperand(earlier, prelude), later);
+    }
+
+    private string PreserveEarlierOperand(string earlier, List<string> laterPrelude)
+    {
+        if (laterPrelude.Count == 0)
+        {
+            return earlier;
+        }
+
+        var local = ReserveGeneratedLocal("__sir_left");
+        AddExpressionPrelude(SetStatement(local, earlier));
+        foreach (var statement in laterPrelude)
+        {
+            AddExpressionPrelude(statement);
+        }
+
+        return Var(local);
     }
 
     private string LowerOperandWithPrelude(

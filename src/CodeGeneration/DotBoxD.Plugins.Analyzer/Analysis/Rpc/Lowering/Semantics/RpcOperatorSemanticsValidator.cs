@@ -27,6 +27,19 @@ internal static class RpcOperatorSemanticsValidator
         }
     }
 
+    public static void ValidateCompound(AssignmentExpressionSyntax assignment, SemanticModel model, CancellationToken cancellationToken)
+    {
+        ValidateWireOperand(model.GetTypeInfo(assignment.Left, cancellationToken).Type);
+        ValidateWireOperand(model.GetTypeInfo(assignment.Right, cancellationToken).Type);
+        if (model.GetSymbolInfo(assignment, cancellationToken).Symbol is
+            IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator } method &&
+            !IsSupportedBinaryOperator(assignment.Kind(), method.ContainingType))
+        {
+            throw new NotSupportedException(
+                "This user-defined compound operator is unsupported; operate on supported scalar fields explicitly or use a remote handler.");
+        }
+    }
+
     public static void ValidateUnary(PrefixUnaryExpressionSyntax unary, SemanticModel model, CancellationToken cancellationToken)
     {
         ValidateWireOperand(model.GetTypeInfo(unary.Operand, cancellationToken).Type);

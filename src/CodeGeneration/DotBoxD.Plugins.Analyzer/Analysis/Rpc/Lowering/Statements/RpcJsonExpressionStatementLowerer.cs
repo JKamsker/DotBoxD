@@ -120,6 +120,7 @@ internal static class RpcJsonExpressionStatementLowerer
         IdentifierNameSyntax target,
         List<string> output)
     {
+        RpcOperatorSemanticsValidator.ValidateCompound(assignment, lowerer.Model, lowerer.CancellationToken);
         if (assignment.Kind() == SyntaxKind.AddAssignmentExpression &&
             lowerer.TypeOf(target).SpecialType == SpecialType.System_String)
         {

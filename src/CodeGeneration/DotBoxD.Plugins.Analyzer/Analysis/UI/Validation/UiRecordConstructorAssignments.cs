@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -24,6 +25,7 @@ internal sealed class UiRecordConstructorAssignments(IMethodSymbol constructor, 
         var parameter = model.GetSymbolInfo(source, token).Symbol as IParameterSymbol
             ?? throw UiRecordConstructionValidator.Unsupported();
         RequireIdentityParameter(parameter, source);
+        RequireMatchingMember(member, parameter);
         if (!_members.Add(member.OriginalDefinition) || !_parameters.Add(parameter.OriginalDefinition))
         {
             throw UiRecordConstructionValidator.Unsupported();
@@ -53,6 +55,17 @@ internal sealed class UiRecordConstructorAssignments(IMethodSymbol constructor, 
         var type = model.GetTypeInfo(source, token);
         if (!SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, constructor.OriginalDefinition) ||
             !SymbolEqualityComparer.Default.Equals(type.Type, type.ConvertedType))
+        {
+            throw UiRecordConstructionValidator.Unsupported();
+        }
+    }
+
+    private void RequireMatchingMember(ISymbol member, IParameterSymbol parameter)
+    {
+        var fields = DotBoxDRpcTypeMapper.RecordFields(constructor.ContainingType);
+        var index = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
+        if (index < 0 || !SymbolEqualityComparer.Default.Equals(
+                fields[index].Symbol.OriginalDefinition, member.OriginalDefinition))
         {
             throw UiRecordConstructionValidator.Unsupported();
         }

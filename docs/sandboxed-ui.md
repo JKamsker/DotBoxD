@@ -184,7 +184,7 @@ block bodies share return-conversion checks: built-in numeric widening is suppor
 implicit scalar conversions are rejected during generation.
 Assignments and increments may mutate locals and parameters; discard assignments are supported.
 Each discard has independent storage, including repeated discards of different scalar types.
-Compound numeric assignments support identity and widening conversions; compound assignments
+Compound assignments on supported numeric scalars allow identity and widening conversions; those
 requiring a narrowing conversion fail with `DBXU001` during generation.
 Static field/property writes fail with `DBXU001` rather than silently dropping setter or field effects.
 Local list/map mutation requires a newly constructed, unaliased local used through direct collection
@@ -201,14 +201,14 @@ Boolean and string value comparisons remain supported. Short-circuit operands th
 generated argument temporaries, including annotated helper calls, receive `DBXU001`; use explicit
 `if` statements to guard those calls. Simple arithmetic operands retain normal `&&`/`||` semantics.
 Eager binary operands, including string concatenation, retain left-to-right evaluation when later
-calls need generated temporaries. Map assignments likewise evaluate the key before RHS helper
-arguments. An earlier failure prevents later host calls. Runtime operators on decimal,
-`DateTime`/`DateTimeOffset` and cancellation tokens receive `DBXU001`: their wire representations do
+calls need generated temporaries. Collection reads and ContainsKey evaluate their receiver before
+index/key temporaries. Map assignments likewise evaluate the key before RHS helper arguments. An earlier failure prevents later host calls. Runtime operators, including compound
+assignments, on decimal, `DateTime`/`DateTimeOffset` and cancellation tokens receive `DBXU001`: their wire representations do
 not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
 Boolean and string scalar operations remain available.
 Local DTO construction requires source-visible plain fields/auto-properties, positional records or
-constructors that only assign unchanged parameters of the same type. Constructor effects or
-transformations, custom accessors, field/property initializers, computed properties and inheritance
+constructors that only assign unchanged parameters to matching named fields of the same type.
+Constructor effects or transformations, custom accessors, field/property initializers, computed properties and inheritance
 receive `DBXU001`; keep those operations in an explicit remote handler. This check also applies to
 construction inside annotated helpers. Ordinary stored DTOs remain supported in both kernel modes.
 

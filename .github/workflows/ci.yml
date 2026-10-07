@@ -472,6 +472,8 @@ jobs:
               "Explicit_guards_and_simple_lazy_operands_preserve_both_kernel_modes",
               "Eager_operands_preserve_native_host_call_order_in_both_kernel_modes",
               "Earlier_operand_failure_prevents_later_host_calls",
+              "Collection_receivers_precede_index_temporaries",
+              "Failed_collection_receivers_prevent_index_host_calls",
               "Decimal_wire_equality_fails_closed_at_compile_time",
               "Framework_wire_comparisons_without_scalar_identity_fail_closed",
               "Both_kernel_modes_use_ordinary_validation_and_metering",
