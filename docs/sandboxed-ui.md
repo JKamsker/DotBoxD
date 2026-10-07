@@ -213,7 +213,9 @@ constructors that only assign unchanged parameters to matching named fields of t
 `this`. Positional record members must retain their synthesized parameter storage.
 Constructor effects or transformations, custom accessors, field/property initializers, computed properties and inheritance
 receive `DBXU001`; keep those operations in an explicit remote handler. This check also applies to
-construction inside annotated helpers. Ordinary stored DTOs remain supported in both kernel modes.
+construction inside annotated helpers. Metadata-only DTO construction, including implicit struct
+constructors, and explicit layouts receive `DBXU001`: their accessor/storage semantics cannot be
+proved from plain source-visible fields. Ordinary source-visible stored DTOs remain supported in both kernel modes.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the

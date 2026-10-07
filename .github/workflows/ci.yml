@@ -480,6 +480,8 @@ jobs:
               "Enum_equality_and_signed_ordering_preserve_both_kernel_modes",
               "User_defined_operator_operand_conversions_fail_closed",
               "Built_in_operator_operand_widening_preserves_both_kernel_modes",
+              "Opaque_or_overlapping_DTO_storage_fails_closed_during_generation",
+              "Source_visible_fields_preserve_execution_in_both_kernel_modes",
               "Both_kernel_modes_use_ordinary_validation_and_metering",
               "Nontrivial_DTO_construction_and_accessors_fail_closed",
               "Plain_stored_DTOs_preserve_native_execution_in_both_modes",

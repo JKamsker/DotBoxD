@@ -24,11 +24,11 @@ internal static class UiGeneratorFixture
         return Assembly.Load(stream.ToArray());
     }
 
-    public static Generation Generate(string source)
+    public static Generation Generate(string source, params MetadataReference[] additionalReferences)
     {
         var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
         var references = paths.Append(typeof(UiPackage).Assembly.Location).Distinct(StringComparer.Ordinal)
-            .Select(p => MetadataReference.CreateFromFile(p));
+            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).Concat(additionalReferences);
         var compilation = CSharpCompilation.Create("UiGenerated" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source)], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

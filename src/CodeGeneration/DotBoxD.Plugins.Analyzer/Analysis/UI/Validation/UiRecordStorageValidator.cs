@@ -7,7 +7,8 @@ internal static class UiRecordStorageValidator
 {
     public static void Validate(INamedTypeSymbol type, CancellationToken token)
     {
-        if (type.BaseType?.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) ||
+        if (type.DeclaringSyntaxReferences.Length == 0 || HasExplicitLayout(type) ||
+            type.BaseType?.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) ||
             type.StaticConstructors.Any(c => !c.IsImplicitlyDeclared))
         {
             throw UiRecordConstructionValidator.Unsupported();
@@ -18,6 +19,11 @@ internal static class UiRecordStorageValidator
             ValidateMember(member, token);
         }
     }
+
+    private static bool HasExplicitLayout(INamedTypeSymbol type)
+        => type.GetAttributes().Any(attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "System.Runtime.InteropServices.StructLayoutAttribute" &&
+            attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is 2);
 
     private static void ValidateMember(ISymbol member, CancellationToken token)
     {

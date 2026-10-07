@@ -90,5 +90,5 @@ internal static class UiRecordConstructionValidator
     }
 
     internal static NotSupportedException Unsupported() => new(
-        "Local DTO construction requires plain stored fields/auto-properties and a constructor that only assigns unchanged parameters to matching members of this instance. Positional members must retain synthesized storage. Custom accessors, initializers, computed properties and inheritance require a remote handler.");
+        "Local DTO construction requires source-visible plain stored fields/auto-properties and a constructor that only assigns unchanged parameters to matching members of this instance. Positional members must retain synthesized storage. Metadata-only DTOs, explicit layouts, custom accessors, initializers, computed properties and inheritance require a remote handler.");
 }
