@@ -2,6 +2,7 @@ using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.UI;
 
@@ -18,6 +19,7 @@ internal sealed class UiRecordConstructorAssignments(IMethodSymbol constructor, 
             throw UiRecordConstructionValidator.Unsupported();
         }
 
+        RequireCurrentInstance(assignment.Left);
         var member = model.GetSymbolInfo(assignment.Left, token).Symbol
             ?? throw UiRecordConstructionValidator.Unsupported();
         RequireStoredMember(member);
@@ -35,6 +37,20 @@ internal sealed class UiRecordConstructorAssignments(IMethodSymbol constructor, 
     public void RequireAllParametersAssigned()
     {
         if (_parameters.Count != constructor.Parameters.Length)
+        {
+            throw UiRecordConstructionValidator.Unsupported();
+        }
+    }
+
+    private void RequireCurrentInstance(ExpressionSyntax target)
+    {
+        var receiver = model.GetOperation(target, token) switch
+        {
+            IPropertyReferenceOperation property => property.Instance,
+            IFieldReferenceOperation field => field.Instance,
+            _ => null
+        };
+        if (receiver is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance })
         {
             throw UiRecordConstructionValidator.Unsupported();
         }

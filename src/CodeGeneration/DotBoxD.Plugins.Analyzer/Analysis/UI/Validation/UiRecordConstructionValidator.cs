@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -27,6 +28,7 @@ internal static class UiRecordConstructionValidator
             var syntax = reference.GetSyntax(token);
             if (syntax is RecordDeclarationSyntax { ParameterList: not null })
             {
+                ValidatePositionalStorage(constructor, token);
                 return;
             }
 
@@ -38,6 +40,20 @@ internal static class UiRecordConstructionValidator
         }
 
         throw Unsupported();
+    }
+
+    private static void ValidatePositionalStorage(IMethodSymbol constructor, CancellationToken token)
+    {
+        var fields = DotBoxDRpcTypeMapper.RecordFields(constructor.ContainingType);
+        foreach (var parameter in constructor.Parameters)
+        {
+            var index = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
+            if (index < 0 || !fields[index].Symbol.DeclaringSyntaxReferences.Any(
+                    reference => reference.GetSyntax(token) is ParameterSyntax))
+            {
+                throw Unsupported();
+            }
+        }
     }
 
     private static void ValidateBody(ConstructorDeclarationSyntax declaration, IMethodSymbol constructor,
@@ -74,5 +90,5 @@ internal static class UiRecordConstructionValidator
     }
 
     internal static NotSupportedException Unsupported() => new(
-        "Local DTO construction requires plain stored fields/auto-properties and a constructor that only assigns unchanged parameters. Custom accessors, initializers, computed properties and inheritance require a remote handler.");
+        "Local DTO construction requires plain stored fields/auto-properties and a constructor that only assigns unchanged parameters to matching members of this instance. Positional members must retain synthesized storage. Custom accessors, initializers, computed properties and inheritance require a remote handler.");
 }

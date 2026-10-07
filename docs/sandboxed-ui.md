@@ -207,7 +207,8 @@ assignments, on decimal, `DateTime`/`DateTimeOffset` and cancellation tokens rec
 not preserve CLR operator semantics. Custom operator overloads are rejected. Supported numeric,
 Boolean and string scalar operations remain available.
 Local DTO construction requires source-visible plain fields/auto-properties, positional records or
-constructors that only assign unchanged parameters to matching named fields of the same type.
+constructors that only assign unchanged parameters to matching named fields of the same type on
+`this`. Positional record members must retain their synthesized parameter storage.
 Constructor effects or transformations, custom accessors, field/property initializers, computed properties and inheritance
 receive `DBXU001`; keep those operations in an explicit remote handler. This check also applies to
 construction inside annotated helpers. Ordinary stored DTOs remain supported in both kernel modes.
