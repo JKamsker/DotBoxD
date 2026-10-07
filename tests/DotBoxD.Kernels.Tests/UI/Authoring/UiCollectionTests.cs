@@ -45,9 +45,9 @@ public sealed class UiCollectionTests
     [InlineData(ExecutionMode.Compiled)]
     public async Task Both_kernel_modes_use_ordinary_validation_and_metering(ExecutionMode mode)
     {
-        using var sandbox = UiTestFixture.Sandbox();
+        using var sandbox = UiTestFixture.CompiledSandbox();
         var host = new UiHost(sandbox, SandboxPolicyBuilder.Create().WithFuel(10_000).Build(),
-            execution: new SandboxExecutionOptions { Mode = mode });
+            execution: new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
         await using var session = await host.InstallAsync(UiTestFixture.Counter() with { Events = [UiTestFixture.Counter().Events[0]], RemoteEndpoints = [] }, new RecordingUiRenderer());
         Assert.Equal(1, UiTestFixture.Slot(await session.DispatchAsync(1), 1).Integer);
         var package = UiTestFixture.Counter() with { Events = [UiTestFixture.Counter().Events[0]], RemoteEndpoints = [] };

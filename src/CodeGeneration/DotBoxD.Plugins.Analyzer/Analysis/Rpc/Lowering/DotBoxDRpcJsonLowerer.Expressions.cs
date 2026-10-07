@@ -92,7 +92,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             if (leftIsString && rightIsString)
             {
                 Allocates = true;
-                return Call("string.concatBudgeted", null, lower(binary.Left), lower(binary.Right));
+                return LowerBinaryOperands(binary, lower, concatenate: true);
             }
 
             if (leftIsString || rightIsString)
@@ -102,7 +102,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
         }
 
-        return BinaryJson(JsonBinaryOperator(binary), lower(binary.Left), LowerBinaryRight(binary, lower));
+        return LowerBinaryOperands(binary, lower);
     }
 
     private string LiteralJson(ExpressionSyntax expression, object? value)

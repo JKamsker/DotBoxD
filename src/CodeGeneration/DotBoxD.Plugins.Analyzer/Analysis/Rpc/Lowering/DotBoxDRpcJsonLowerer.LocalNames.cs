@@ -6,26 +6,41 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
-    private string LowerBinaryRight(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
-        => binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression
-            ? LowerLazyOperand(binary.Right, lower)
-            : lower(binary.Right);
-
-    private string LowerLazyOperand(ExpressionSyntax expression, Func<ExpressionSyntax, string> lower)
+    private string LowerBinaryOperands(
+        BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower, bool concatenate = false)
     {
-        var previous = _expressionPrelude;
+        var left = lower(binary.Left);
         var prelude = new List<string>();
-        _expressionPrelude = prelude;
-        try
+        var right = LowerOperandWithPrelude(binary.Right, lower, prelude);
+        if (prelude.Count > 0)
         {
-            var lowered = lower(expression);
-            if (prelude.Count > 0)
+            if (binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression)
             {
                 throw new NotSupportedException(
                     "Short-circuit operands requiring generated argument temporaries are unsupported; use explicit if statements to guard the call.");
             }
 
-            return lowered;
+            var local = ReserveGeneratedLocal("__sir_left");
+            AddExpressionPrelude(SetStatement(local, left));
+            left = Var(local);
+            foreach (var statement in prelude)
+            {
+                AddExpressionPrelude(statement);
+            }
+        }
+
+        return concatenate ? Call("string.concatBudgeted", null, left, right)
+            : BinaryJson(JsonBinaryOperator(binary), left, right);
+    }
+
+    private string LowerOperandWithPrelude(
+        ExpressionSyntax expression, Func<ExpressionSyntax, string> lower, List<string> prelude)
+    {
+        var previous = _expressionPrelude;
+        _expressionPrelude = prelude;
+        try
+        {
+            return lower(expression);
         }
         finally
         {

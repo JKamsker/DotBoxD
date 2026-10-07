@@ -8,6 +8,8 @@ namespace DotBoxD.Kernels.Tests.UI;
 internal static class UiTestFixture
 {
     public static SandboxHost Sandbox() => SandboxHost.Create(b => b.AddDefaultPureBindings());
+    public static SandboxHost CompiledSandbox()
+        => SandboxHost.Create(b => b.AddDefaultPureBindings().UseCompilerIfAvailable());
     public static UiHost Host(SandboxHost sandbox, UiPolicy? policy = null, long fuel = 10_000)
         => new(sandbox, SandboxPolicyBuilder.Create().WithFuel(fuel).Build(), policy);
 

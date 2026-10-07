@@ -17,9 +17,10 @@ internal static class UiBooleanGeneratorFixture
     public static async Task AssertExecutes(string body, bool expected, ExecutionMode mode)
     {
         var package = UiGeneratorFixture.Package(PackageSource(body));
-        using var sandbox = UiTestFixture.Sandbox();
+        using var sandbox = UiTestFixture.CompiledSandbox();
         await using var session = await new UiHost(sandbox, SandboxPolicyBuilder.Create().Build(),
-            execution: new SandboxExecutionOptions { Mode = mode }).InstallAsync(package, new RecordingUiRenderer());
+            execution: new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false })
+            .InstallAsync(package, new RecordingUiRenderer());
         Assert.Equal(expected, (await session.DispatchAsync(1)).State.Single(s => s.SlotId == 2).Value.Boolean);
     }
 

@@ -200,6 +200,10 @@ compare supported scalar fields explicitly or keep the operation in a remote han
 Boolean and string value comparisons remain supported. Short-circuit operands that require
 generated argument temporaries, including annotated helper calls, receive `DBXU001`; use explicit
 `if` statements to guard those calls. Simple arithmetic operands retain normal `&&`/`||` semantics.
+Eager binary operands, including string concatenation, retain left-to-right evaluation when later
+calls need generated temporaries. An earlier failure prevents later host calls. Runtime decimal,
+`DateTime`/`DateTimeOffset` and cancellation-token equality receives `DBXU001`: their wire representations do not
+preserve CLR equality. Comparisons of supported numeric, Boolean and string scalars remain available.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the
