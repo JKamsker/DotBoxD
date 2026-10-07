@@ -31,6 +31,19 @@ internal static class UiBooleanGeneratorFixture
         using DotBoxD.UI.Authoring;
         public enum UnsignedValue : ulong { Zero = 0, Below = 0x7FFFFFFFFFFFFFFFUL, Above = 0x8000000000000000UL, Max = ulong.MaxValue }
         public enum SignedValue : long { Negative = -1, Zero = 0, Max = long.MaxValue }
+        public readonly struct ConversionBox
+        {
+            public int Value { get; }
+            public ConversionBox(int value) { Value = value; }
+            public static implicit operator int(ConversionBox value) => value.Value % 2;
+        }
+        public readonly struct RoundTripBox
+        {
+            public int Value { get; }
+            public RoundTripBox(int value) { Value = value; }
+            public static implicit operator int(RoundTripBox value) => value.Value % 2;
+            public static implicit operator RoundTripBox(int value) => new(value);
+        }
         public sealed record ValueRecord(int Value);
         public readonly record struct ValueStruct(int Value);
         public readonly record struct OperatorValue(int Value)
@@ -41,6 +54,8 @@ internal static class UiBooleanGeneratorFixture
         }
         public static partial class Counter
         {
+            [KernelMethod] public static ConversionBox MakeBox(int value) => new(value);
+            [KernelMethod] public static int Converted(int value) => new ConversionBox(value);
             [KernelMethod] public static bool Positive(int x) => x > 0;
             [UiLocalHandler] public static bool Handle(int value)
         """ + body + "}";

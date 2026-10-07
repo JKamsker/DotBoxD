@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -20,6 +21,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal string ApplyNumericConversion(ExpressionSyntax expression, string lowered)
     {
+        RejectUserDefinedConversion(expression);
         var type = ModelFor(expression).GetTypeInfo(expression, _cancellationToken);
         if (type.Type is null ||
             type.ConvertedType is null)
@@ -32,8 +34,20 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal string ApplyNumericConversion(ExpressionSyntax expression, ITypeSymbol targetType, string lowered)
     {
+        RejectUserDefinedConversion(expression, targetType);
         var sourceType = ModelFor(expression).GetTypeInfo(expression, _cancellationToken).Type;
         return sourceType is null ? lowered : ApplyNumericConversion(sourceType, targetType, lowered);
+    }
+
+    private void RejectUserDefinedConversion(ExpressionSyntax expression, ITypeSymbol? targetType = null)
+    {
+        var model = ModelFor(expression);
+        if (model.GetConversion(expression, _cancellationToken).IsUserDefined ||
+            targetType is not null && model.ClassifyConversion(expression, targetType).IsUserDefined)
+        {
+            throw new NotSupportedException(
+                "User-defined conversions are unsupported in local kernels; operate on supported scalar fields explicitly or use a remote handler.");
+        }
     }
 
     internal string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)

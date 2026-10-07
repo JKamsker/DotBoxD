@@ -181,7 +181,8 @@ operations produce error `DBXU001` at the method, suggesting explicit remote RPC
 There is no automatic remote fallback. Overloads, captures, instance handlers, generic/ref/async
 local signatures, file-local containers and unlowerable library calls fail closed. Expression and
 block bodies share return-conversion checks: built-in numeric widening is supported; user-defined
-implicit scalar conversions are rejected during generation.
+implicit scalar conversions are rejected during generation, including conversions on built-in operator
+operands, unary operands and inlined helper returns. Supported built-in numeric widening remains available.
 Assignments and increments may mutate locals and parameters; discard assignments are supported.
 Each discard has independent storage, including repeated discards of different scalar types.
 Compound assignments on supported numeric scalars allow identity and widening conversions; those
