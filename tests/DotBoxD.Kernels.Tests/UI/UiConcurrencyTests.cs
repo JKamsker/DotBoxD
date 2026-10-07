@@ -1,9 +1,52 @@
+using System.Collections.Immutable;
 using DotBoxD.UI;
+using DotBoxD.UI.Runtime;
 
 namespace DotBoxD.Kernels.Tests.UI;
 
 public sealed class UiConcurrencyTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime(bool callerCancellation)
+    {
+        using var sandbox = UiTestFixture.Sandbox();
+        using var caller = new CancellationTokenSource();
+        var started = new TaskCompletionSource<UiRemoteEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reply = new TaskCompletionSource<UiStatePatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var remoteToken = CancellationToken.None;
+        var remote = new TestUiTransport((request, token) =>
+        { remoteToken = token; started.SetResult(request); return new(reply.Task); });
+        var renderer = new GateRenderer();
+        await using var session = await UiTestFixture.Host(sandbox,
+            new UiPolicy { RemoteEventTimeout = TimeSpan.FromSeconds(2) }).InstallAsync(UiTestFixture.Counter(), renderer, remote);
+        var pending = session.DispatchAsync(2, caller.Token).AsTask();
+        var request = await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        using var registration = remoteToken.Register(() => cancelled.TrySetResult());
+        var local = session.SetInputAsync(4, UiPropertyId.Text, UiValue.FromString("new query")).AsTask();
+        try
+        {
+            await renderer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            reply.SetResult(UiTestFixture.Reply(request));
+            if (callerCancellation)
+            { caller.Cancel(); }
+            await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally { renderer.Release.TrySetResult(); }
+        var localError = await Record.ExceptionAsync(() => local.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.True(localError is null or ObjectDisposedException or OperationCanceledException);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(!callerCancellation, session.IsDisconnected);
+        Assert.Equal(callerCancellation ? 0 : 1, renderer.Disposals);
+        if (callerCancellation)
+        {
+            Assert.Null(localError);
+            Assert.Equal("new query", UiTestFixture.Slot(await session.SnapshotAsync(), 2).Text);
+        }
+    }
+
     [Fact]
     public async Task Remote_deadline_disconnects_noncooperative_transport_and_disposes_renderer()
     {
@@ -98,5 +141,18 @@ public sealed class UiConcurrencyTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
         Assert.True(session.IsDisconnected);
         Assert.Equal(1, renderer.Disposals);
+    }
+
+    private sealed class GateRenderer : IUiRenderer
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Disposals { get; private set; }
+        public ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+        public ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
+        { Entered.TrySetResult(); return new(Release.Task); }
+        public ValueTask DisposeAsync()
+        { Disposals++; return ValueTask.CompletedTask; }
     }
 }

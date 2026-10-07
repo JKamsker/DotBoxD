@@ -31,6 +31,9 @@ if ($requiredNames.Count -eq 0) {
 $defaultMinimums = @{
     File_local_handler_containers_have_actionable_diagnostics = 2
     Null_items_properties_report_validation_errors_for_objects_and_wire = 2
+    Handwritten_facets_do_not_require_generation_container_shapes = 3
+    Unused_kernels_still_require_a_supported_scalar_result = 2
+    Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime = 2
     PluginConnectionHostLifetimeTests = 5
     MemberPlatformMetadataParityTests = 6
     ForeignMemberAttributeIdentityTests = 11

@@ -4,6 +4,25 @@ namespace DotBoxD.Kernels.Tests.UI;
 
 public sealed class UiLifecycleTests
 {
+    [Theory]
+    [InlineData("Unit", "{\"unit\":true}")]
+    [InlineData("I64", "{\"i64\":1}")]
+    public async Task Unused_kernels_still_require_a_supported_scalar_result(string type, string expression)
+    {
+        var json = $$"""
+            {"id":"unused-ui-kernel","version":"1.0.0","targetSandboxVersion":"1.0.0",
+            "capabilityRequests":[],"functions":[{"id":"main","visibility":"entrypoint","parameters":[],
+            "returnType":"{{type}}","body":[{"op":"return","value":{{expression}}}]}]}
+            """;
+        var package = new UiPackage(1, 1, [new UiNode(1, UiPrimitive.Text, [], [])], [],
+            [new UiKernel(1, json, "main")], [], []);
+        using var sandbox = UiTestFixture.Sandbox();
+        var renderer = new RecordingUiRenderer();
+        await Assert.ThrowsAsync<UiValidationException>(() => UiTestFixture.Host(sandbox).InstallAsync(package, renderer).AsTask());
+        Assert.Equal(0, renderer.Materializations);
+        Assert.Equal(1, renderer.Disposals);
+    }
+
     [Fact]
     public void Disposed_sessions_release_renderer_and_connection_adapter_references()
     {

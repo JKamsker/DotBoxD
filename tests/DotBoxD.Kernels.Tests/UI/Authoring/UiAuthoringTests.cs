@@ -98,9 +98,13 @@ public sealed class UiAuthoringTests
             {
                 [UiLocalHandler(GenerateKernel = false)] public static int Disabled(int x) => x;
                 [UiLocalHandler] public static int Owned(int x) => x;
+                public static int Owned(int x, int y) => x + y;
                 public static UiKernelDefinition<int,int> OwnedUiKernel() => new("manual", "main");
                 [UiLocalHandler] public static int Generated(int x) => x + 1;
                 [UiRemoteHandler(8, GenerateEndpoint = false)] public static void Remote() { }
+                [UiRemoteHandler(9)] public static void OwnedRemote() { }
+                public static void OwnedRemote(string value) { }
+                public const int OwnedRemoteUiEndpoint = 9;
             }
             """);
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
@@ -109,6 +113,25 @@ public sealed class UiAuthoringTests
         Assert.DoesNotContain("OwnedUiKernel", source, StringComparison.Ordinal);
         Assert.DoesNotContain("DisabledUiKernel", source, StringComparison.Ordinal);
         Assert.DoesNotContain("RemoteUiEndpoint", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("public static class Manual")]
+    [InlineData("public static class Manual<T>")]
+    [InlineData("file static partial class Manual")]
+    public void Handwritten_facets_do_not_require_generation_container_shapes(string container)
+    {
+        var result = Generate("using DotBoxD.UI.Authoring; " + container + """
+            {
+                [UiLocalHandler] public static int Owned(int x) => x;
+                public static UiKernelDefinition<int,int> OwnedUiKernel() => new("manual", "main");
+                [UiRemoteHandler(9)] public static void Remote() { }
+                public const int RemoteUiEndpoint = 9;
+            }
+            """);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Result.GeneratedTrees);
     }
 
     [Fact]

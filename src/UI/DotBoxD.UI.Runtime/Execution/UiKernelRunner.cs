@@ -25,6 +25,7 @@ internal sealed class UiKernelRunner(SandboxHost host, SandboxExecutionOptions o
                 throw new UiValidationException("UI kernel input must match its scalar state slot (or have no parameters).");
             }
 
+            RequireScalarResult(function.ReturnType);
             _kernels.Add(kernel.Id, new PreparedKernel(kernel, plan, function.ReturnType));
         }
 
@@ -73,6 +74,12 @@ internal sealed class UiKernelRunner(SandboxHost host, SandboxExecutionOptions o
     }
 
     public void Clear() => _kernels.Clear();
+
+    private static void RequireScalarResult(SandboxType type)
+    {
+        if (type != SandboxType.Bool && type != SandboxType.I32 && type != SandboxType.F64 && type != SandboxType.String)
+        { throw new UiValidationException("Every UI kernel must return a supported scalar, including unused kernels."); }
+    }
 
     private void RequireResultType(int id, UiValueKind kind)
     {

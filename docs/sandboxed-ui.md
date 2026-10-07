@@ -181,7 +181,8 @@ endpoint through `IUiRemoteTransport` to an existing generated typed RPC contrac
 invoke or discover plugin methods by name. The sample demonstrates this mapping explicitly.
 
 `GenerateKernel = false` and `GenerateEndpoint = false` independently disable the corresponding
-method output. A handwritten member with the generated name wins. No attribute is necessary: a
+method output. A handwritten member with the generated name wins before generation-only restrictions
+on container shapes and handler overloads are applied. No attribute is necessary: a
 consumer may handwrite the identical kernel definition, route, builder or entire package. Tests
 compare handwritten/generated execution and canonical hashes and guard incremental output caching.
 

@@ -132,6 +132,11 @@ public sealed class UiSession : IAsyncDisposable
 
             return await ApplyPatchAsync(patch, pending.Token).ConfigureAwait(false);
         }
+        catch when (!cancellationToken.IsCancellationRequested && pending.IsCancellationRequested)
+        {
+            await DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
         finally
         {
             await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
