@@ -1,0 +1,75 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.UI
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public const int CurrentFormatVersion = 1
+public enum UiEventKind
+public enum UiEventKind.Click = 1
+public enum UiEventTarget
+public enum UiEventTarget.LocalKernel = 1
+public enum UiEventTarget.Remote = 2
+public enum UiPrimitive
+public enum UiPrimitive.Border = 3
+public enum UiPrimitive.Button = 5
+public enum UiPrimitive.CheckBox = 7
+public enum UiPrimitive.Grid = 2
+public enum UiPrimitive.Items = 10
+public enum UiPrimitive.ProgressBar = 8
+public enum UiPrimitive.ScrollViewer = 9
+public enum UiPrimitive.Stack = 1
+public enum UiPrimitive.Text = 4
+public enum UiPrimitive.TextBox = 6
+public enum UiPropertyId
+public enum UiPropertyId.Checked = 6
+public enum UiPropertyId.Enabled = 2
+public enum UiPropertyId.Maximum = 5
+public enum UiPropertyId.Text = 1
+public enum UiPropertyId.Value = 4
+public enum UiPropertyId.Visible = 3
+public enum UiValueKind
+public enum UiValueKind.Boolean = 1
+public enum UiValueKind.Int32 = 2
+public enum UiValueKind.Number = 3
+public enum UiValueKind.String = 4
+public ImmutableArray<UiPrimitive> AllowedPrimitives { get; init; } = [.. Enum.GetValues<UiPrimitive>()]
+public int MaxChildren { get; init; } = 1_000
+public int MaxDepth { get; init; } = 64
+public int MaxEvents { get; init; } = 256
+public int MaxInFlightRemoteEvents { get; init; } = 4
+public int MaxKernelBytes { get; init; } = 256 * 1024
+public int MaxKernels { get; init; } = 128
+public int MaxNodes { get; init; } = 2_000
+public int MaxPackageBytes { get; init; } = 2 * 1024 * 1024
+public int MaxPatchSlots { get; init; } = 128
+public int MaxStateBytes { get; init; } = 1024 * 1024
+public int MaxStateSlots { get; init; } = 256
+public int MaxStringLength { get; init; } = 16_384
+public sealed class UiValidationException(string message) : Exception(message)
+public sealed record UiEvent( int Id, int NodeId, UiEventKind Kind, UiEventTarget Target, int KernelId = 0, int OutputSlotId = 0, int RemoteEndpointId = 0)
+public sealed record UiKernel(int Id, string ModuleJson, string Entrypoint, int InputSlotId = 0)
+public sealed record UiNode( int Id, UiPrimitive Primitive, ImmutableArray<int> Children, ImmutableArray<UiProperty> Properties)
+public sealed record UiPackage( int FormatVersion, int RootNodeId, ImmutableArray<UiNode> Nodes, ImmutableArray<UiStateSlot> State, ImmutableArray<UiKernel> Kernels, ImmutableArray<UiEvent> Events, ImmutableArray<int> RemoteEndpoints)
+public sealed record UiPolicy
+public sealed record UiProperty( UiPropertyId Id, UiValue? Literal = null, int StateSlotId = 0, int BindingKernelId = 0, bool TwoWay = false)
+public sealed record UiPropertyValue(int NodeId, UiPropertyId PropertyId, UiValue Value)
+public sealed record UiRemoteEvent(int EventId, int NodeId, int EndpointId, UiSnapshot Snapshot)
+public sealed record UiSnapshot(Guid SessionId, long Version, ImmutableArray<UiStateValue> State)
+public sealed record UiStatePatch(Guid SessionId, long ExpectedVersion, ImmutableArray<UiStateValue> Writes)
+public sealed record UiStateSlot(int Id, UiValue InitialValue)
+public sealed record UiStateValue(int SlotId, UiValue Value)
+public sealed record UiValue( UiValueKind Kind, bool Boolean = false, int Integer = 0, double Number = 0, string Text = "")
+public static class UiPackageJson
+public static class UiPackageValidator
+public static class UiValueValidator
+public static int Validate(UiValue value, UiPolicy policy)
+public static string ComputeHash(UiPackage package, UiPolicy policy)
+public static string Export(UiPackage package, UiPolicy policy)
+public static UiPackage Import(string json, UiPolicy policy)
+public static UiValue FromBoolean(bool value) => new(UiValueKind.Boolean, Boolean: value)
+public static UiValue FromInt32(int value) => new(UiValueKind.Int32, Integer: value)
+public static UiValue FromNumber(double value) => new(UiValueKind.Number, Number: value)
+public static UiValue FromString(string value) => new(UiValueKind.String, Text: value)
+public static UiValueKind PropertyKind(UiPrimitive primitive, UiPropertyId property)
+public static void Validate(UiPackage package, UiPolicy policy)
+public TimeSpan RemoteEventTimeout { get; init; } = TimeSpan.FromSeconds(10)
+public void Validate()

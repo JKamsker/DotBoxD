@@ -79,6 +79,12 @@ jobs:
           dotnet publish samples/AotSmoke/DotBoxD.AotSmoke.csproj -c Release -r linux-x64 -o artifacts/aot-smoke
           ./artifacts/aot-smoke/DotBoxD.AotSmoke
 
+      - name: Sandboxed UI process-boundary smoke
+        shell: pwsh
+        run: |
+          dotnet samples/SandboxedUi/Host/bin/Release/net10.0/Examples.SandboxedUi.Host.dll samples/SandboxedUi/Plugin/bin/Release/net10.0/Examples.SandboxedUi.Plugin.dll
+          if ($LASTEXITCODE -ne 0) { throw "Sandboxed UI smoke failed." }
+
       - name: GameServer example smoke
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -411,6 +417,11 @@ jobs:
               "WorkerResultHardeningTests",
               "Fix_CI_0001_Tests",
               "JsonApiSurfaceTests",
+              "UiPackageValidationTests",
+              "UiPackageJsonTests",
+              "UiSessionTests",
+              "UiConcurrencyTests",
+              "UiLifecycleTests",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

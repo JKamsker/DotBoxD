@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
     <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting.Http\DotBoxD.Hosting.Http.csproj" />
     <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
