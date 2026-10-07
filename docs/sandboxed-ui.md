@@ -132,7 +132,8 @@ leave state/version/rendered values unchanged. Local event output writes one slo
 may write several. External host binding effects are outside this state transaction.
 
 One renderer update contains all changed property values. The normal tree is materialized once.
-If an update fails after commit, the session disconnects and disposes its renderer; a disconnected
+If an update fails after commit, the session closes admission before releasing its state gate,
+then disconnects and disposes its renderer; a disconnected
 session cannot be used to read or mutate the partially rendered UI. Renderer adapters must marshal
 to the toolkit UI thread, dispose subscriptions/controls, and queue semantic input without
 synchronously reentering the session from Materialize/Update/Dispose callbacks.

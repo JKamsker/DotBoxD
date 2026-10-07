@@ -437,6 +437,7 @@ jobs:
               "UiSessionTests",
               "UiConcurrencyTests",
               "UiLifecycleTests",
+              "Renderer_failure_closes_admission_before_queued_operations_can_enter",
               "UiAuthoringTests",
               "UiCollectionTests",
               "Keyed_rows_obey_the_independent_child_limit_before_install",

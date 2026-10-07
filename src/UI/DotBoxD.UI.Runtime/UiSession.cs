@@ -195,6 +195,11 @@ public sealed class UiSession : IAsyncDisposable
                 ThrowIfDisconnected();
                 return await action().ConfigureAwait(false);
             }
+            catch (UiRendererException)
+            {
+                Interlocked.Exchange(ref _closed, 1);
+                throw;
+            }
             finally { _gate.Release(); }
         }
         catch (UiRendererException)

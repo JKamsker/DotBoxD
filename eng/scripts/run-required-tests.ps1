@@ -29,6 +29,7 @@ if ($requiredNames.Count -eq 0) {
 }
 
 $defaultMinimums = @{
+    Renderer_failure_closes_admission_before_queued_operations_can_enter = 4
     Canonical_kernel_expansion_obeys_the_independent_byte_limit = 3
     File_local_handler_containers_have_actionable_diagnostics = 2
     Null_items_properties_report_validation_errors_for_objects_and_wire = 2
