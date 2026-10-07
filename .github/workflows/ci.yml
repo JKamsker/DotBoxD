@@ -79,7 +79,7 @@ jobs:
           dotnet publish samples/AotSmoke/DotBoxD.AotSmoke.csproj -c Release -r linux-x64 -o artifacts/aot-smoke
           ./artifacts/aot-smoke/DotBoxD.AotSmoke
 
-      - name: Sandboxed UI process-boundary smoke
+      - name: Sandboxed UI process-boundary idle-crash and reconnect smoke
         shell: pwsh
         run: |
           dotnet samples/SandboxedUi/Host/bin/Release/net10.0/Examples.SandboxedUi.Host.dll samples/SandboxedUi/Plugin/bin/Release/net10.0/Examples.SandboxedUi.Plugin.dll
@@ -341,7 +341,9 @@ jobs:
             -NoBuild `
             -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests",
               "Sparse_and_state_bound_grid_rows_have_matching_definitions",
-              "Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers")
+              "Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers",
+              "Connection_close_and_host_shutdown_release_idle_sessions",
+              "Connection_owner_observes_async_session_cleanup_failures")
 
       - name: Security-boundary required tests
         shell: pwsh

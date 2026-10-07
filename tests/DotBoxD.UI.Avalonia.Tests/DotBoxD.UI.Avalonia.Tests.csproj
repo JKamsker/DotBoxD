@@ -9,6 +9,7 @@
     <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../samples/SandboxedUi/Host/Examples.SandboxedUi.Host.csproj" />
     <ProjectReference Include="../../src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
     <PackageReference Include="Avalonia.Headless.XUnit" />
     <PackageReference Include="Avalonia.Skia" />

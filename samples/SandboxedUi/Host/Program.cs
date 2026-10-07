@@ -11,6 +11,7 @@ if (args.Length != 1) { throw new ArgumentException("Pass the path to Examples.S
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 var token = timeout.Token;
 await using var avalonia = HeadlessUnitTestSession.StartNew(typeof(SampleApplication));
+var previousId = Guid.Empty;
 for (var attempt = 0; attempt < 2; attempt++)
 {
     var pipe = "dotboxd-ui-" + Guid.NewGuid().ToString("N");
@@ -31,14 +32,14 @@ for (var attempt = 0; attempt < 2; attempt++)
         {
             await avalonia.Dispatch(async () =>
             {
-                await UiSmoke.RunAsync(plugin, package, async () =>
+                previousId = await UiSmoke.RunAsync(plugin, package, connection.Peer, async () =>
                 { worker.Kill(entireProcessTree: true); await worker.WaitForExitAsync(token); }, token);
                 return true;
             }, token);
         }
         else
         {
-            await avalonia.Dispatch(async () => { await UiSmoke.ReconnectAsync(plugin, package, token); return true; }, token);
+            await avalonia.Dispatch(async () => { await UiSmoke.ReconnectAsync(plugin, package, connection.Peer, previousId, token); return true; }, token);
         }
     }
     finally
@@ -51,4 +52,4 @@ for (var attempt = 0; attempt < 2; attempt++)
         { await Console.Error.WriteLineAsync(diagnostics); }
     }
 }
-Console.WriteLine("PASS: generated components; local counter; two-way search; host capability; Avalonia offscreen; plugin assembly absent; crash and reconnect.");
+Console.WriteLine("PASS: generated components; local counter; two-way search; host capability; Avalonia offscreen; plugin assembly absent; idle crash release without RPC; fresh-session reconnect.");

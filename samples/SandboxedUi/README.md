@@ -28,9 +28,11 @@ dotnet samples/SandboxedUi/Host/bin/Release/net10.0/Examples.SandboxedUi.Host.dl
 The host starts a worker on a random pipe with bounded frames and generated typed RPC. It installs
 the package, increments Counter with no IPC, reads score 42 through the explicit `game.score.read`
 capability, edits two-way search text, receives a versioned batch result and captures real Avalonia
-pixels on a headless Skia backend. State updates retain the materialized tree. It kills the worker,
-checks host survival/session release, creates a new session that rejects the old session ID, then
-starts a second worker and repeats remote search to prove reconnect. Success prints `PASS:` and
+pixels on a headless Skia backend. State updates retain the materialized tree. Each session is bound
+to its RPC peer's disconnect signal, including closure during installation; normal teardown detaches
+the subscription and awaits cleanup. It kills the idle worker and checks session/control release
+without a probe RPC, then starts a second worker and installs a fresh session that rejects the old
+session ID and repeats remote search to prove reconnect. Success prints `PASS:` and
 exits 0. CI runs this on Linux and Windows; separate headless UI tests cover actual focus, keyboard,
 mouse, boolean/numeric input, background-thread updates, keyed rows and subscription teardown.
 

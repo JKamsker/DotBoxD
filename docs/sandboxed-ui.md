@@ -153,7 +153,9 @@ timeout and receive linked caller/session cancellation. Teardown invalidates adm
 cancels in-flight operations, serializes renderer disposal, and clears live state/routes/plans and
 adapter references. Even a transport that ignores cancellation cannot delay the session's wait
 indefinitely. The transport owner remains responsible for cancelling/draining its underlying RPC
-work and notifying/disconnecting sessions when its connection closes. Transport failures/timeouts
+work and notifying/disconnecting sessions when its connection closes. The sample's connection
+owner binds `RpcPeer.Disconnected` to session disposal even while idle. It covers closure during
+installation, detaches subscriptions and awaits cleanup. Remote transport failures/timeouts
 disconnect the session; cancelling one call by its caller does not disconnect it. Releasing remote
 admission does not wait for unrelated rendering work. Invalid patches
 are rejected without disconnecting by default.
