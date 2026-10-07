@@ -87,10 +87,10 @@ internal static class UiHandlerModelFactory
         var input = method.Parameters.Length == 0 ? null : ScalarTag(method.Parameters[0].Type);
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
-        var prelude = new List<string>();
-        var lowerer = new DotBoxDRpcJsonLowerer(model, capabilities, effects, token, expressionPrelude: prelude);
+        var lowerer = new DotBoxDRpcJsonLowerer(model, capabilities, effects, token);
         var body = syntax.Body is { } block ? lowerer.LowerBody(block, method.ReturnType)
-            : ExpressionBody(lowerer, syntax, prelude);
+            : lowerer.LowerExpressionBody(syntax.ExpressionBody?.Expression ??
+                throw new NotSupportedException("a local method body is required"), returnsVoid: false, method.ReturnType);
         if (lowerer.Allocates)
         { effects.Add("Alloc"); }
         var parameters = method.Parameters.Length == 0 ? "[]" : "[{\"name\":" + Json(method.Parameters[0].Name) + ",\"type\":" + Json(input!) + "}]";
@@ -108,14 +108,6 @@ internal static class UiHandlerModelFactory
         if (!method.IsStatic || method.IsGenericMethod || method.IsAsync || method.Parameters.Length > 1 ||
             method.Parameters.Any(p => p.RefKind != RefKind.None))
         { throw new NotSupportedException("local methods must be static, synchronous, non-generic, with zero or one scalar value parameter"); }
-    }
-
-    private static string ExpressionBody(DotBoxDRpcJsonLowerer lowerer, MethodDeclarationSyntax syntax, List<string> prelude)
-    {
-        var expression = syntax.ExpressionBody?.Expression ?? throw new NotSupportedException("a local method body is required");
-        var value = lowerer.LowerExpression(expression);
-        prelude.Add("{\"op\":\"return\",\"value\":" + value + "}");
-        return "[" + string.Join(",", prelude) + "]";
     }
 
     private static string ScalarTag(ITypeSymbol type) => type.SpecialType switch

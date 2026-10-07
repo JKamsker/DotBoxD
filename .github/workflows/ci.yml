@@ -447,6 +447,8 @@ jobs:
               "Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime",
               "Cancelled_remote_dispatch_releases_admission_before_unrelated_rendering_finishes",
               "Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation",
+              "User_defined_scalar_return_conversions_fail_closed_for_expression_and_block_bodies",
+              "Built_in_numeric_return_conversions_execute_for_expression_and_block_bodies",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

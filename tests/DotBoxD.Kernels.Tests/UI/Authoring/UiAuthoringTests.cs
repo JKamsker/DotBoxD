@@ -89,6 +89,52 @@ public sealed class UiAuthoringTests
         Assert.Contains(result.Diagnostics, d => d.Id == "DBXU001");
     }
 
+    [Theory]
+    [InlineData("=> new Box(value);")]
+    [InlineData("{ return new Box(value); }")]
+    public void User_defined_scalar_return_conversions_fail_closed_for_expression_and_block_bodies(string body)
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public sealed record Box(int Value)
+            {
+                public static implicit operator int(Box value) => value.Value;
+            }
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Convert(int value)
+            """ + body + " }");
+        Assert.Empty(result.Compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXU001"));
+        Assert.Empty(result.Result.GeneratedTrees);
+    }
+
+    [Theory]
+    [InlineData("=> value;")]
+    [InlineData("{ return value; }")]
+    public async Task Built_in_numeric_return_conversions_execute_for_expression_and_block_bodies(string body)
+    {
+        var package = Package("""
+            using DotBoxD.UI;
+            using DotBoxD.UI.Authoring;
+            public static partial class Counter
+            {
+                [UiLocalHandler] public static double Convert(int value)
+            """ + body + """
+                public static UiPackage Package()
+                {
+                    var builder = new UiBuilder();
+                    var input = builder.State(42);
+                    return builder.Build(builder.Progress(builder.Kernel(ConvertUiKernel(), input)));
+                }
+            }
+            """);
+        using var sandbox = UiTestFixture.Sandbox();
+        var renderer = new RecordingUiRenderer();
+        await using var session = await UiTestFixture.Host(sandbox).InstallAsync(package, renderer);
+        Assert.Equal(42d, Assert.Single(renderer.Initial, p => p.PropertyId == UiPropertyId.Value).Value.Number);
+    }
+
     [Fact]
     public void Individual_facets_can_be_disabled_and_user_members_win()
     {

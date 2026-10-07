@@ -174,7 +174,9 @@ statement bodies, including structured control flow and explicitly attributed ho
 Use `value.ToString(CultureInfo.InvariantCulture)` for invariant Int32 text. Other unsupported
 operations produce error `DBXU001` at the method, suggesting explicit remote RPC or a host binding.
 There is no automatic remote fallback. Overloads, captures, instance handlers, generic/ref/async
-local signatures, file-local containers and unlowerable library calls fail closed.
+local signatures, file-local containers and unlowerable library calls fail closed. Expression and
+block bodies share return-conversion checks: built-in numeric widening is supported; user-defined
+implicit scalar conversions are rejected during generation.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the
