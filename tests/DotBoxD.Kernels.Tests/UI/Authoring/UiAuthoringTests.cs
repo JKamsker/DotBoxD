@@ -69,6 +69,27 @@ public sealed class UiAuthoringTests
     }
 
     [Fact]
+    public void Invariant_format_provider_must_be_the_framework_symbol()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            namespace System.Globalization
+            {
+                public static class CultureInfo
+                {
+                    public static System.IFormatProvider InvariantCulture => throw new System.Exception("plugin getter");
+                }
+            }
+            public static partial class Provider
+            {
+                [UiLocalHandler] public static string Text(int value)
+                    => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            """);
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXU001");
+    }
+
+    [Fact]
     public void Individual_facets_can_be_disabled_and_user_members_win()
     {
         var result = Generate("""
