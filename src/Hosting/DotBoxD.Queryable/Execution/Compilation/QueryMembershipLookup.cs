@@ -35,7 +35,14 @@ internal sealed class QueryMembershipLookup
                 QueryValueKind.UnsignedInteger => value.UnsignedInteger,
                 _ => value.Decimal,
             }));
-            _floating = new HashSet<double>(_exact.Select(value => (double)value));
+            // Project original literals before exact-value deduplication: value-equal decimals
+            // with different scales can convert to different doubles on the runtime comparer path.
+            _floating = new HashSet<double>(_values.Select(value => value.Kind switch
+            {
+                QueryValueKind.Integer => (double)value.Integer,
+                QueryValueKind.UnsignedInteger => value.UnsignedInteger,
+                _ => (double)value.Decimal,
+            }));
         }
     }
 

@@ -81,6 +81,26 @@ public sealed class QueryCompiledMembershipTests
         Assert.False(compiled(new Sample(8)));
     }
 
+    [Fact]
+    public void Value_equal_decimal_scales_keep_distinct_floating_projections()
+    {
+        const decimal first = 47308777318835.42989m;
+        const decimal second = 47308777318835.429890m;
+        Assert.Equal(first, second);
+        Assert.NotEqual((double)first, (double)second);
+        var values = Enumerable.Repeat(QueryValue.FromDecimal(first), 8).ToArray();
+        values[1] = QueryValue.FromDecimal(second);
+        AssertEquivalent(QueryFilter.In("Value", values), [(double)first, (double)second, first, second]);
+    }
+
+    [Fact]
+    public void Guid_lookup_finds_nonfirst_candidates()
+    {
+        var guids = Enumerable.Range(0, 8).Select(i => new Guid(i + 1, 0, 0, new byte[8])).ToArray();
+        AssertEquivalent(QueryFilter.In("Value", guids.Select(QueryValue.FromGuid).ToArray()),
+            [guids[0], guids[1], guids[4], guids[7], Guid.Empty, null]);
+    }
+
     private static void AssertEquivalent(QueryFilter filter, object?[] actuals)
     {
         foreach (var reader in new[] { new MemberValueReader(typeof(Sample)), new MemberValueReader() })

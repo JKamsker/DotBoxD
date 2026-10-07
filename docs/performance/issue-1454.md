@@ -69,7 +69,9 @@ work. These measurements concern already-promoted queries, not promotion/startup
 
 At compilation, privately owned factory snapshots with at least eight candidates can prepare
 ordinal strings, GUIDs, or canonical exact numeric sets. Exact numerics use a decimal set;
-floating runtime members use the corresponding double set. Small lists, mixed literal kinds,
+floating runtime members use a double set projected from the original literals before
+exact-value deduplication. This preserves distinct floating projections of value-equal
+decimal literals with different scales. Small lists, mixed literal kinds,
 timestamps, Number sets, mutable raw initializers, and custom IConvertible values stay linear.
 String/GUID first hits retain a direct first-candidate check. Lookup storage is built once
 and never mutated after publication.
@@ -79,11 +81,11 @@ with an unowned array. It isolates lookup preparation from member-access special
 
 | Eight candidates | Linear ns/op | Prepared ns/op |
 | --- | ---: | ---: |
-| Integer miss / first / middle / last | 253.5 / 37.3 / 178.7 / 290.6 | 24.6 / 23.7 / 35.0 / 27.0 |
-| String miss / first / middle / last | 159.8 / 31.6 / 120.5 / 179.7 | 28.2 / 22.8 / 40.8 / 57.2 |
+| Integer miss / first / middle / last | 253.5 / 37.3 / 178.7 / 290.6 | 24.1 / 24.3 / 27.1 / 27.0 |
+| String miss / first / middle / last | 159.8 / 31.6 / 120.5 / 179.7 | 28.3 / 22.0 / 40.8 / 40.5 |
 
 Eight is a demonstrated conservative crossover; 1/4 stay linear. With 256 candidates, the
-original promoted integer/string misses take 10,616.6/8,053.7 ns versus 26.9/27.9 ns prepared.
+original promoted integer/string misses take 10,616.6/8,053.7 ns versus 24.7/29.0 ns prepared.
 Every row in this object-member probe stays at 0 B/op. A primitive member can still require
 one box for the object comparer; this change removes repeated scans, not all IN boxing.
 
