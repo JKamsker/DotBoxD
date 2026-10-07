@@ -30,7 +30,9 @@ public static class UiPackageJson
             var package = JsonSerializer.Deserialize(json, UiJsonContext.Default.UiPackage)
                 ?? throw new UiValidationException("UI package must be an object.");
             UiPackageValidator.Validate(package, policy);
-            return NormalizeKernels(package, policy);
+            var normalized = NormalizeKernels(package, policy);
+            _ = SerializeBounded(normalized, policy);
+            return normalized;
         }
         catch (JsonException ex)
         {
@@ -55,7 +57,12 @@ public static class UiPackageJson
             Events = [.. package.Events.OrderBy(e => e.Id)],
             RemoteEndpoints = [.. package.RemoteEndpoints.Order()]
         };
-        var json = JsonSerializer.Serialize(normalized, UiJsonContext.Default.UiPackage);
+        return SerializeBounded(normalized, policy);
+    }
+
+    private static string SerializeBounded(UiPackage package, UiPolicy policy)
+    {
+        var json = JsonSerializer.Serialize(package, UiJsonContext.Default.UiPackage);
         if (StrictUtf8.GetByteCount(json) > policy.MaxPackageBytes)
         {
             throw new UiValidationException("UI package exceeds the host byte limit.");

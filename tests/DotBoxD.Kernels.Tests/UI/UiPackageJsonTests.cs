@@ -46,6 +46,36 @@ public sealed class UiPackageJsonTests
         Assert.Equal(UiPackageJson.ComputeHash(package, policy), UiPackageJson.ComputeHash(imported, policy));
     }
 
+    [Fact]
+    public void Canonical_package_expansion_obeys_the_complete_package_byte_limit()
+    {
+        var json = CompactWireJson();
+        var canonical = UiPackageJson.Export(CompactPackage(), new UiPolicy());
+        var policy = new UiPolicy { MaxPackageBytes = Encoding.UTF8.GetByteCount(json) };
+        Assert.True(Encoding.UTF8.GetByteCount(canonical) > policy.MaxPackageBytes);
+        UiPackageValidator.Validate(UiPackageJson.Import(json, new UiPolicy()), policy);
+        var error = Assert.Throws<UiValidationException>(() => UiPackageJson.Import(json, policy));
+        Assert.Contains("package", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Canonical_package_at_the_exact_byte_limit_roundtrips_and_revalidates()
+    {
+        var canonical = UiPackageJson.Export(CompactPackage(), new UiPolicy());
+        var policy = new UiPolicy { MaxPackageBytes = Encoding.UTF8.GetByteCount(canonical) };
+        var imported = UiPackageJson.Import(CompactWireJson(), policy);
+        UiPackageValidator.Validate(imported, policy);
+        Assert.Equal(canonical, UiPackageJson.Export(imported, policy));
+        Assert.Equal(UiPackageJson.ComputeHash(CompactPackage(), policy), UiPackageJson.ComputeHash(imported, policy));
+    }
+
+    private static string CompactWireJson()
+    {
+        var wire = JsonNode.Parse(UiPackageJson.Export(CompactPackage(), new UiPolicy()))!;
+        wire["kernels"]![0]!["moduleJson"] = CompactKernel;
+        return wire.ToJsonString();
+    }
+
     private static UiPackage CompactPackage() => new(1, 1,
         [new UiNode(1, UiPrimitive.Text, [], [])], [], [new UiKernel(1, CompactKernel, "main")], [], []);
 
