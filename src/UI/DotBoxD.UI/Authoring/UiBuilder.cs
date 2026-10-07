@@ -10,6 +10,7 @@ public sealed class UiBuilder
     private readonly List<UiKernel> _kernels = [];
     private readonly List<UiEvent> _events = [];
     private readonly HashSet<int> _endpoints = [];
+    private readonly object _elementOwner = new();
 
     public UiState<int> State(int initial) => State<int>(UiValue.FromInt32(initial));
     public UiState<bool> State(bool initial) => State<bool>(UiValue.FromBoolean(initial));
@@ -40,15 +41,30 @@ public sealed class UiBuilder
 
     public UiElement Element(UiPrimitive primitive, ImmutableArray<UiProperty> properties, params UiElement[] children)
     {
+        ValidateChildren(children);
         var id = _nodes.Count + 1;
         _nodes.Add(new UiNode(id, primitive, [.. children.Select(c => c.Id)], properties));
-        return new UiElement(id);
+        return new UiElement(id, _elementOwner);
+    }
+
+    private void ValidateChildren(UiElement[] children)
+    {
+        ArgumentNullException.ThrowIfNull(children);
+        foreach (var child in children)
+        { ValidateElement(child, nameof(children)); }
+    }
+
+    private void ValidateElement(UiElement element, string parameterName)
+    {
+        if (element is null || !ReferenceEquals(element.Owner, _elementOwner))
+        { throw new ArgumentException("UI elements must be created by this builder.", parameterName); }
     }
 
     public UiElement Stack(params UiElement[] children) => Element(UiPrimitive.Stack, [], children);
     public UiElement Grid(int columns, params UiElement[] children)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(columns);
+        ValidateChildren(children);
         for (var index = 0; index < children.Length; index++)
         {
             var id = children[index].Id;
@@ -103,6 +119,7 @@ public sealed class UiBuilder
     public UiPackage Build(UiElement root, UiPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(root);
+        ValidateElement(root, nameof(root));
         var package = new UiPackage(UiPackage.CurrentFormatVersion, root.Id, [.. _nodes], [.. _state],
             [.. _kernels], [.. _events], [.. _endpoints.Order()]);
         UiPackageValidator.Validate(package, policy ?? new UiPolicy());

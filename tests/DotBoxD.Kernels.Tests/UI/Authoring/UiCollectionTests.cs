@@ -102,6 +102,21 @@ public sealed class UiCollectionTests
         Assert.Equal(UiValue.FromString("").GetHashCode(), snapshot.State[0].Value.GetHashCode());
     }
 
+    [Fact]
+    public void Foreign_elements_are_rejected_before_local_nodes_are_mutated()
+    {
+        var builder = new UiBuilder();
+        var local = builder.Text("local");
+        var foreign = new UiBuilder().Text("foreign");
+        Assert.Equal(local.Id, foreign.Id);
+        Assert.Throws<ArgumentException>(() => builder.Grid(1, local, foreign));
+        Assert.Throws<ArgumentException>(() => builder.Stack(local, foreign));
+        Assert.Throws<ArgumentException>(() => builder.Build(foreign));
+        Assert.Throws<ArgumentException>(() => builder.Stack([null!]));
+        var node = Assert.Single(builder.Build(local).Nodes);
+        Assert.Equal(UiPropertyId.Text, Assert.Single(node.Properties).Id);
+    }
+
     private sealed class LabelComponent(string text) : IUiComponent
     {
         public UiElement Render(UiBuilder builder) => builder.Text(text);

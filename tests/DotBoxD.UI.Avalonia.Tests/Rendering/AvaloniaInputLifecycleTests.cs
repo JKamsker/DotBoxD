@@ -72,6 +72,32 @@ public sealed class AvaloniaInputLifecycleTests
         Assert.All(references, r => Assert.False(r.IsAlive));
     }
 
+    [AvaloniaFact]
+    public async Task Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers()
+    {
+        var b = new UiBuilder();
+        var text = b.State("");
+        var renderer = new AvaloniaUiRenderer();
+        using var sandbox = SandboxHost.Create(h => h.AddDefaultPureBindings());
+        await using var session = await new UiHost(sandbox, SandboxPolicyBuilder.Create().Build(),
+            new UiPolicy { MaxStringLength = 8 }).InstallAsync(b.Build(b.TextBox(text)), renderer);
+        var box = Assert.IsType<TextBox>(renderer.Root);
+        box.Text = "too much text";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (session.LastInputError is null)
+        { await Task.Delay(1, timeout.Token); }
+        var rejected = await session.SnapshotAsync(timeout.Token);
+        Assert.Equal(0, rejected.Version);
+        Assert.Equal("", rejected.State[0].Value.Text);
+        Assert.False(session.IsDisconnected);
+        Assert.False(renderer.IsDisposed);
+        box.Text = "valid";
+        while ((await session.SnapshotAsync(timeout.Token)).Version == 0)
+        { await Task.Delay(1, timeout.Token); }
+        Assert.Equal("valid", (await session.SnapshotAsync(timeout.Token)).State[0].Value.Text);
+        Assert.Equal(1, renderer.Materializations);
+    }
+
     private static async Task<WeakReference[]> InstallAndReleaseAsync(UiHost host)
     {
         var b = new UiBuilder();

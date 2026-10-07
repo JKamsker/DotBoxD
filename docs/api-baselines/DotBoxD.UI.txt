@@ -46,6 +46,7 @@ public enum UiValueKind.String = 4
 public ImmutableArray<UiListItem> Items { get; init; } = []
 public ImmutableArray<UiPrimitive> AllowedPrimitives { get; init; } = [.. Enum.GetValues<UiPrimitive>()]
 public int EndpointId { get; } = endpointId
+public int Id { get; }
 public int MaxChildren { get; init; } = 1_000
 public int MaxDepth { get; init; } = 64
 public int MaxEvents { get; init; } = 256
@@ -70,7 +71,7 @@ public sealed class UiBuilder
 public sealed class UiLocalHandlerAttribute : Attribute
 public sealed class UiRemoteHandlerAttribute(int endpointId) : Attribute
 public sealed class UiValidationException(string message) : Exception(message)
-public sealed record UiElement(int Id)
+public sealed record UiElement
 public sealed record UiEvent( int Id, int NodeId, UiEventKind Kind, UiEventTarget Target, int KernelId = 0, int OutputSlotId = 0, int RemoteEndpointId = 0)
 public sealed record UiKernel(int Id, string ModuleJson, string Entrypoint, int InputSlotId = 0)
 public sealed record UiKernelDefinition<TInput, TOutput>(string ModuleJson, string Entrypoint)
@@ -135,4 +136,5 @@ public UiState<double> State(double initial) => State<double>(UiValue.FromNumber
 public UiState<ImmutableArray<UiListItem>> State(ImmutableArray<UiListItem> initial)
 public UiState<int> State(int initial) => State<int>(UiValue.FromInt32(initial))
 public UiState<string> State(string initial) => State<string>(UiValue.FromString(initial))
+public void Deconstruct(out int id) => id = Id
 public void Validate()

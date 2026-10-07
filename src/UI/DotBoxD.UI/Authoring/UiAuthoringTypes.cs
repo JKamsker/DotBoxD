@@ -12,7 +12,14 @@ public readonly record struct UiState<T>(int Id);
 public readonly record struct UiBoundKernel<T>(int Id);
 public sealed record UiKernelDefinition<TInput, TOutput>(string ModuleJson, string Entrypoint);
 public readonly record struct UiUnit;
-public sealed record UiElement(int Id);
+/// <summary>An immutable node handle belonging to the builder that created it.</summary>
+public sealed record UiElement
+{
+    internal UiElement(int id, object owner) { Id = id; Owner = owner; }
+    public int Id { get; }
+    internal object Owner { get; }
+    public void Deconstruct(out int id) => id = Id;
+}
 
 /// <summary>Typed sugar over the public property source IDs.</summary>
 public readonly record struct UiBinding<T>(UiValue? Literal = null, int StateSlotId = 0, int KernelId = 0, bool TwoWay = false)

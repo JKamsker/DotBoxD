@@ -161,6 +161,9 @@ can compose other components using the same builder; typed `UiState<T>`, `UiBind
 `UiBoundKernel<T>` keep scalar binding and local event targets aligned. Builder allocation order
 produces deterministic IDs; canonical hashing also normalizes definition order. Authoring executes
 only in the worker; it never ships a render delegate or plugin object to the host.
+`UiElement` handles belong to their creating builder; composing children or selecting a root from
+another builder is rejected before changing nodes. Handwritten packages use the public `UiNode`
+and `UiPackage` schema directly.
 
 Reference the optional `DotBoxD.Plugins.Analyzer` as an analyzer to use `[UiLocalHandler]` on static
 methods of a top-level non-generic partial class/struct. Each method accepts zero or one
@@ -191,7 +194,9 @@ The host owns Avalonia application setup, themes and the containing TopLevel. It
 then use normal Avalonia input routing into the semantic input queue. `UiHost` automatically
 connects renderers implementing `IUiInputSource` to the session. Input queues and rate limits are
 bounded; overflow disconnects and releases the session. Remote events do not block local typing;
-rejected stale remote input is visible through `UiSession.LastInputError`.
+rejected local edits (such as an overlong paste) and stale remote input are visible through
+`UiSession.LastInputError` without closing the session. A rejected edit leaves host state unchanged,
+and subsequent valid input can proceed.
 
 `CaptureAsync(PixelSize, Vector)` measures/arranges the root and returns a host-owned
 `RenderTargetBitmap` for CPU/offscreen composition. The embedding host disposes it and decides how
