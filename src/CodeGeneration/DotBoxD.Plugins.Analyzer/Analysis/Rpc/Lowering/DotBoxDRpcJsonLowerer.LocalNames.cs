@@ -6,6 +6,33 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private string LowerBinaryRight(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
+        => binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression
+            ? LowerLazyOperand(binary.Right, lower)
+            : lower(binary.Right);
+
+    private string LowerLazyOperand(ExpressionSyntax expression, Func<ExpressionSyntax, string> lower)
+    {
+        var previous = _expressionPrelude;
+        var prelude = new List<string>();
+        _expressionPrelude = prelude;
+        try
+        {
+            var lowered = lower(expression);
+            if (prelude.Count > 0)
+            {
+                throw new NotSupportedException(
+                    "Short-circuit operands requiring generated argument temporaries are unsupported; use explicit if statements to guard the call.");
+            }
+
+            return lowered;
+        }
+        finally
+        {
+            _expressionPrelude = previous;
+        }
+    }
+
     internal string LowerExpressionWithPrelude(ExpressionSyntax expression, List<string> output)
     {
         var previous = _expressionPrelude;

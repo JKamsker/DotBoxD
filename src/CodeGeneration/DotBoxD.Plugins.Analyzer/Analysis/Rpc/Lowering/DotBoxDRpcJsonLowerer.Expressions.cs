@@ -83,6 +83,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string LowerBinary(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
     {
         ValidateBinarySingleSemantics(binary);
+        RpcBinaryEqualityValidator.Validate(binary, ModelFor(binary), _cancellationToken);
 
         if (binary.Kind() == SyntaxKind.AddExpression)
         {
@@ -101,7 +102,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
         }
 
-        return BinaryJson(JsonBinaryOperator(binary), lower(binary.Left), lower(binary.Right));
+        return BinaryJson(JsonBinaryOperator(binary), lower(binary.Left), LowerBinaryRight(binary, lower));
     }
 
     private string LiteralJson(ExpressionSyntax expression, object? value)

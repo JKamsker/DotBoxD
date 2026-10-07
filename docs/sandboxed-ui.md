@@ -195,6 +195,11 @@ in every scope: plugin `Dispose` methods cannot silently disappear or execute in
 These unsupported forms report `DBXU001` with the explicit remote/host-binding alternative.
 Distinct locals in a handler must use unique names, including in separate blocks or foreach loops;
 reusing a name receives `DBXU001` because kernel storage is scoped to the entire function.
+Reference equality of collections/DTOs and user-defined equality operators are unsupported;
+compare supported scalar fields explicitly or keep the operation in a remote handler. Numeric,
+Boolean and string value comparisons remain supported. Short-circuit operands that require
+generated argument temporaries, including annotated helper calls, receive `DBXU001`; use explicit
+`if` statements to guard those calls. Simple arithmetic operands retain normal `&&`/`||` semantics.
 
 `[UiRemoteHandler(7)]` generates `MethodUiEndpoint`, a stable numeric endpoint for
 `UiBuilder.RemoteButton`. The method body remains ordinary C# in the worker; the host binds the
