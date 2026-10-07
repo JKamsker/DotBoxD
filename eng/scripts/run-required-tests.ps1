@@ -34,6 +34,7 @@ $defaultMinimums = @{
     Handwritten_facets_do_not_require_generation_container_shapes = 3
     Unused_kernels_still_require_a_supported_scalar_result = 2
     Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime = 2
+    Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation = 3
     PluginConnectionHostLifetimeTests = 5
     MemberPlatformMetadataParityTests = 6
     ForeignMemberAttributeIdentityTests = 11

@@ -103,14 +103,14 @@ public sealed class UiSession : IAsyncDisposable
                 return new Dispatch(snapshot, null, null, null);
             }
 
-            if (_inFlight >= _policy.MaxInFlightRemoteEvents)
+            if (Volatile.Read(ref _inFlight) >= _policy.MaxInFlightRemoteEvents)
             {
                 throw new UiValidationException("UI remote event concurrency limit exceeded.");
             }
 
             var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
             linked.CancelAfter(_policy.RemoteEventTimeout);
-            _inFlight++;
+            Interlocked.Increment(ref _inFlight);
             return new Dispatch(null, new UiRemoteEvent(route.Id, route.NodeId, route.RemoteEndpointId, _state.Snapshot(Id)),
                 _remote!, linked);
         }, cancellationToken).ConfigureAwait(false);
@@ -139,10 +139,7 @@ public sealed class UiSession : IAsyncDisposable
         }
         finally
         {
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-            try
-            { _inFlight--; }
-            finally { _gate.Release(); }
+            Interlocked.Decrement(ref _inFlight);
         }
     }
 

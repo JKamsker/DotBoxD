@@ -145,6 +145,37 @@ public sealed class UiAuthoringTests
     }
 
     [Theory]
+    [InlineData("public", true)]
+    [InlineData("protected", true)]
+    [InlineData("private", false)]
+    public void Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation(string accessibility, bool inherited)
+    {
+        var result = Generate("using DotBoxD.UI.Authoring; public class Base { " + accessibility +
+            " static UiKernelDefinition<int,int> IncrementUiKernel() => new(\"manual\", \"main\"); " +
+            accessibility + " const int SearchUiEndpoint = 99; }" + """
+            public partial class Derived : Base
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+                [UiRemoteHandler(7)] public static void Search() { }
+                public static string SelectedModule() => IncrementUiKernel().ModuleJson;
+                public static int SelectedEndpoint() => SearchUiEndpoint;
+            }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning));
+        Assert.Equal(inherited ? 0 : 2, result.Result.GeneratedTrees.Length);
+        using var stream = new MemoryStream();
+        Assert.True(result.Output.Emit(stream).Success);
+        var type = Assembly.Load(stream.ToArray()).GetType("Derived")!;
+        Assert.Equal(inherited ? 99 : 7, (int)type.GetMethod("SelectedEndpoint")!.Invoke(null, null)!);
+        var module = (string)type.GetMethod("SelectedModule")!.Invoke(null, null)!;
+        if (inherited)
+        { Assert.Equal("manual", module); }
+        else
+        { Assert.Contains("Derived.Increment", module, StringComparison.Ordinal); }
+    }
+
+    [Theory]
     [InlineData("UiLocalHandler")]
     [InlineData("UiRemoteHandler(7)")]
     public void File_local_handler_containers_have_actionable_diagnostics(string attribute)

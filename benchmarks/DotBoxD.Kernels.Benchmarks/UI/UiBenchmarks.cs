@@ -15,6 +15,7 @@ public class UiBenchmarks
     private UiHost _host = null!;
     private UiPackage _package = null!;
     private UiSession _session = null!;
+    private UiSession _remoteSession = null!;
     private ImmutableArray<UiStateValue> _batch;
     private string _json = null!;
     private long _version;
@@ -43,6 +44,12 @@ public class UiBenchmarks
         _json = UiPackageJson.Export(_package, _policy);
         _batch = [.. Enumerable.Range(2, 100).Select(id => new UiStateValue(id, UiValue.FromInt32(1)))];
         _session = _host.InstallAsync(_package, new NullRenderer()).AsTask().GetAwaiter().GetResult();
+        var remotePackage = _package with
+        {
+            Events = [new UiEvent(1, 3, UiEventKind.Click, UiEventTarget.Remote, RemoteEndpointId: 1)],
+            RemoteEndpoints = [1]
+        };
+        _remoteSession = _host.InstallAsync(remotePackage, new NullRenderer(), new EchoTransport()).AsTask().GetAwaiter().GetResult();
     }
 
     [Benchmark]
@@ -63,6 +70,9 @@ public class UiBenchmarks
         var snapshot = await _session.DispatchAsync(1);
         _version = snapshot.Version;
     }
+
+    [Benchmark]
+    public async Task RemoteButton() => await _remoteSession.DispatchAsync(1);
 
     [Benchmark]
     public async Task TwoWayText()
@@ -90,6 +100,7 @@ public class UiBenchmarks
     public void Cleanup()
     {
         _session.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _remoteSession.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _sandbox.Dispose();
     }
 
@@ -100,5 +111,11 @@ public class UiBenchmarks
         public ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
             => ValueTask.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class EchoTransport : IUiRemoteTransport
+    {
+        public ValueTask<UiStatePatch> DispatchAsync(UiRemoteEvent message, CancellationToken cancellationToken)
+            => ValueTask.FromResult(new UiStatePatch(message.Snapshot.SessionId, message.Snapshot.Version, []));
     }
 }

@@ -151,7 +151,8 @@ cancels in-flight operations, serializes renderer disposal, and clears live stat
 adapter references. Even a transport that ignores cancellation cannot delay the session's wait
 indefinitely. The transport owner remains responsible for cancelling/draining its underlying RPC
 work and notifying/disconnecting sessions when its connection closes. Transport failures/timeouts
-disconnect the session; cancelling one call by its caller does not disconnect it. Invalid patches
+disconnect the session; cancelling one call by its caller does not disconnect it. Releasing remote
+admission does not wait for unrelated rendering work. Invalid patches
 are rejected without disconnecting by default.
 
 ## C# component authoring
@@ -181,7 +182,8 @@ endpoint through `IUiRemoteTransport` to an existing generated typed RPC contrac
 invoke or discover plugin methods by name. The sample demonstrates this mapping explicitly.
 
 `GenerateKernel = false` and `GenerateEndpoint = false` independently disable the corresponding
-method output. A handwritten member with the generated name wins before generation-only restrictions
+method output. A handwritten member with the generated name, including an accessible inherited
+member, wins before generation-only restrictions
 on container shapes and handler overloads are applied. No attribute is necessary: a
 consumer may handwrite the identical kernel definition, route, builder or entire package. Tests
 compare handwritten/generated execution and canonical hashes and guard incremental output caching.

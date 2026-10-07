@@ -20,7 +20,7 @@ internal static class UiHandlerModelFactory
             if (attribute.NamedArguments.Any(a => a.Key == facet && a.Value.Value is false))
             { return Model(null, null); }
             var name = method.Name + (remote ? "UiEndpoint" : "UiKernel");
-            if (method.ContainingType.GetMembers(name).Length != 0)
+            if (HasHandwrittenMember(method.ContainingType, name, context.SemanticModel.Compilation))
             { return Model(null, null); }
             RequireSourceContainer(syntax);
             RequireContainer(method);
@@ -41,6 +41,16 @@ internal static class UiHandlerModelFactory
 
         UiHandlerModel Model(string? source, string? error) => new(method.Name, hint, source, error,
             location.SourceTree!.FilePath, location.SourceSpan, location.GetLineSpan().Span);
+    }
+
+    private static bool HasHandwrittenMember(INamedTypeSymbol type, string name, Compilation compilation)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (current.GetMembers(name).Any(member => compilation.IsSymbolAccessibleWithin(member, type)))
+            { return true; }
+        }
+        return false;
     }
 
     private static void RequireSourceContainer(MethodDeclarationSyntax syntax)

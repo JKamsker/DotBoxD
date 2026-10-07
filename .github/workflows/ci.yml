@@ -445,6 +445,8 @@ jobs:
               "Individual_facets_can_be_disabled_and_user_members_win",
               "Unused_kernels_still_require_a_supported_scalar_result",
               "Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime",
+              "Cancelled_remote_dispatch_releases_admission_before_unrelated_rendering_finishes",
+              "Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",

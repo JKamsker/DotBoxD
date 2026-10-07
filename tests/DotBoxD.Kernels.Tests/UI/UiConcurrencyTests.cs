@@ -6,6 +6,44 @@ namespace DotBoxD.Kernels.Tests.UI;
 
 public sealed class UiConcurrencyTests
 {
+    [Fact]
+    public async Task Cancelled_remote_dispatch_releases_admission_before_unrelated_rendering_finishes()
+    {
+        using var sandbox = UiTestFixture.Sandbox();
+        using var caller = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var never = new TaskCompletionSource<UiStatePatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var remote = new TestUiTransport((request, _) =>
+        {
+            if (Interlocked.Increment(ref calls) != 1)
+            { return ValueTask.FromResult(UiTestFixture.Reply(request)); }
+            started.SetResult();
+            return new(never.Task);
+        });
+        var renderer = new GateRenderer();
+        await using var session = await UiTestFixture.Host(sandbox,
+            new UiPolicy { MaxInFlightRemoteEvents = 1, RemoteEventTimeout = TimeSpan.FromSeconds(30) })
+            .InstallAsync(UiTestFixture.Counter(), renderer, remote);
+        var pending = session.DispatchAsync(2, caller.Token).AsTask();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var local = session.SetInputAsync(4, UiPropertyId.Text, UiValue.FromString("new query")).AsTask();
+        try
+        {
+            await renderer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            caller.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(session.IsDisconnected);
+        }
+        finally
+        {
+            renderer.Release.TrySetResult();
+            await local.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.Equal("new query", UiTestFixture.Slot(await session.DispatchAsync(2), 2).Text);
+        Assert.Equal(2, remote.Calls);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
