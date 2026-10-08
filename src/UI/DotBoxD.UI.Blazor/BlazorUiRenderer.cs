@@ -16,6 +16,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
     private readonly UiPolicy _inputPolicy;
     private readonly BlazorInputAdmission _admission;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _authorizationGate = new(1, 1);
     private readonly Dictionary<(int Node, UiPropertyId Property), UiInput> _latest = [];
     private BlazorUiSnapshot? _snapshot;
     private Func<Task>? _changed;
@@ -127,29 +128,42 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         using var cancellation = linked;
         try
         {
-            lock (_sync)
+            // Circuit callbacks can overlap at awaits. Keep authorization and queue admission in
+            // arrival order so an older edit cannot overwrite a newer one after a slow policy check.
+            await _authorizationGate.WaitAsync(linked.Token).ConfigureAwait(false);
+            try
             {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
+                return await AuthorizeAndQueueAsync(session, input, user, authorizer, linked.Token).ConfigureAwait(false);
             }
-            if (!await authorizer.AuthorizeAsync(user, session, input, linked.Token).AsTask().WaitAsync(linked.Token).ConfigureAwait(false))
-            { return false; }
-            linked.Token.ThrowIfCancellationRequested();
-            lock (_sync)
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
-                if (_inputs.Writer.TryWrite(input))
-                {
-                    if (input.NodeId > 0)
-                    { _latest[(input.NodeId, input.PropertyId)] = input; }
-                    return true;
-                }
-                _inputs.Writer.TryComplete(new UiValidationException("Blazor UI input queue limit exceeded."));
-                throw new UiValidationException("Blazor UI input queue limit exceeded.");
-            }
+            finally { _authorizationGate.Release(); }
         }
         finally { _admission.End(); }
+    }
+
+    private async ValueTask<bool> AuthorizeAndQueueAsync(UiSession session, UiInput input, ClaimsPrincipal user,
+        IUiInteractionAuthorizer authorizer, CancellationToken token)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
+        }
+        if (!await authorizer.AuthorizeAsync(user, session, input, token).AsTask().WaitAsync(token).ConfigureAwait(false))
+        { return false; }
+        token.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
+            if (_inputs.Writer.TryWrite(input))
+            {
+                if (input.NodeId > 0)
+                { _latest[(input.NodeId, input.PropertyId)] = input; }
+                return true;
+            }
+            _inputs.Writer.TryComplete(new UiValidationException("Blazor UI input queue limit exceeded."));
+            throw new UiValidationException("Blazor UI input queue limit exceeded.");
+        }
     }
 
     public ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken) => _inputs.Reader.ReadAsync(cancellationToken);

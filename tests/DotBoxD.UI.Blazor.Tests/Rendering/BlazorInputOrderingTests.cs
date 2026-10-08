@@ -35,6 +35,26 @@ public sealed class BlazorInputOrderingTests
     }
 
     [Fact]
+    public async Task Async_authorization_preserves_browser_input_order()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var renderer = new BlazorUiRenderer();
+        await using var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), renderer);
+        var authorizer = new DelayedAuthorizer();
+        UiInput Input(string value) => new(NodeId: 1, PropertyId: UiPropertyId.Text, Value: UiValue.FromString(value));
+        var first = renderer.SubmitAsync(session, Input("old"), UiFixture.User(), authorizer).AsTask();
+        await authorizer.Entered.Task;
+        var second = renderer.SubmitAsync(session, Input("new"), UiFixture.User(), authorizer).AsTask();
+        try
+        { Assert.Equal(1, authorizer.Calls); }
+        finally { authorizer.Release.TrySetResult(true); }
+        Assert.True(await first);
+        Assert.True(await second);
+        await UiFixture.WaitAsync(async () => (await session.SnapshotAsync()).Version == 2);
+        Assert.Equal("new", (await session.SnapshotAsync()).State[0].Value.Text);
+    }
+
+    [Fact]
     public async Task Queue_overflow_disconnects_and_releases_viewer_without_unbounded_input()
     {
         using var sandbox = UiFixture.Sandbox();
@@ -56,5 +76,18 @@ public sealed class BlazorInputOrderingTests
         await session.DisposeAsync();
         Assert.True(renderer.IsDisposed);
         Assert.Null(renderer.Snapshot);
+    }
+
+    private sealed class DelayedAuthorizer : IUiInteractionAuthorizer
+    {
+        public int Calls { get; private set; }
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ValueTask<bool> AuthorizeAsync(System.Security.Claims.ClaimsPrincipal user, UiSession session, UiInput input, CancellationToken cancellationToken)
+        {
+            if (++Calls == 1)
+            { Entered.TrySetResult(); return new ValueTask<bool>(Release.Task); }
+            return ValueTask.FromResult(true);
+        }
     }
 }

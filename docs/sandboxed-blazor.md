@@ -90,7 +90,9 @@ Disabled and hidden nodes, including descendants of disabled/hidden containers, 
 input inside `UiSession`. This holds even when a browser forges an event for an existing handler.
 Accepted nonempty writes increment the shared version exactly once. State-only updates retain the
 package/tree installation; keyed row reordering uses Blazor keys. Earlier echoes and rejected-edit
-corrections cannot replace newer queued browser edits.
+corrections cannot replace newer queued browser edits. Authorization and queue admission are serialized
+per viewer, so delayed asynchronous policy checks cannot reorder browser inputs. Pending authorization
+waiters share the bounded admission quota and are cancelled when the viewer/session is disposed.
 
 ## Viewers and lifecycle
 
