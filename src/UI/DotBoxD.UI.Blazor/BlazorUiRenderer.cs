@@ -121,13 +121,17 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
             _admission.Begin();
             linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
         }
         using var cancellation = linked;
         try
         {
+            lock (_sync)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
+            }
             if (!await authorizer.AuthorizeAsync(user, session, input, linked.Token).AsTask().WaitAsync(linked.Token).ConfigureAwait(false))
             { return false; }
             linked.Token.ThrowIfCancellationRequested();

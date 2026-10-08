@@ -73,6 +73,21 @@ public sealed class BlazorSecurityTests
     }
 
     [Fact]
+    public async Task Malformed_input_consumes_the_browser_rate_budget_without_leaking_authorization_admission()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var renderer = new BlazorUiRenderer(new UiPolicy { MaxInputEventsPerSecond = 2, MaxInFlightRemoteEvents = 1 });
+        await using var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), renderer);
+        var authorizer = new Authorizer(false);
+        await Assert.ThrowsAsync<UiValidationException>(() => renderer.SubmitAsync(session, new UiInput(EventId: 999), UiFixture.User(), authorizer).AsTask());
+        Assert.False(await renderer.SubmitAsync(session, new UiInput(NodeId: 1, PropertyId: UiPropertyId.Text, Value: UiValue.FromString("x")), UiFixture.User(), authorizer));
+        var error = await Assert.ThrowsAsync<UiValidationException>(() => renderer.SubmitAsync(session, new UiInput(EventId: 999), UiFixture.User(), authorizer).AsTask());
+        Assert.Contains("rate", error.Message, StringComparison.Ordinal);
+        Assert.Equal(1, authorizer.Calls);
+        Assert.Equal(0, (await session.SnapshotAsync()).Version);
+    }
+
+    [Fact]
     public async Task Disposed_remote_dispatch_cancels_work_and_late_patch_cannot_revive_session()
     {
         using var sandbox = UiFixture.Sandbox();
