@@ -11,6 +11,13 @@ public enum UiEventKind.Click = 1
 public enum UiEventTarget
 public enum UiEventTarget.LocalKernel = 1
 public enum UiEventTarget.Remote = 2
+public enum UiFeature
+public enum UiFeature.GridLayout = 2
+public enum UiFeature.KeyedItems = 6
+public enum UiFeature.RangeInput = 5
+public enum UiFeature.StackLayout = 1
+public enum UiFeature.TextInput = 3
+public enum UiFeature.ToggleInput = 4
 public enum UiPrimitive
 public enum UiPrimitive.Border = 3
 public enum UiPrimitive.Button = 5
@@ -43,6 +50,8 @@ public enum UiValueKind.Int32 = 2
 public enum UiValueKind.Items = 5
 public enum UiValueKind.Number = 3
 public enum UiValueKind.String = 4
+public ImmutableArray<UiFeature> OptionalFeatures { get; init; } = []
+public ImmutableArray<UiFeature> RequiredFeatures { get; init; } = []
 public ImmutableArray<UiListItem> Items { get; init; } = []
 public ImmutableArray<UiPrimitive> AllowedPrimitives { get; init; } = [.. Enum.GetValues<UiPrimitive>()]
 public int EndpointId { get; } = endpointId

@@ -9,11 +9,15 @@ public sealed class LayeringTests
 {
     [Fact]
     public void Ui_model_is_renderer_neutral_and_does_not_depend_on_hosting()
-        => AssertNoDependency("DotBoxD.UI", "DotBoxD.Hosting", "DotBoxD.UI.Runtime", "DotBoxD.Services", "Avalonia.Controls");
+        => AssertNoDependency("DotBoxD.UI", "DotBoxD.Hosting", "DotBoxD.UI.Runtime", "DotBoxD.Services", "Avalonia.Controls", "Microsoft.AspNetCore.Components");
 
     [Fact]
     public void Ui_runtime_does_not_depend_on_a_renderer_or_plugin_implementation()
-        => AssertNoDependency("DotBoxD.UI.Runtime", "Avalonia.Controls", "Examples.SandboxedUi.Plugin");
+        => AssertNoDependency("DotBoxD.UI.Runtime", "Avalonia.Controls", "Microsoft.AspNetCore.Components", "Examples.SandboxedUi.Plugin");
+
+    [Fact]
+    public void Blazor_adapter_does_not_load_plugin_implementation_or_native_renderer()
+        => AssertNoDependency("DotBoxD.UI.Blazor", "Examples.SandboxedUi.Plugin", "Avalonia.Controls");
 
     private static void AssertNoDependency(string assemblyName, params string[] forbidden)
     {

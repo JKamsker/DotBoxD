@@ -1,7 +1,5 @@
 using Avalonia;
 using DotBoxD.Hosting.Execution;
-using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Services.Peer;
@@ -9,6 +7,7 @@ using DotBoxD.UI;
 using DotBoxD.UI.Avalonia;
 using DotBoxD.UI.Runtime;
 using Examples.SandboxedUi.Contracts;
+using Examples.SandboxedUi.Shared;
 
 namespace Examples.SandboxedUi.Host;
 
@@ -16,7 +15,7 @@ internal static class UiSmoke
 {
     public static async Task<Guid> RunAsync(IUiPlugin plugin, UiPackage package, RpcPeer peer, Func<Task> crash, CancellationToken token)
     {
-        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(ScoreBinding()));
+        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(SampleScoreBinding.Create()));
         var kernelPolicy = SandboxPolicyBuilder.Create().Grant("game.score.read", new Dictionary<string, string>(), SandboxEffect.HostStateRead).Build();
         var host = new UiHost(sandbox, kernelPolicy, new UiPolicy { MaxPackageBytes = 128 * 1024 });
         var renderer = new AvaloniaUiRenderer();
@@ -52,7 +51,7 @@ internal static class UiSmoke
 
     public static async Task ReconnectAsync(IUiPlugin plugin, UiPackage package, RpcPeer peer, Guid previousId, CancellationToken token)
     {
-        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(ScoreBinding()));
+        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(SampleScoreBinding.Create()));
         var policy = SandboxPolicyBuilder.Create().Grant("game.score.read", new Dictionary<string, string>(), SandboxEffect.HostStateRead).Build();
         await using var session = await new UiHost(sandbox, policy).InstallAsync(package, new AvaloniaUiRenderer(), new SearchTransport(plugin), token);
         await using var connection = new UiSessionConnection(peer, session);
@@ -71,22 +70,6 @@ internal static class UiSmoke
             throw new InvalidOperationException("Old session patch was accepted.");
         }
         catch (UiValidationException) { }
-    }
-
-    private static BindingDescriptor ScoreBinding() => new("ui.game.score", SemVersion.One, [], SandboxType.I32,
-        SandboxEffect.Cpu | SandboxEffect.HostStateRead, "game.score.read", BindingCostModel.Fixed(1), AuditLevel.PerResource,
-        BindingSafety.ReadOnlyExternal, InvokeScore,
-
-        CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"), GrantValidator: static (_, _) => { });
-
-    private static ValueTask<SandboxValue> InvokeScore(SandboxContext context, IReadOnlyList<SandboxValue> arguments, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        var started = DateTimeOffset.UtcNow;
-        context.Audit.Write(new SandboxAuditEvent(context.RunId, "BindingCall", started, true,
-            BindingId: "ui.game.score", CapabilityId: "game.score.read", Effect: SandboxEffect.HostStateRead,
-            ResourceId: "score", Fields: context.BindingAuditFields("ui-score", started)));
-        return ValueTask.FromResult(SandboxValue.FromInt32(42));
     }
 
     private static void Require(bool condition, string operation)

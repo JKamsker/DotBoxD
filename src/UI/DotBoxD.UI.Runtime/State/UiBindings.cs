@@ -6,6 +6,7 @@ internal sealed class UiBindings(UiPackage package, UiPolicy policy, UiKernelRun
 {
     private ImmutableArray<UiNode> _nodes = package.Nodes;
     private ImmutableArray<UiPropertyValue> _current = [];
+    public ImmutableArray<UiPropertyValue> Current => _current;
 
     public async ValueTask<ImmutableArray<UiPropertyValue>> EvaluateAsync(
         IReadOnlyDictionary<int, UiValue> state,

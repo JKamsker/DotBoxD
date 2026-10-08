@@ -85,6 +85,12 @@ jobs:
           dotnet samples/SandboxedUi/Host/bin/Release/net10.0/Examples.SandboxedUi.Host.dll samples/SandboxedUi/Plugin/bin/Release/net10.0/Examples.SandboxedUi.Plugin.dll
           if ($LASTEXITCODE -ne 0) { throw "Sandboxed UI smoke failed." }
 
+      - name: Sandboxed Blazor process and independent-viewer smoke
+        shell: pwsh
+        run: |
+          dotnet samples/SandboxedUi/BlazorHost/bin/Release/net10.0/Examples.SandboxedUi.BlazorHost.dll --smoke --worker samples/SandboxedUi/Plugin/bin/Release/net10.0/Examples.SandboxedUi.Plugin.dll
+          if ($LASTEXITCODE -ne 0) { throw "Sandboxed Blazor smoke failed." }
+
       - name: GameServer example smoke
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -121,6 +127,7 @@ jobs:
             suite: integration-smoke
             projects: |
               tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
+              tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -153,6 +160,7 @@ jobs:
             suite: integration-smoke
             projects: |
               tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
+              tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -345,6 +353,16 @@ jobs:
               "Earlier_input_echoes_preserve_newer_native_edits",
               "Connection_close_and_host_shutdown_release_idle_sessions",
               "Connection_owner_observes_async_session_cleanup_failures")
+
+      - name: Blazor required rendering, authorization, and conformance tests
+        shell: pwsh
+        run: |
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj `
+            -Configuration Release `
+            -NoBuild `
+            -RequiredFullyQualifiedNameContains @("BlazorComponentTests", "BlazorSecurityTests",
+              "BlazorInputOrderingTests", "RendererCapabilityTests", "RendererConformanceTests")
 
       - name: Security-boundary required tests
         shell: pwsh

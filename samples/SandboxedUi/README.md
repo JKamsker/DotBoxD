@@ -47,3 +47,23 @@ and mount the renderer Root in their trusted game/window input and composition p
 bitmap capture is a host-only hook; a C++/.NET embedding host decides how to composite/upload it.
 Images and resource handles are an explicit post-MVP limitation, as permitted by the issue's DoD.
 See [schema, security model, supported C#, ordering and limits](../../docs/sandboxed-ui.md).
+
+## Blazor host
+
+The Interactive Server host reuses the same plugin executable without referencing its implementation
+assembly. It displays two independent demo viewer sessions with Counter, Search, and a player score
+host binding. Each viewer can disconnect its own worker without affecting the other.
+
+```sh
+dotnet run --project samples/SandboxedUi/BlazorHost -c Release -- --urls http://localhost:5078
+```
+
+Run the process-boundary, independent-viewer, and reconnect smoke without a browser:
+
+```sh
+dotnet run --project samples/SandboxedUi/BlazorHost -c Release -- --smoke
+```
+
+The host's explicitly labeled demo identities are for the sample. Production applications supply
+their authenticated browser principal and trusted interaction policy. See [sandboxed Blazor](../../docs/sandboxed-blazor.md)
+for authorization, circuit lifetime, quota configuration, and the decision to defer safe Razor authoring.

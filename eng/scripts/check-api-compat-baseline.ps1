@@ -14,6 +14,7 @@ $baselineRoot = if ([System.IO.Path]::IsPathRooted($BaselineDirectory)) {
 }
 
 $packages = @(
+    @{ Id = "DotBoxD.UI.Blazor"; Path = "src/UI/DotBoxD.UI.Blazor" },
     @{ Id = "DotBoxD.UI.Avalonia"; Path = "src/UI/DotBoxD.UI.Avalonia" },
     @{ Id = "DotBoxD.UI"; Path = "src/UI/DotBoxD.UI" },
     @{ Id = "DotBoxD.UI.Runtime"; Path = "src/UI/DotBoxD.UI.Runtime" },

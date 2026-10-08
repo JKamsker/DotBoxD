@@ -13,6 +13,8 @@ public sealed record UiPackage(
     ImmutableArray<int> RemoteEndpoints)
 {
     public const int CurrentFormatVersion = 1;
+    public ImmutableArray<UiFeature> RequiredFeatures { get; init; } = [];
+    public ImmutableArray<UiFeature> OptionalFeatures { get; init; } = [];
 }
 
 public enum UiPrimitive

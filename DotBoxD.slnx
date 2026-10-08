@@ -6,6 +6,9 @@
     <Project Path="samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj" />
   </Folder>
   <Folder Name="/samples/SandboxedUi/" />
+  <Folder Name="/samples/SandboxedUi/BlazorHost/">
+    <Project Path="samples/SandboxedUi/BlazorHost/Examples.SandboxedUi.BlazorHost.csproj" />
+  </Folder>
   <Folder Name="/samples/SandboxedUi/Contracts/">
     <Project Path="samples/SandboxedUi/Contracts/Examples.SandboxedUi.Contracts.csproj" />
   </Folder>
@@ -69,12 +72,14 @@
   </Folder>
   <Folder Name="/src/UI/">
     <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
+    <Project Path="src/UI/DotBoxD.UI.Blazor/DotBoxD.UI.Blazor.csproj" />
     <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj" />
+    <Project Path="tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj" />
     <Project Path="tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj" />
     <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
     <Project Path="tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj" />

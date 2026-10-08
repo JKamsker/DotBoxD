@@ -1,10 +1,11 @@
 # Sandboxed UI
 
-`DotBoxD.UI`, `DotBoxD.UI.Runtime` and `DotBoxD.UI.Avalonia` are optional .NET 10 packages
+`DotBoxD.UI`, `DotBoxD.UI.Runtime`, `DotBoxD.UI.Avalonia` and `DotBoxD.UI.Blazor` are optional .NET 10 packages
 implementing [issue #1453](https://github.com/JKamsker/DotBoxD/issues/1453). Plugin authors compose
 C# components and typed state in their worker. The existing plugin analyzer lowers declared local
 methods into restricted IR. Trusted host code validates the package, owns state, and renders Avalonia
 controls without loading the plugin implementation assembly.
+[Sandboxed Blazor](sandboxed-blazor.md) adds a trusted web renderer over the same package/session API.
 
 ## Trust boundary
 

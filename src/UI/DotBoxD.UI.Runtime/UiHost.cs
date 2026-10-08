@@ -38,6 +38,7 @@ public sealed class UiHost
             UiPackageValidator.Validate(package, _policy);
             // Enforce the same byte/canonical IR boundary for hand-written packages and wire imports.
             package = UiPackageJson.Import(UiPackageJson.Export(package, _policy), _policy);
+            renderer.Capabilities.Validate(package);
             if (package.Events.Any(e => e.Target == UiEventTarget.Remote) && remote is null)
             {
                 throw new UiValidationException("UI package requires an explicit remote transport.");

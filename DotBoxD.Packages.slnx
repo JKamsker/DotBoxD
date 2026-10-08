@@ -51,6 +51,7 @@
   </Folder>
   <Folder Name="/src/UI/">
     <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
+    <Project Path="src/UI/DotBoxD.UI.Blazor/DotBoxD.UI.Blazor.csproj" />
     <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
   </Folder>

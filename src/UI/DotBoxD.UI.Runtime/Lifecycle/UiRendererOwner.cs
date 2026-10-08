@@ -5,6 +5,7 @@ namespace DotBoxD.UI.Runtime;
 internal sealed class UiRendererOwner(IUiRenderer renderer) : IAsyncDisposable
 {
     private IUiRenderer? _renderer = renderer;
+    public IUiRenderer? Renderer => Volatile.Read(ref _renderer);
 
     public ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken token)
         => _renderer!.MaterializeAsync(package, values, token);

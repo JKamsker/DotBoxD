@@ -1,0 +1,29 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.UI.Blazor
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+protected override async Task OnParametersSetAsync()
+protected override void BuildRenderTree(RenderTreeBuilder builder)
+public async ValueTask AcknowledgeAsync(UiInput input, CancellationToken cancellationToken)
+public async ValueTask DisposeAsync()
+public async ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
+public async ValueTask<bool> SubmitAsync(UiSession session, UiInput input, ClaimsPrincipal user, IUiInteractionAuthorizer authorizer, CancellationToken cancellationToken = default)
+public BlazorUiRenderer(UiPolicy? inputPolicy = null, int inputCapacity = 128)
+public BlazorUiSnapshot? Snapshot { get; }
+public bool DisposeSessionOnDetach { get; set; } = true
+public bool IsDisposed { get { lock (_sync) { return _disposed; } } }
+public ClaimsPrincipal User { get; set; } = new()
+public IDisposable Subscribe(Func<Task> changed)
+public int Materializations { get; private set; }
+public int Updates { get; private set; }
+public interface IUiInteractionAuthorizer
+public IUiInteractionAuthorizer? Authorizer { get; set; }
+public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
+public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
+public sealed record BlazorUiSnapshot( UiPackage Package, ImmutableDictionary<int, UiNode> Nodes, ImmutableDictionary<(int Node, UiPropertyId Property), UiValue> Values)
+public string? LastInteractionError { get; private set; }
+public UiRendererCapabilities Capabilities => UiRendererCapabilities.Core
+public UiSession? Session { get; set; }
+public UiValue? Get(int nodeId, UiPropertyId property) => Values.GetValueOrDefault((nodeId, property))
+public ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
+public ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken) => _inputs.Reader.ReadAsync(cancellationToken)
