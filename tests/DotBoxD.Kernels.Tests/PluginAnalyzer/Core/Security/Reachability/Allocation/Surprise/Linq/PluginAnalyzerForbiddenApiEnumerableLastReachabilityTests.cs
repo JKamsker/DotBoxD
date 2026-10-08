@@ -32,6 +32,27 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableLastReachabilityTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Reports_predicate_method_group_in_reachable_event_handler()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("""
+                Func<IEnumerable<int>, Func<int, bool>, int> last = Enumerable.Last;
+                try
+                {
+                    return last(Retained, static _ => false) > 0;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                """),
+            "DotBoxDPluginAnalyzerEnumerableLastMethodGroupReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.Last", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
     private static string Source(string body)
         => $$"""
             #nullable enable

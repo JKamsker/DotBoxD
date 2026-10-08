@@ -177,11 +177,9 @@ public sealed partial class PluginAnalyzer
         ISymbol? symbol,
         out string forbidden)
     {
-        if (symbol is IMethodSymbol method &&
-            method.ContainingType is { } containingType)
+        if (symbol is IMethodSymbol method)
         {
-            var displayName = ForbiddenMemberContainingTypeName(containingType) + "." + method.Name;
-            if (ForbiddenApiNamePolicy.TryGetForbiddenExactMemberDisplayName(displayName, out forbidden))
+            if (ForbiddenApiNamePolicy.TryGetForbiddenExactMemberDisplayName(method, out forbidden))
             {
                 return true;
             }
@@ -190,12 +188,6 @@ public sealed partial class PluginAnalyzer
         forbidden = null!;
         return false;
     }
-
-    private static string ForbiddenMemberContainingTypeName(INamedTypeSymbol containingType)
-        => containingType.SpecialType == SpecialType.System_String
-            ? "System.String"
-            : containingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-
     private static bool TryGetForbiddenNondeterministicMethod(
         IMethodSymbol method,
         out ITypeSymbol forbidden)
