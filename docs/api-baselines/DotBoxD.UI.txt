@@ -145,6 +145,7 @@ public UiBoundKernel<TOutput> Kernel<TOutput>(UiKernelDefinition<UiUnit, TOutput
 public UiElement Border(UiElement child, double padding = 0)
 public UiElement Button<T>(string label, UiBoundKernel<T> handler, UiState<T> output)
 public UiElement CheckBox(string label, UiState<bool> value)
+public UiElement Configure(UiElement element, ImmutableArray<UiProperty> properties)
 public UiElement Element(UiPrimitive primitive, ImmutableArray<UiProperty> properties, params UiElement[] children)
 public UiElement Extension(string schemaId, string payloadJson)
 public UiElement Grid(int columns, params UiElement[] children)

@@ -47,13 +47,23 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var attribute = context.Attributes[0];
         var path = attribute.ConstructorArguments[0].Value as string ?? "";
         var skip = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false) ||
-            type.GetMembers("Render").OfType<IMethodSymbol>().Any(m => m.Parameters.Length == 1 &&
-                m.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder");
+            HasHandwrittenRender(type, context.SemanticModel.Compilation);
         var valid = !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
             type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is ClassDeclarationSyntax c && c.Modifiers.Any(SyntaxKind.PartialKeyword));
         return new Component(type.ToDisplayString(), type.Name,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             string.Join(" ", syntax.Modifiers.Select(m => m.Text)), path, syntax.SyntaxTree.FilePath, skip, valid);
+    }
+
+    private static bool HasHandwrittenRender(INamedTypeSymbol type, Compilation compilation)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (current.GetMembers("Render").OfType<IMethodSymbol>().Any(m => m.Parameters.Length == 1 &&
+                m.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder" && compilation.IsSymbolAccessibleWithin(m, type)))
+            { return true; }
+        }
+        return false;
     }
 
     private static Output Generate(Component component, EquatableArray<RazorFile> files, CancellationToken token)

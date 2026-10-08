@@ -59,6 +59,26 @@ public sealed class UiRazorAuthoringTests
         Assert.Equal("host.icon", Assert.Single(package.Resources).Handle);
     }
 
+    [Fact]
+    public void Grid_uses_shared_automatic_cell_placement_and_preserves_semantic_parent_properties()
+    {
+        var package = Package(markup: """
+            <UiGrid Columns="2" Enabled="false">
+                <UiText Text="A" />
+                <UiText Text="B" />
+                <UiText Text="C" />
+            </UiGrid>
+            """);
+        var builder = new global::DotBoxD.UI.Authoring.UiBuilder();
+        var grid = builder.Grid(2, builder.Text("A"), builder.Text("B"), builder.Text("C"));
+        builder.Configure(grid, [new(UiPropertyId.Enabled, UiValue.FromBoolean(false))]);
+        Assert.Equal(UiPackageJson.ComputeHash(builder.Build(grid), new UiPolicy()), UiPackageJson.ComputeHash(package, new UiPolicy()));
+        Assert.Equal(new[] { 0, 0, 1 }, package.Nodes.Where(n => n.Primitive == UiPrimitive.Text)
+            .Select(n => n.Properties.Single(p => p.Id == UiPropertyId.Row).Literal!.Integer));
+        Assert.Equal(new[] { 0, 1, 0 }, package.Nodes.Where(n => n.Primitive == UiPrimitive.Text)
+            .Select(n => n.Properties.Single(p => p.Id == UiPropertyId.Column).Literal!.Integer));
+    }
+
     [Theory]
     [InlineData("@state bool flag = -true;\n<UiText />")]
     [InlineData("<UiText Enabled=\"@Ui.TwoWay(flag)\" />")]
@@ -102,6 +122,31 @@ public sealed class UiRazorAuthoringTests
         var result = Generate(source, "<escape />");
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
         Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("public", true)]
+    [InlineData("protected", true)]
+    [InlineData("private", false)]
+    public void Accessible_inherited_handwritten_Render_wins_while_private_members_allow_generation(string accessibility, bool inherited)
+    {
+        var source = Component.Replace("[UiRazorComponent(\"Counter.ui.razor\")]", "", StringComparison.Ordinal)
+            .Replace("public partial class Counter", "public class Base { " + accessibility +
+                " UiElement Render(UiBuilder builder) => builder.Text(\"manual\"); } " +
+                "[UiRazorComponent(\"Counter.ui.razor\")] public partial class Counter : Base", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning));
+        Assert.Equal(inherited ? 0 : 1, result.Result.GeneratedTrees.Count(t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal)));
+        if (inherited)
+        { Assert.Equal("manual", Assert.Single(Package(source).Nodes).Properties[0].Literal!.Text); }
+    }
+
+    [Fact]
+    public void Escaped_at_signs_are_literal_text_and_do_not_become_expressions()
+    {
+        var package = Package(markup: """<UiText Text="@@Ui.Bind(count)" />""");
+        Assert.Equal("@Ui.Bind(count)", Assert.Single(package.Nodes).Properties[0].Literal!.Text);
     }
 
     [Fact]

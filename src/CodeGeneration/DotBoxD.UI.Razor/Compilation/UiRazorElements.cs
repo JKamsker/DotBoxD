@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Xml.Linq;
 
 namespace DotBoxD.UI.Razor;
@@ -54,10 +56,28 @@ internal static class UiRazorElements
         var maximum = MaximumChildren(primitive);
         if (children.Length > maximum)
         { throw new NotSupportedException("Unsupported children on " + tag + "; UiItems uses bounded keyed state, not arbitrary foreach templates."); }
-        var element = "builder.Element(global::DotBoxD.UI.UiPrimitive." + primitive + ", [" + string.Join(", ", properties) + "]" +
-            (children.Length == 0 ? "" : ", " + string.Join(", ", children.Select(c => Render(c, expressions, token)))) + ")";
+        var renderedChildren = children.Select(c => Render(c, expressions, token)).ToArray();
+        var element = primitive == "Grid" ? Grid(node, properties, renderedChildren)
+            : "builder.Element(global::DotBoxD.UI.UiPrimitive." + primitive + ", [" + string.Join(", ", properties) + "]" +
+                (renderedChildren.Length == 0 ? "" : ", " + string.Join(", ", renderedChildren)) + ")";
         return click is null ? element : expressions.Event(element, click);
     }
+
+    private static string Grid(XElement node, List<string> properties, string[] children)
+    {
+        var columns = node.Attribute("Columns")?.Value ?? "1";
+        if (columns.StartsWith("@", StringComparison.Ordinal))
+        {
+            if (node.Elements().Any(c => c.Attribute("Row") is null || c.Attribute("Column") is null))
+            { throw new NotSupportedException("Bound grid columns require explicit Row and Column on each child. Use literal Columns for automatic placement, or hand-write UiBuilder composition."); }
+            return "builder.Element(global::DotBoxD.UI.UiPrimitive.Grid, [" + string.Join(", ", properties) + "]" + Arguments(children) + ")";
+        }
+        if (SyntaxFactory.ParseExpression(columns) is not LiteralExpressionSyntax { Token.Value: int count } || count is < 1 or > 64)
+        { throw new NotSupportedException("Grid Columns must be an integer literal from 1 to 64, or a binding with explicit child positions."); }
+        return "builder.Configure(builder.Grid(" + columns + Arguments(children) + "), [" + string.Join(", ", properties) + "])";
+    }
+
+    private static string Arguments(string[] children) => children.Length == 0 ? "" : ", " + string.Join(", ", children);
 
     private static int MaximumChildren(string primitive) => primitive switch
     { "Stack" or "Grid" => 1_000, "Border" or "ScrollViewer" => 1, _ => 0 };

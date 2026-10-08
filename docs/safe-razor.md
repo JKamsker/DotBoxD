@@ -71,8 +71,11 @@ C# belongs in a separately declared `[UiRemoteHandler]` method and explicitly re
 Use one well-formed root and explicitly quoted attributes. Supported properties are `Text`, `Enabled`,
 `Visible`, `Checked`, `Value`, `Maximum`, `Items`, `Horizontal`, `Spacing`, `Columns`, `Row`, `Column`,
 `Padding`, and `Resource`, restricted to their corresponding primitive. Text literals are escaped
-by each renderer. Source is bounded to 256 KiB, 2,000 nodes and 64 levels; host policy can impose
-smaller package/materialization limits. Composition remains subject to host validation.
+by each renderer; start a literal with `@@` to render a leading `@`. Source is bounded to 256 KiB, 2,000 nodes and 64 levels; host policy can impose
+smaller package/materialization limits. Composition remains subject to host validation. Literal grid
+columns use the same automatic cell placement as `UiBuilder.Grid`; bound columns require explicit
+`Row` and `Column` on every child. `UiBuilder.Configure` overlays construction-time semantic properties
+while retaining node IDs and event routes, so this generated composition can also be handwritten.
 
 This is a closed authoring grammar. Normal Razor directives, `@code`, inline arbitrary expressions,
 raw HTML, JS, CSS, CLR component resolution, RenderFragment/RenderTreeBuilder values, DI, HttpContext,
@@ -81,7 +84,7 @@ auth mutation, reflection, browser storage, attribute splatting, arbitrary event
 expressions in annotated scalar C# methods; use `UiWhen` for conditional visibility and `UiItems` for
 bounded keyed collections. Hand-write worker-side `Render(UiBuilder)` for custom composition.
 
-Generation is opt-in through `[UiRazorComponent]`. A hand-written `Render(UiBuilder)` wins; set
+Generation is opt-in through `[UiRazorComponent]`. A hand-written `Render(UiBuilder)`, including an accessible inherited implementation, wins; set
 `GenerateRender=false` to disable only rendering generation while retaining local-kernel/remote-endpoint
 facets. Their existing `GenerateKernel` and `GenerateEndpoint` flags remain independent. Removing
 attributes and hand-writing public builder/kernel APIs gives the same package hash and semantics;

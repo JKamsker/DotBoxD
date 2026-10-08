@@ -65,6 +65,8 @@ internal sealed class UiRazorExpressions
 
     public string Property(string text, string type)
     {
+        if (IsEscapedText(text, type))
+        { return "global::DotBoxD.UI.Authoring.UiLiteral.Text(" + SymbolDisplay.FormatLiteral(text.Substring(1), quote: true) + ")"; }
         if (!text.StartsWith("@", StringComparison.Ordinal))
         { return "global::DotBoxD.UI.Authoring.UiLiteral." + LiteralFactory(type) + "(" + AttributeLiteral(text, type) + ")"; }
         var expression = text.Substring(1);
@@ -163,6 +165,9 @@ internal sealed class UiRazorExpressions
         "double" => literal.Token.Value is int or double,
         _ => false
     };
+
+    private static bool IsEscapedText(string text, string type)
+        => type == "string" && text.StartsWith("@@", StringComparison.Ordinal);
 
     private static string AttributeLiteral(string text, string type)
         => type == "string" ? SymbolDisplay.FormatLiteral(text, quote: true) : Literal(text, type);

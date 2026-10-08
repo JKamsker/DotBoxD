@@ -49,6 +49,18 @@ public sealed class UiBuilder
         return new UiElement(id, _elementOwner);
     }
 
+    /// <summary>Overlays construction-time properties without changing node identity or event routes.</summary>
+    public UiElement Configure(UiElement element, ImmutableArray<UiProperty> properties)
+    {
+        ValidateElement(element, nameof(element));
+        if (properties.IsDefault || properties.Any(p => p is null) || properties.Select(p => p.Id).Distinct().Count() != properties.Length)
+        { throw new ArgumentException("Properties must be present, non-null and unique.", nameof(properties)); }
+        var node = _nodes[element.Id - 1];
+        var replacements = properties.Select(p => p.Id).ToHashSet();
+        _nodes[element.Id - 1] = node with { Properties = [.. node.Properties.Where(p => !replacements.Contains(p.Id)), .. properties] };
+        return element;
+    }
+
     private void ValidateChildren(UiElement[] children)
     {
         ArgumentNullException.ThrowIfNull(children);
