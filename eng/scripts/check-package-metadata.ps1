@@ -45,6 +45,18 @@ $expectedLicenseExpression = "MIT"
 $expectedRepositoryUrl = "https://github.com/JKamsker/DotBoxD"
 $expectedRepositoryType = "git"
 $expectedPackageMetadata = @{
+    "DotBoxD.UI.Avalonia" = @{
+        Description = "Trusted Avalonia rendering and bounded semantic input for sandbox UI packages."
+        Tags = @("dotboxd", "sandbox", "ui", "avalonia")
+    }
+    "DotBoxD.UI" = @{
+        Description = "Renderer-neutral, bounded sandbox UI packages and validation."
+        Tags = @("dotboxd", "sandbox", "ui", "schema")
+    }
+    "DotBoxD.UI.Runtime" = @{
+        Description = "Trusted sandbox UI sessions, kernel execution and versioned remote events."
+        Tags = @("dotboxd", "sandbox", "ui", "hosting")
+    }
     "DotBoxD.Kernels" = @{
         Description = "Core DotBoxD.Kernels model, policy, resource metering, diagnostics, and canonical hashing primitives."
         Tags = @("dotboxd", "core", "policy", "resources", "hashing")
@@ -376,6 +388,9 @@ function AssertSymbolPackage(
 }
 
 $expectedIds = [string[]] @(
+    "DotBoxD.UI.Avalonia",
+    "DotBoxD.UI",
+    "DotBoxD.UI.Runtime",
     "DotBoxD.Kernels",
     "DotBoxD.Kernels.Validation",
     "DotBoxD.Kernels.Runtime",

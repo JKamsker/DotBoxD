@@ -28,7 +28,7 @@ public sealed class LoweringFailClosedInvariantTests
     ];
 
     [Fact]
-    public void Lowering_diagnostic_catalog_entries_are_documented_DBXK_rules()
+    public void Lowering_diagnostic_catalog_entries_are_documented_DBXK_or_DBXU_rules()
     {
         var entries = LoweringDiagnosticCatalog.Entries;
         Assert.NotEmpty(entries);
@@ -43,7 +43,7 @@ public sealed class LoweringFailClosedInvariantTests
         var releaseText = AnalyzerReleaseText();
         foreach (var entry in entries)
         {
-            Assert.StartsWith("DBXK", entry.Descriptor.Id, StringComparison.Ordinal);
+            Assert.Matches("^DBX[KU][0-9]{3}$", entry.Descriptor.Id);
             Assert.False(string.IsNullOrWhiteSpace(entry.Surface));
             Assert.False(string.IsNullOrWhiteSpace(entry.FactoryTypeName));
             Assert.False(string.IsNullOrWhiteSpace(entry.FailureRoute));

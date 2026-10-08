@@ -7,6 +7,14 @@ namespace DotBoxD.Architecture.Tests;
 /// </summary>
 public sealed class LayeringTests
 {
+    [Fact]
+    public void Ui_model_is_renderer_neutral_and_does_not_depend_on_hosting()
+        => AssertNoDependency("DotBoxD.UI", "DotBoxD.Hosting", "DotBoxD.UI.Runtime", "DotBoxD.Services", "Avalonia.Controls");
+
+    [Fact]
+    public void Ui_runtime_does_not_depend_on_a_renderer_or_plugin_implementation()
+        => AssertNoDependency("DotBoxD.UI.Runtime", "Avalonia.Controls", "Examples.SandboxedUi.Plugin");
+
     private static void AssertNoDependency(string assemblyName, params string[] forbidden)
     {
         var assembly = ArchTestSupport.Load(assemblyName);

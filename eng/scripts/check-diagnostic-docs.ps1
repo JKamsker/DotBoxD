@@ -7,6 +7,7 @@ $referencePath = Join-Path $root "docs-site/src/content/docs/reference/diagnosti
 $sourcePaths = @(
     "src/CodeGeneration/DotBoxD.Services.SourceGenerator/EntryPoint/DotBoxDRpcGenerator.cs",
     "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs",
+    "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/UI/UiHandlerGenerator.cs",
     "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzerDiagnostics.cs",
     "src/Hosting/DotBoxD.Plugins/Runtime/Diagnostics/PluginDiagnosticCodes.cs"
 )
@@ -15,7 +16,7 @@ $reference = Get-Content -LiteralPath $referencePath -Raw -Encoding utf8
 $codes = @(
     foreach ($relativePath in $sourcePaths) {
         $source = Get-Content -LiteralPath (Join-Path $root $relativePath) -Raw -Encoding utf8
-        foreach ($match in [regex]::Matches($source, '"(?<code>DBX[SK][0-9]{3})"')) {
+        foreach ($match in [regex]::Matches($source, '"(?<code>DBX[SKU][0-9]{3})"')) {
             $match.Groups["code"].Value
         }
     }
@@ -50,4 +51,4 @@ foreach ($column in $requiredColumns) {
     }
 }
 
-Write-Host "Diagnostics reference covers all $($codes.Count) production DBXS/DBXK codes."
+Write-Host "Diagnostics reference covers all $($codes.Count) production DBXS/DBXK/DBXU codes."

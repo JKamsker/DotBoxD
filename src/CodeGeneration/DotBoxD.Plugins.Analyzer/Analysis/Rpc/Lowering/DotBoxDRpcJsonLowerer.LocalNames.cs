@@ -6,6 +6,69 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private string LowerBinaryOperands(
+        BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower, bool concatenate = false)
+    {
+        var left = lower(binary.Left);
+        var prelude = new List<string>();
+        var right = LowerOperandWithPrelude(binary.Right, lower, prelude);
+        if (prelude.Count > 0)
+        {
+            if (binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression)
+            {
+                throw new NotSupportedException(
+                    "Short-circuit operands requiring generated argument temporaries are unsupported; use explicit if statements to guard the call.");
+            }
+
+            left = PreserveEarlierOperand(left, prelude);
+        }
+
+        return concatenate ? Call("string.concatBudgeted", null, left, right)
+            : BinaryJson(JsonBinaryOperator(binary), left, right);
+    }
+
+    private string LowerReceiverCall(
+        string bindingId, ExpressionSyntax receiver, ExpressionSyntax argument, ITypeSymbol argumentType, string description)
+    {
+        var earlier = LowerExpression(receiver);
+        var prelude = new List<string>();
+        var later = LowerOperandWithPrelude(argument,
+            expression => LowerRequiredExpression(expression, argumentType, description), prelude);
+        return Call(bindingId, null, PreserveEarlierOperand(earlier, prelude), later);
+    }
+
+    private string PreserveEarlierOperand(string earlier, List<string> laterPrelude)
+    {
+        if (laterPrelude.Count == 0)
+        {
+            return earlier;
+        }
+
+        var local = ReserveGeneratedLocal("__sir_left");
+        AddExpressionPrelude(SetStatement(local, earlier));
+        foreach (var statement in laterPrelude)
+        {
+            AddExpressionPrelude(statement);
+        }
+
+        return Var(local);
+    }
+
+    private string LowerOperandWithPrelude(
+        ExpressionSyntax expression, Func<ExpressionSyntax, string> lower, List<string> prelude)
+    {
+        var previous = _expressionPrelude;
+        _expressionPrelude = prelude;
+        try
+        {
+            return lower(expression);
+        }
+        finally
+        {
+            _expressionPrelude = previous;
+        }
+    }
+
     internal string LowerExpressionWithPrelude(ExpressionSyntax expression, List<string> output)
     {
         var previous = _expressionPrelude;

@@ -79,6 +79,12 @@ jobs:
           dotnet publish samples/AotSmoke/DotBoxD.AotSmoke.csproj -c Release -r linux-x64 -o artifacts/aot-smoke
           ./artifacts/aot-smoke/DotBoxD.AotSmoke
 
+      - name: Sandboxed UI process-boundary idle-crash and reconnect smoke
+        shell: pwsh
+        run: |
+          dotnet samples/SandboxedUi/Host/bin/Release/net10.0/Examples.SandboxedUi.Host.dll samples/SandboxedUi/Plugin/bin/Release/net10.0/Examples.SandboxedUi.Plugin.dll
+          if ($LASTEXITCODE -ne 0) { throw "Sandboxed UI smoke failed." }
+
       - name: GameServer example smoke
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -114,6 +120,7 @@ jobs:
           - os: ubuntu-latest
             suite: integration-smoke
             projects: |
+              tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -145,6 +152,7 @@ jobs:
           - os: windows-latest
             suite: integration-smoke
             projects: |
+              tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj
               tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
@@ -324,6 +332,20 @@ jobs:
       - name: Build
         run: dotnet build DotBoxD.slnx -c Release --no-restore
 
+      - name: Avalonia required input and lifecycle tests
+        shell: pwsh
+        run: |
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj `
+            -Configuration Release `
+            -NoBuild `
+            -RequiredFullyQualifiedNameContains @("AvaloniaRendererTests", "AvaloniaInputLifecycleTests",
+              "Sparse_and_state_bound_grid_rows_have_matching_definitions",
+              "Oversized_text_edit_is_rejected_without_closing_session_and_valid_edit_recovers",
+              "Earlier_input_echoes_preserve_newer_native_edits",
+              "Connection_close_and_host_shutdown_release_idle_sessions",
+              "Connection_owner_observes_async_session_cleanup_failures")
+
       - name: Security-boundary required tests
         shell: pwsh
         run: |
@@ -411,6 +433,66 @@ jobs:
               "WorkerResultHardeningTests",
               "Fix_CI_0001_Tests",
               "JsonApiSurfaceTests",
+              "UiPackageValidationTests",
+              "UiPackageJsonTests",
+              "Canonical_kernel_expansion_obeys_the_independent_byte_limit",
+              "Canonical_kernel_at_the_exact_byte_limit_roundtrips_and_revalidates",
+              "Canonical_package_expansion_obeys_the_complete_package_byte_limit",
+              "Canonical_package_at_the_exact_byte_limit_roundtrips_and_revalidates",
+              "UiSessionTests",
+              "UiConcurrencyTests",
+              "UiLifecycleTests",
+              "Renderer_failure_closes_admission_before_queued_operations_can_enter",
+              "UiAuthoringTests",
+              "UiCollectionTests",
+              "Keyed_rows_obey_the_independent_child_limit_before_install",
+              "Keyed_rows_obey_the_independent_child_limit_before_patch_commit",
+              "Null_items_properties_report_validation_errors_for_objects_and_wire",
+              "File_local_handler_containers_have_actionable_diagnostics",
+              "Handwritten_facets_do_not_require_generation_container_shapes",
+              "Individual_facets_can_be_disabled_and_user_members_win",
+              "Unused_kernels_still_require_a_supported_scalar_result",
+              "Cancellation_during_remote_reply_gate_wait_obeys_deadline_and_caller_lifetime",
+              "Cancelled_remote_dispatch_releases_admission_before_unrelated_rendering_finishes",
+              "Accessible_inherited_handwritten_facets_win_while_private_members_allow_generation",
+              "User_defined_scalar_return_conversions_fail_closed_for_expression_and_block_bodies",
+              "Built_in_numeric_return_conversions_execute_for_expression_and_block_bodies",
+              "Nonlocal_handler_writes_fail_closed_at_compile_time",
+              "Local_parameter_and_discard_writes_keep_their_execution_semantics",
+              "Narrowing_compound_handler_writes_fail_closed_at_compile_time",
+              "Widening_compound_handler_writes_preserve_numeric_execution",
+              "Input_acknowledgement_failure_closes_queued_admission_and_releases_renderer",
+              "Mutable_collection_aliases_fail_closed_at_compile_time",
+              "Using_declarations_fail_closed_in_every_handler_scope",
+              "Distinct_scoped_locals_with_same_name_fail_closed_before_installation",
+              "Unaliased_mutation_and_ordinary_value_locals_preserve_execution",
+              "Reference_and_user_defined_equality_fail_closed_at_compile_time",
+              "Scalar_equality_preserves_execution_in_both_kernel_modes",
+              "Short_circuit_operands_requiring_temporaries_fail_closed_at_compile_time",
+              "Explicit_guards_and_simple_lazy_operands_preserve_both_kernel_modes",
+              "Eager_operands_preserve_native_host_call_order_in_both_kernel_modes",
+              "Earlier_operand_failure_prevents_later_host_calls",
+              "Collection_receivers_precede_index_temporaries",
+              "Failed_collection_receivers_prevent_index_host_calls",
+              "Decimal_wire_equality_fails_closed_at_compile_time",
+              "Framework_wire_comparisons_without_scalar_identity_fail_closed",
+              "Unsigned_enum_ordering_fails_closed_at_compile_time",
+              "Enum_equality_and_signed_ordering_preserve_both_kernel_modes",
+              "User_defined_operator_operand_conversions_fail_closed",
+              "Built_in_operator_operand_widening_preserves_both_kernel_modes",
+              "Opaque_or_overlapping_DTO_storage_fails_closed_during_generation",
+              "Source_visible_fields_preserve_execution_in_both_kernel_modes",
+              "Live_settings_fail_closed_in_UI_handlers_and_inlined_helpers",
+              "Parameters_named_like_live_settings_preserve_both_kernel_modes",
+              "Unsupported_host_receivers_and_scoped_handles_fail_closed",
+              "Explicit_host_arguments_preserve_capture_and_both_kernel_modes",
+              "Enum_arithmetic_requiring_underlying_width_conversion_fails_closed",
+              "Enum_comparisons_and_matching_width_arithmetic_preserve_both_modes",
+              "Unused_handler_parameters_never_collide_with_generated_locals",
+              "Both_kernel_modes_use_ordinary_validation_and_metering",
+              "Nontrivial_DTO_construction_and_accessors_fail_closed",
+              "Plain_stored_DTOs_preserve_native_execution_in_both_modes",
+              "Unsupported_operator_semantics_fail_closed_during_generation",
               "PublicModelImmutabilityTests",
               "PluginPackageJsonTests",
               "PluginPackageValidationTests",
