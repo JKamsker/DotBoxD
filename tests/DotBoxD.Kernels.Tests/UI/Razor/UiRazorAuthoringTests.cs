@@ -142,11 +142,67 @@ public sealed class UiRazorAuthoringTests
         { Assert.Equal("manual", Assert.Single(Package(source).Nodes).Properties[0].Literal!.Text); }
     }
 
+    [Theory]
+    [InlineData("Render<T>(UiBuilder builder)")]
+    [InlineData("Render(ref UiBuilder builder)")]
+    [InlineData("Render(in UiBuilder builder)")]
+    public void Distinct_Render_overloads_preserve_nongeneric_value_parameter_generation(string signature)
+    {
+        var source = Component.Replace("[UiLocalHandler] public static int Increment",
+            "public UiElement " + signature + " => builder.Text(\"helper\"); [UiLocalHandler] public static int Increment", StringComparison.Ordinal);
+        var package = Package(source, "<UiText Text=\"generated\" />");
+        Assert.Equal("generated", Assert.Single(package.Nodes).Properties[0].Literal!.Text);
+    }
+
     [Fact]
     public void Escaped_at_signs_are_literal_text_and_do_not_become_expressions()
     {
         var package = Package(markup: """<UiText Text="@@Ui.Bind(count)" />""");
         Assert.Equal("@Ui.Bind(count)", Assert.Single(package.Nodes).Properties[0].Literal!.Text);
+    }
+
+    [Theory]
+    [InlineData("Use @key=Key for identity", "Use @key=Key for identity")]
+    [InlineData("@@key=value", "@key=value")]
+    public void Key_attribute_normalization_preserves_literal_text(string markupText, string expected)
+    {
+        var package = Package(markup: "<UiText Text=\"" + markupText + "\" />");
+        Assert.Equal(expected, Assert.Single(package.Nodes).Properties[0].Literal!.Text);
+    }
+
+    [Fact]
+    public void Escaped_class_and_namespace_identifiers_generate_compilable_public_Render()
+    {
+        var source = "namespace @namespace;\n" + Component.Replace("class Counter", "class @event", StringComparison.Ordinal)
+            .Replace("new Counter()", "new @event()", StringComparison.Ordinal);
+        var generated = Generate(source, "<UiText Text=\"escaped\" />");
+        Assert.Empty(generated.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        var type = Authoring.UiGeneratorFixture.Emit(generated.Output).GetType("namespace.event")!;
+        var package = (UiPackage)type.GetMethod("Package")!.Invoke(null, null)!;
+        Assert.Equal("escaped", Assert.Single(package.Nodes).Properties[0].Literal!.Text);
+    }
+
+    [Theory]
+    [InlineData("-2147483648")]
+    [InlineData("-2_147_483_648")]
+    public void Minimum_Int32_literal_has_the_same_value_as_public_builder_state(string literal)
+    {
+        var package = Package(markup: "@state int minimum = " + literal + ";\n<UiText />");
+        Assert.Equal(int.MinValue, Assert.Single(package.State).InitialValue.Integer);
+    }
+
+    [Theory]
+    [InlineData("@state int count = 42;")]
+    [InlineData("@kernel increment = Ui.Bind(Increment);")]
+    [InlineData("@resource icon = &quot;host.icon&quot;;")]
+    public void Directive_like_lines_inside_multiline_attributes_remain_literal_text(string line)
+    {
+        var package = Package(markup: "<UiText Text=\"start\n" + line + "\nend\" />");
+        Assert.Equal("start " + line.Replace("&quot;", "\"", StringComparison.Ordinal) + " end",
+            Assert.Single(package.Nodes).Properties[0].Literal!.Text);
+        Assert.Empty(package.State);
+        Assert.Empty(package.Kernels);
+        Assert.Empty(package.Resources);
     }
 
     [Fact]

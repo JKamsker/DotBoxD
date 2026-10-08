@@ -152,16 +152,20 @@ internal sealed class UiRazorExpressions
         { throw new NotSupportedException("Only numeric literals can be negated; boolean and string state use typed literals."); }
         var value = syntax is PrefixUnaryExpressionSyntax prefix && prefix.IsKind(SyntaxKind.UnaryMinusExpression)
             ? prefix.Operand : syntax;
-        if (syntax.ContainsDiagnostics || value is not LiteralExpressionSyntax literal || !Matches(literal, type))
+        if (syntax.ContainsDiagnostics || value is not LiteralExpressionSyntax literal || !Matches(literal, syntax, type))
         { throw new NotSupportedException("Initial state and literal properties require finite typed literals; use a restricted kernel for computed values."); }
         return type == "double" ? "(double)(" + text + ")" : text;
     }
 
-    private static bool Matches(LiteralExpressionSyntax literal, string type) => type switch
+    private static bool IsMinimumInt32(ExpressionSyntax syntax, LiteralExpressionSyntax literal)
+        => syntax.IsKind(SyntaxKind.UnaryMinusExpression) &&
+            literal.Token.Value is uint && literal.Token.Text.Replace("_", "") == "2147483648";
+
+    private static bool Matches(LiteralExpressionSyntax literal, ExpressionSyntax syntax, string type) => type switch
     {
         "string" => literal.IsKind(SyntaxKind.StringLiteralExpression),
         "bool" => literal.IsKind(SyntaxKind.TrueLiteralExpression) || literal.IsKind(SyntaxKind.FalseLiteralExpression),
-        "int" => literal.Token.Value is int,
+        "int" => literal.Token.Value is int || IsMinimumInt32(syntax, literal),
         "double" => literal.Token.Value is int or double,
         _ => false
     };

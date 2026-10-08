@@ -46,7 +46,7 @@ public partial class Counter
 </UiVertical>
 ```
 
-State declarations initialize `int`, `bool`, `double`, `string`, or `items` slots with literals;
+Declarations precede the markup root. State declarations initialize `int`, `bool`, `double`, `string`, or `items` slots with literals;
 `items` starts with `[]` and carries shared `UiListItem` values in bounded patches. Kernel declarations
 bind a `[UiLocalHandler]` method to zero or one scalar state input. These methods go through the
 existing DotBoxD C# lowerer and runtime verifier, with the same host capabilities and effects.

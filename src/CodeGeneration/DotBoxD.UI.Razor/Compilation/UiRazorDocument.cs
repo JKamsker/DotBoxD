@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -6,6 +7,10 @@ namespace DotBoxD.UI.Razor;
 
 internal static class UiRazorDocument
 {
+    // Consume quoted values unchanged so Razor's attribute spelling cannot alter literal text.
+    private static readonly Regex KeyAttributes = new("\"[^\"]*\"|'[^']*'|(?<=\\s)@key(?=\\s*=)",
+        RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
     public static string Compile(string text, CancellationToken token)
     {
         if (text.Length > 262_144)
@@ -13,10 +18,13 @@ internal static class UiRazorDocument
         var statements = new StringBuilder();
         var markup = new StringBuilder();
         var expressions = new UiRazorExpressions();
+        var inMarkup = false;
         foreach (var line in text.Split('\n'))
         {
             token.ThrowIfCancellationRequested();
             var trimmed = line.Trim();
+            if (inMarkup)
+            { markup.AppendLine(line); continue; }
             if (trimmed.StartsWith("@state ", StringComparison.Ordinal))
             { statements.AppendLine(expressions.State(trimmed.Substring(7))); }
             else if (trimmed.StartsWith("@kernel ", StringComparison.Ordinal))
@@ -24,12 +32,13 @@ internal static class UiRazorDocument
             else if (trimmed.StartsWith("@resource ", StringComparison.Ordinal))
             { statements.AppendLine(expressions.Resource(trimmed.Substring(10))); }
             else
-            { markup.AppendLine(line); }
+            { markup.AppendLine(line); inMarkup = trimmed.Length > 0; }
         }
         XElement root;
         try
         {
-            using var reader = XmlReader.Create(new StringReader(markup.ToString().Replace("@key=", "Key=")),
+            var normalized = KeyAttributes.Replace(markup.ToString(), static match => match.Value[0] == '@' ? "Key" : match.Value);
+            using var reader = XmlReader.Create(new StringReader(normalized),
                 new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 262_144 });
             root = XElement.Load(reader, LoadOptions.SetLineInfo);
         }
