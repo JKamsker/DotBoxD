@@ -160,8 +160,9 @@ public sealed class UiSession : IAsyncDisposable
         {
             return await transport.DispatchAsync(message, token).AsTask().WaitAsync(token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (caller.IsCancellationRequested)
+        catch when (caller.IsCancellationRequested)
         {
+            caller.ThrowIfCancellationRequested();
             throw;
         }
         catch
