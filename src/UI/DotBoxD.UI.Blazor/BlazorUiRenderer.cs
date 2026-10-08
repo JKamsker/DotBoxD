@@ -11,6 +11,9 @@ namespace DotBoxD.UI.Blazor;
 /// </summary>
 public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
 {
+    private readonly UiExtensionRegistry<IUiBlazorExtension> _extensions;
+    private ImmutableDictionary<int, UiResolvedExtension<IUiBlazorExtension>> _resolved = ImmutableDictionary<int, UiResolvedExtension<IUiBlazorExtension>>.Empty;
+    private readonly UiResourceCatalog _resources;
     private readonly object _sync = new();
     private readonly Channel<UiInput> _inputs;
     private readonly UiPolicy _inputPolicy;
@@ -23,9 +26,11 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
     private bool _disposed;
     private bool _installed;
 
-    public BlazorUiRenderer(UiPolicy? inputPolicy = null, int inputCapacity = 128)
+    public BlazorUiRenderer(UiPolicy? inputPolicy = null, int inputCapacity = 128, UiResourceCatalog? resources = null, IEnumerable<IUiBlazorExtension>? extensions = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(inputCapacity);
+        _extensions = new UiExtensionRegistry<IUiBlazorExtension>(extensions ?? []);
+        _resources = resources ?? UiResourceCatalog.Empty;
         _inputPolicy = inputPolicy ?? new UiPolicy();
         _inputPolicy.Validate();
         _admission = new BlazorInputAdmission(_inputPolicy);
@@ -33,7 +38,13 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         { FullMode = BoundedChannelFullMode.Wait });
     }
 
-    public UiRendererCapabilities Capabilities => UiRendererCapabilities.Core;
+    public void ValidatePackage(UiPackage package, UiPolicy policy)
+    {
+        _resources.Validate(package, policy);
+        _resolved = _extensions.Resolve(package, policy);
+    }
+
+    public UiRendererCapabilities Capabilities => UiRendererCapabilities.Core with { ExtensionSchemas = _extensions.Schemas };
     public BlazorUiSnapshot? Snapshot
     {
         get
@@ -77,7 +88,8 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
             { throw new InvalidOperationException("A Blazor renderer owns one UI installation."); }
             _installed = true;
             _snapshot = new BlazorUiSnapshot(package, package.Nodes.ToImmutableDictionary(n => n.Id),
-                values.ToImmutableDictionary(v => (v.NodeId, v.PropertyId), v => v.Value));
+                values.ToImmutableDictionary(v => (v.NodeId, v.PropertyId), v => v.Value))
+            { Extensions = _resolved, Images = package.Resources.ToImmutableDictionary(r => r.Id, r => Image(_resources.GetImage(r.Handle))) };
             Materializations++;
         }
         return ValueTask.CompletedTask;
@@ -191,6 +203,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
             { return; }
             _disposed = true;
             _snapshot = null;
+            _resolved = ImmutableDictionary<int, UiResolvedExtension<IUiBlazorExtension>>.Empty;
             _latest.Clear();
             changed = _changed;
             _changed = null;
@@ -203,6 +216,9 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         if (changed is not null)
         { await changed().ConfigureAwait(false); }
     }
+
+    private static BlazorUiImage Image(UiImageResource image) => new(image.Width, image.Height,
+        "data:image/png;base64," + Convert.ToBase64String(image.ToPng()));
 
     private sealed class Subscription(BlazorUiRenderer renderer, Func<Task> changed) : IDisposable
     {

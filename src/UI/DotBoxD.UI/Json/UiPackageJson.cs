@@ -35,6 +35,10 @@ public static class UiPackageJson
             { package = package with { RequiredFeatures = [] }; }
             if (!document.RootElement.TryGetProperty("optionalFeatures", out _))
             { package = package with { OptionalFeatures = [] }; }
+            if (!document.RootElement.TryGetProperty("extensions", out _))
+            { package = package with { Extensions = [] }; }
+            if (!document.RootElement.TryGetProperty("resources", out _))
+            { package = package with { Resources = [] }; }
             UiPackageValidator.Validate(package, policy);
             var normalized = NormalizeKernels(package, policy);
             _ = SerializeBounded(normalized, policy);
@@ -61,6 +65,8 @@ public static class UiPackageJson
             })],
             State = [.. package.State.OrderBy(s => s.Id)],
             Events = [.. package.Events.OrderBy(e => e.Id)],
+            Extensions = [.. package.Extensions.OrderBy(e => e.NodeId)],
+            Resources = [.. package.Resources.OrderBy(r => r.Id)],
             RemoteEndpoints = [.. package.RemoteEndpoints.Order()],
             RequiredFeatures = [.. package.RequiredFeatures.Order()],
             OptionalFeatures = [.. package.OptionalFeatures.Order()]

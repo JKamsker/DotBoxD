@@ -362,7 +362,8 @@ jobs:
             -Configuration Release `
             -NoBuild `
             -RequiredFullyQualifiedNameContains @("BlazorComponentTests", "BlazorSecurityTests",
-              "BlazorInputOrderingTests", "RendererCapabilityTests", "RendererConformanceTests")
+              "BlazorInputOrderingTests", "RendererCapabilityTests", "RendererConformanceTests",
+              "BlazorResourceTests", "BlazorExtensionTests")
 
       - name: Security-boundary required tests
         shell: pwsh
@@ -372,6 +373,8 @@ jobs:
             -Configuration Release `
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
+              "UiRazorAuthoringTests",
+              "UiResourceValidationTests",
               "SafeFileSystemTests",
               "SafeFileSystemWriteTests",
               "SafeFileSystemReparsePointTests",
@@ -993,6 +996,10 @@ jobs:
       - name: Check package consumer smoke
         shell: pwsh
         run: ./eng/scripts/check-package-consumer-smoke.ps1 -PackageDirectory artifacts/packages -Configuration $env:CONFIGURATION
+
+      - name: Check safe Razor package consumer smoke
+        shell: pwsh
+        run: ./eng/scripts/check-ui-razor-package-smoke.ps1 -PackageDirectory artifacts/packages
 
       - name: Check netstandard package consumer smoke
         shell: pwsh

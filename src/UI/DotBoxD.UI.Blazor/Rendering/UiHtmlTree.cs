@@ -11,6 +11,8 @@ internal static class UiHtmlTree
 {
     private static readonly FrozenDictionary<UiPrimitive, string> Tags = new Dictionary<UiPrimitive, string>
     {
+        [UiPrimitive.Extension] = "div",
+        [UiPrimitive.Image] = "img",
         [UiPrimitive.Text] = "span",
         [UiPrimitive.Button] = "button",
         [UiPrimitive.TextBox] = "input",
@@ -43,6 +45,31 @@ internal static class UiHtmlTree
     }
 
     private static void RenderContent(RenderTreeBuilder builder, BlazorUiSnapshot snapshot, UiNode node,
+        object receiver, Func<UiInput, Task> submit, bool enabled)
+    {
+        var nodeId = node.Id;
+        switch (node.Primitive)
+        {
+            case UiPrimitive.Extension:
+                var extension = snapshot.Extensions[nodeId];
+                builder.OpenRegion(22);
+                extension.Schema.Render(builder, extension.Payload);
+                builder.CloseRegion();
+                break;
+            case UiPrimitive.Image:
+                var image = snapshot.Images[snapshot.Get(nodeId, UiPropertyId.Resource)!.Integer];
+                builder.AddAttribute(18, "src", image.Source);
+                builder.AddAttribute(19, "alt", snapshot.Get(nodeId, UiPropertyId.Text)?.Text ?? "");
+                builder.AddAttribute(20, "width", image.Width);
+                builder.AddAttribute(21, "height", image.Height);
+                break;
+            default:
+                RenderCoreContent(builder, snapshot, node, receiver, submit, enabled);
+                break;
+        }
+    }
+
+    private static void RenderCoreContent(RenderTreeBuilder builder, BlazorUiSnapshot snapshot, UiNode node,
         object receiver, Func<UiInput, Task> submit, bool enabled)
     {
         var nodeId = node.Id;

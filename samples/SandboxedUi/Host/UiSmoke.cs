@@ -18,11 +18,12 @@ internal static class UiSmoke
         using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(SampleScoreBinding.Create()));
         var kernelPolicy = SandboxPolicyBuilder.Create().Grant("game.score.read", new Dictionary<string, string>(), SandboxEffect.HostStateRead).Build();
         var host = new UiHost(sandbox, kernelPolicy, new UiPolicy { MaxPackageBytes = 128 * 1024 });
-        var renderer = new AvaloniaUiRenderer();
+        var renderer = new AvaloniaUiRenderer(resources: SampleResources.Images());
         var remote = new SearchTransport(plugin);
         await using var session = await host.InstallAsync(package, renderer, remote, token);
         await using var connection = new UiSessionConnection(peer, session);
         var root = renderer.Root;
+        Require(package.Resources.Length == 1 && package.Nodes.Any(n => n.Primitive == UiPrimitive.Image), "shared host image grant");
         var counter = await session.DispatchAsync(1, token);
         Require(counter.State.Single(s => s.SlotId == 1).Value.Integer == 1 && remote.Calls == 0, "local counter");
         var score = await session.DispatchAsync(3, token);
@@ -53,7 +54,7 @@ internal static class UiSmoke
     {
         using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(SampleScoreBinding.Create()));
         var policy = SandboxPolicyBuilder.Create().Grant("game.score.read", new Dictionary<string, string>(), SandboxEffect.HostStateRead).Build();
-        await using var session = await new UiHost(sandbox, policy).InstallAsync(package, new AvaloniaUiRenderer(), new SearchTransport(plugin), token);
+        await using var session = await new UiHost(sandbox, policy).InstallAsync(package, new AvaloniaUiRenderer(resources: SampleResources.Images()), new SearchTransport(plugin), token);
         await using var connection = new UiSessionConnection(peer, session);
         Require(session.Id != previousId && (await session.DispatchAsync(1, token)).State[0].Value.Integer == 1, "fresh session after crash");
         await RejectOldPatchAsync(session, previousId, token);

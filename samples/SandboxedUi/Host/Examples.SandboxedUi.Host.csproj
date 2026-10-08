@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Shared/SampleResources.cs" Link="Shared/SampleResources.cs" />
     <Compile Include="../Shared/SampleScoreBinding.cs" Link="SampleScoreBinding.cs" />
     <InternalsVisibleTo Include="DotBoxD.UI.Avalonia.Tests" />
     <PackageReference Include="Avalonia.Headless" />

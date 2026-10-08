@@ -16,6 +16,8 @@ public static class UiPackageValidator
         }
 
         var nodes = Index(package.Nodes, policy.MaxNodes, n => n.Id);
+        UiResourceValidator.Validate(package, policy);
+        UiExtensionValidator.Validate(package, policy);
         ValidateFeatures(package.RequiredFeatures);
         ValidateFeatures(package.OptionalFeatures);
         var state = Index(package.State, policy.MaxStateSlots, s => s.Id);

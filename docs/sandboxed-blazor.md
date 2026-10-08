@@ -5,7 +5,7 @@ Interactive Server renderer. It consumes exactly the same `UiPackage`, restricte
 `UiSession`, versioned state, remote endpoints, host bindings, and structural policy as Avalonia.
 The [Blazor host example](../samples/SandboxedUi/BlazorHost) reuses the existing plugin executable.
 Blazor Hybrid can embed the same component with host-managed session/process lifetimes; it has
-no JavaScript bridge. Interactive WebAssembly is outside this milestone.
+no JavaScript bridge. The server owns the authoritative session; arbitrary plugin assemblies are never downloaded to a browser.
 
 ```mermaid
 flowchart LR
@@ -22,10 +22,11 @@ flowchart LR
 The trusted host never loads plugin implementation or Razor component assemblies. Text is escaped
 with Blazor text rendering. Package data cannot supply component types, render fragments, render-tree
 callbacks, tag names, event attribute names, delegates, HTML, CSS, JavaScript, services, DOM handles,
-or resource URLs. Rendering uses fixed host code and bounded numeric layout values. Images and
-resource handles remain deferred with the common v1 schema; unknown primitives fail closed.
-Navigation, uploads/downloads, browser storage, forms, custom CSS, and executable renderer extensions
-are not exposed. Future extensions require a shared schema and explicit trusted host policy.
+or resource URLs. Rendering uses fixed host code and bounded numeric layout values. Images reference
+opaque handles in a host-granted `UiResourceCatalog`; their bytes and pixel counts obey shared policy.
+Trusted renderer extensions use stable schema IDs, explicit host registrations and policy grants.
+Navigation, uploads/downloads, browser storage, forms, custom CSS and executable plugin extensions
+are not exposed by the common schema.
 
 ## Install and attach
 
@@ -85,6 +86,8 @@ without declarations imports as empty declarations.
 | ProgressBar | progress element |
 | ScrollViewer | overflow container |
 | Items | static children or escaped text rows keyed by shared row identity |
+| Image | host-granted pixels encoded as bounded PNG with escaped alternative text |
+| Extension | host-registered schema renderer, independently enabled by policy |
 
 Disabled and hidden nodes, including descendants of disabled/hidden containers, reject semantic
 input inside `UiSession`. This holds even when a browser forges an event for an existing handler.
@@ -121,18 +124,38 @@ HTML escaping and keyed render-tree moves, and cover authorization, malformed in
 input ordering, and cancellation. Both CI platforms run the generated-plugin process smoke with two
 independent viewers, host score binding, idle crash, and reconnect.
 
-## Razor authoring decision
+## Safe Razor authoring
 
-Safe Razor authoring is deferred. This change ships the required renderer and preserves the existing
-C# authoring frontend and its deterministic unsupported-local-code diagnostics. Normal plugin Razor
-components are executable managed code and cannot be loaded by the trusted host. A later safe Razor
-compiler must lower a closed supported syntax to the existing `UiPackage` and existing restricted IR;
-it must not add a parallel component/state/event runtime.
+[DotBoxD.UI.Razor](safe-razor.md) ships the opt-in safe Razor frontend. It generates worker-side
+`IUiComponent.Render(UiBuilder)` code over public primitives. The sample counter uses this frontend;
+the exact same generated package is consumed by Avalonia and Blazor. Local methods use the existing
+`[UiLocalHandler]` lowerer/verifier and remote C# stays in the worker. Unsupported markup fails with
+`DBXR001`; unsupported local C# fails with `DBXU001`. Normal executable Razor component assemblies
+are never loaded by a trusted host.
+
+## Resource grants and trusted extensions
+
+Construct `UiImageResource.FromRgba(width, height, pixels)` in trusted host code and grant its opaque
+handle through `UiResourceCatalog`. Pass the catalog to either renderer's `resources` parameter.
+`UiPackage.Resources` contains IDs and handles only. Image nodes require a literal declared resource
+ID; URLs, paths and executable formats cannot enter the protocol. `UiHost` validates grants and the
+shared resource count, individual/total byte and pixel budgets before initial kernels run. Avalonia
+copies pixels directly into an owned bitmap; Blazor encodes them as PNG once per installation. Session
+disposal releases renderer projections and bitmaps. No plugin image data reaches a decoder.
+
+For a renderer-specific feature, implement the public `IUiBlazorExtension` or `IUiAvaloniaExtension`
+contract in audited host code and pass it through the renderer's `extensions` parameter. Each
+implementation declares a stable `SchemaId`, validates a closed bounded JSON object, and creates
+trusted presentation. The host must also grant the schema in `UiPolicy.AllowedExtensionSchemas`.
+The renderer advertises registered IDs through `Capabilities.ExtensionSchemas`. Missing registration,
+missing grant, unknown schema fields, duplicate JSON members and excessive/deep payloads fail before
+kernels execute. Plugins provide `UiExtension` data; they never register factories, delegates or CLR
+names. Host implementations remain responsible for bounded presentation and root containment.
 
 ## Measurement
 
 `UiBlazorBenchmarks` measures 10/100/1,000 static nodes and keyed rows, state-only rerendering, browser
-text admission, local clicks, 100-slot patches, keyed reordering, and component attach/detach with
+text admission, local clicks, 100-slot patches, keyed reordering, component attach/detach, and fresh-session disconnect/reconnect with
 BenchmarkDotNet's allocation diagnostics. No performance improvement is claimed.
 
 ```sh

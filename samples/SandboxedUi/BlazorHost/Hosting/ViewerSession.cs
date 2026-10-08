@@ -48,7 +48,7 @@ internal sealed class ViewerSession : IAsyncDisposable
             owner.Transport = new SearchTransport(plugin);
             var kernelPolicy = SandboxPolicyBuilder.Create().Grant("game.score.read", new Dictionary<string, string>(), SandboxEffect.HostStateRead).Build();
             owner.Session = await new UiHost(owner._sandbox, kernelPolicy, policy).InstallAsync(
-                owner.Package, new BlazorUiRenderer(policy), owner.Transport, timeout.Token);
+                owner.Package, new BlazorUiRenderer(policy, resources: Examples.SandboxedUi.Host.SampleResources.Images()), owner.Transport, timeout.Token);
             owner._lifecycle = new UiSessionConnection(owner._connection.Peer, owner.Session);
             return owner;
         }

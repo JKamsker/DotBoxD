@@ -82,6 +82,9 @@ internal static class UiControlProperties
     {
         switch (control)
         {
+            case Image image:
+                global::Avalonia.Automation.AutomationProperties.SetName(image, text);
+                break;
             case TextBlock block:
                 block.Text = text;
                 break;

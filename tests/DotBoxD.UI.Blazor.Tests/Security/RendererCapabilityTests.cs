@@ -30,7 +30,7 @@ public sealed class RendererCapabilityTests
         Assert.Equal(UiPackageJson.ComputeHash(package, policy), UiPackageJson.ComputeHash(package with { RequiredFeatures = [UiFeature.GridLayout, UiFeature.TextInput] }, policy));
         var json = UiPackageJson.Export(package, policy);
         Assert.Equal(new[] { UiFeature.GridLayout, UiFeature.TextInput }, UiPackageJson.Import(json, policy).RequiredFeatures);
-        foreach (var declaration in new[] { "[999]", "[3,3]", "[1,2,3,4,5,6,7]", "null" })
+        foreach (var declaration in new[] { "[999]", "[3,3]", "[1,2,3,4,5,6,7,8]", "null" })
         {
             var node = JsonNode.Parse(json)!;
             node["requiredFeatures"] = JsonNode.Parse(declaration);

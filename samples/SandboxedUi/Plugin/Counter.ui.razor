@@ -1,0 +1,18 @@
+@state int count = 0;
+@state string query = "";
+@state string results = "";
+@state int score = 0;
+@kernel increment = Ui.Bind(Increment, count);
+@kernel label = Ui.Bind(Label, count);
+@kernel readScore = Ui.Bind(ReadScore);
+@resource icon = "sample.icon";
+
+<UiBorder Padding="0">
+    <UiVertical>
+        <UiText Text="@Ui.Bind(label)" />
+        <UiButton Text="Increment" OnClick="@Ui.Handle(increment, count)" />
+        <UiComponent Type="Examples.SandboxedUi.Plugin.SearchComponent" Arguments="query, results" />
+        <UiButton Text="Read game score" OnClick="@Ui.Handle(readScore, score)" />
+        <UiImage Resource="@icon" Text="Host-granted sample icon" />
+    </UiVertical>
+</UiBorder>

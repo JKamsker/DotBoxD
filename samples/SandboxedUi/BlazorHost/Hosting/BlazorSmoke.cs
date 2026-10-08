@@ -39,6 +39,7 @@ internal static class BlazorSmoke
         await WaitAsync(alice.Session, s => s.State[2].Value.Text == "apple, apricot", token);
         var markup = await html.Dispatcher.InvokeAsync(root.ToHtmlString);
         Require(markup.Contains("apple, apricot", StringComparison.Ordinal) && renderer.Materializations == 1, "generated plugin rendered through Blazor");
+        Require(markup.Contains("src=\"data:image/png;base64,", StringComparison.Ordinal), "host-granted image rendering");
         Require(!AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "Examples.SandboxedUi.Plugin"), "plugin assembly absent");
         Require(!await renderer.SubmitAsync(alice.Session, new UiInput(EventId: 1), user, new ViewerAuthorizer(bob.Session.Id, "Alice"), token), "cross-viewer authorization");
         var calls = alice.Transport.Calls;

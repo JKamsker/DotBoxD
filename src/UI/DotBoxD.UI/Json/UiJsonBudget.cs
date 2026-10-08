@@ -7,6 +7,7 @@ internal static class UiJsonBudget
     public static void Validate(JsonElement root, UiPolicy policy)
     {
         CheckFeatures(root);
+        CheckOptionalCollections(root, policy);
         foreach (var slot in RequireArray(root, "state", policy.MaxStateSlots).EnumerateArray())
         {
             if (slot.ValueKind != JsonValueKind.Object || !slot.TryGetProperty("initialValue", out var value))
@@ -26,6 +27,14 @@ internal static class UiJsonBudget
                 { CheckValue(literal, policy); }
             }
         }
+    }
+
+    private static void CheckOptionalCollections(JsonElement root, UiPolicy policy)
+    {
+        if (root.TryGetProperty("extensions", out _))
+        { RequireArray(root, "extensions", policy.MaxNodes); }
+        if (root.TryGetProperty("resources", out _))
+        { RequireArray(root, "resources", policy.MaxResources); }
     }
 
     private static void CheckFeatures(JsonElement root)

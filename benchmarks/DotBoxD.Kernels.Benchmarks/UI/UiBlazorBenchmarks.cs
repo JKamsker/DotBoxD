@@ -70,6 +70,19 @@ public class UiBlazorBenchmarks
     }
 
     [Benchmark]
+    public async Task DisconnectReconnect()
+    {
+        var disconnected = await _host.InstallAsync(_package, new BlazorUiRenderer());
+        var previousId = disconnected.Id;
+        await disconnected.DisposeAsync();
+        await using var reconnected = await _host.InstallAsync(_package, new BlazorUiRenderer());
+        if (reconnected.Id == previousId)
+        { throw new InvalidOperationException("Reconnection reused a session incarnation."); }
+        await using var html = new HtmlRenderer(_services, _services.GetRequiredService<ILoggerFactory>());
+        await html.Dispatcher.InvokeAsync(() => html.RenderComponentAsync<DotBoxDUi>(Parameters(reconnected)));
+    }
+
+    [Benchmark]
     public async Task LocalButton()
     {
         var snapshot = await _session.DispatchAsync(1);

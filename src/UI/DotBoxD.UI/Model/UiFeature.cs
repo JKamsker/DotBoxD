@@ -8,5 +8,6 @@ public enum UiFeature
     TextInput = 3,
     ToggleInput = 4,
     RangeInput = 5,
-    KeyedItems = 6
+    KeyedItems = 6,
+    ImageResources = 7
 }

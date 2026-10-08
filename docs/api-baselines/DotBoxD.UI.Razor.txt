@@ -1,0 +1,6 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.UI.Razor
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public sealed class UiRazorGenerator : IIncrementalGenerator
+public void Initialize(IncrementalGeneratorInitializationContext context)

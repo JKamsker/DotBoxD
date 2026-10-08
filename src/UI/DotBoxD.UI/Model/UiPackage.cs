@@ -13,6 +13,8 @@ public sealed record UiPackage(
     ImmutableArray<int> RemoteEndpoints)
 {
     public const int CurrentFormatVersion = 1;
+    public ImmutableArray<UiExtension> Extensions { get; init; } = [];
+    public ImmutableArray<UiResource> Resources { get; init; } = [];
     public ImmutableArray<UiFeature> RequiredFeatures { get; init; } = [];
     public ImmutableArray<UiFeature> OptionalFeatures { get; init; } = [];
 }
@@ -29,7 +31,9 @@ public enum UiPrimitive
     ProgressBar = 8,
     ScrollViewer = 9,
     Items = 10,
-    Slider = 11
+    Slider = 11,
+    Image = 12,
+    Extension = 13
 }
 
 public enum UiPropertyId
@@ -46,7 +50,8 @@ public enum UiPropertyId
     Columns = 10,
     Row = 11,
     Column = 12,
-    Padding = 13
+    Padding = 13,
+    Resource = 14
 }
 
 public sealed record UiNode(

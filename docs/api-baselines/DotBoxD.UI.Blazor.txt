@@ -8,22 +8,27 @@ public async ValueTask AcknowledgeAsync(UiInput input, CancellationToken cancell
 public async ValueTask DisposeAsync()
 public async ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
 public async ValueTask<bool> SubmitAsync(UiSession session, UiInput input, ClaimsPrincipal user, IUiInteractionAuthorizer authorizer, CancellationToken cancellationToken = default)
-public BlazorUiRenderer(UiPolicy? inputPolicy = null, int inputCapacity = 128)
+public BlazorUiRenderer(UiPolicy? inputPolicy = null, int inputCapacity = 128, UiResourceCatalog? resources = null, IEnumerable<IUiBlazorExtension>? extensions = null)
 public BlazorUiSnapshot? Snapshot { get; }
 public bool DisposeSessionOnDetach { get; set; } = true
 public bool IsDisposed { get { lock (_sync) { return _disposed; } } }
 public ClaimsPrincipal User { get; set; } = new()
 public IDisposable Subscribe(Func<Task> changed)
+public ImmutableDictionary<int, BlazorUiImage> Images { get; init; } = ImmutableDictionary<int, BlazorUiImage>.Empty
+public ImmutableDictionary<int, Runtime.UiResolvedExtension<IUiBlazorExtension>> Extensions { get; init; } = ImmutableDictionary<int, Runtime.UiResolvedExtension<IUiBlazorExtension>>.Empty
 public int Materializations { get; private set; }
 public int Updates { get; private set; }
+public interface IUiBlazorExtension : IUiExtensionSchema
 public interface IUiInteractionAuthorizer
 public IUiInteractionAuthorizer? Authorizer { get; set; }
 public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
 public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
+public sealed record BlazorUiImage(int Width, int Height, string Source)
 public sealed record BlazorUiSnapshot( UiPackage Package, ImmutableDictionary<int, UiNode> Nodes, ImmutableDictionary<(int Node, UiPropertyId Property), UiValue> Values)
 public string? LastInteractionError { get; private set; }
-public UiRendererCapabilities Capabilities => UiRendererCapabilities.Core
+public UiRendererCapabilities Capabilities => UiRendererCapabilities.Core with { ExtensionSchemas = _extensions.Schemas }
 public UiSession? Session { get; set; }
 public UiValue? Get(int nodeId, UiPropertyId property) => Values.GetValueOrDefault((nodeId, property))
 public ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
 public ValueTask<UiInput> ReadAsync(CancellationToken cancellationToken) => _inputs.Reader.ReadAsync(cancellationToken)
+public void ValidatePackage(UiPackage package, UiPolicy policy)

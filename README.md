@@ -316,3 +316,5 @@ original repos, see
 DotBoxD is [MIT licensed](LICENSE). It preserves the attribution of both original projects:
 **Copyright (c) 2026 Danial Jumagaliyev** (ShaRPC, the Services/channels stack) and
 **Copyright (c) 2026 Jonas Kamsker** (Safe-IR / DotBoxD, the Kernels/Pushdown stack).
+
+Safe Razor authoring: [DotBoxD.UI.Razor](docs/safe-razor.md) compiles closed UI markup to the shared sandbox package.
