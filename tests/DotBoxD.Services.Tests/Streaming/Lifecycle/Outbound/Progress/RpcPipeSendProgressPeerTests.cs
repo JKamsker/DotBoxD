@@ -33,11 +33,11 @@ public sealed class RpcPipeSendProgressPeerTests
             RequestTimeout = TimeSpan.FromSeconds(5),
             ExceptionTransformer = static error => error is IOException ? new RpcErrorInfo("Upload send failed", "UploadSendFailure") : null,
         }).Start();
-        var pipe = new Pipe(new PipeOptions(minimumSegmentSize: 4096, pauseWriterThreshold: 0, resumeWriterThreshold: 0));
+        var pipe = new Pipe(new PipeOptions(minimumSegmentSize: 65536, pauseWriterThreshold: 0, resumeWriterThreshold: 0));
         var payloads = new List<byte[]>();
         for (var i = 0; i < 2; i++)
         {
-            var memory = pipe.Writer.GetMemory(4096);
+            var memory = pipe.Writer.GetMemory(65536).Slice(0, 65536);
             memory.Span.Fill((byte)(i + 1));
             payloads.Add(memory.ToArray());
             pipe.Writer.Advance(memory.Length);

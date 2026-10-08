@@ -4,6 +4,16 @@ This file tracks the focused performance findings from the current perf-hunter p
 All numbers are local Release stopwatch probes on the same machine and are intended
 as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 
+## Issue #1454 follow-up
+
+[The query/streaming/subscription scaling report](../../docs/performance/issue-1454.md) records
+reproducible baselines and raw outputs for all five hypotheses. Retained changes remove 24 B
+per promoted scalar evaluation, reduce 256 B pipe segmentation from 4,096 to 16 frames per
+MiB, index eligible IN snapshots at eight candidates, and reduce 10,000 registrations across
+31 routing shapes from 69.95 GB to 155.56 MB of cumulative allocation. Snapshot dispatch
+controls keep exact allocations and have no median regression in six balanced pairs. A lazy
+primitive-packing adapter is rejected because reads/materialization recreate wrappers.
+
 ## Results
 
 | Finding | Probe | Workload | Before total | Before ns/op | Before alloc | Before B/op | After total | After ns/op | After alloc | After B/op | Notes |

@@ -29,7 +29,7 @@ internal sealed class PipeSendProgressFixture : IAsyncDisposable
         }
     }
 
-    public Pipe Pipe { get; } = new(new PipeOptions(minimumSegmentSize: 4096, pauseWriterThreshold: 0, resumeWriterThreshold: 0));
+    public Pipe Pipe { get; } = new(new PipeOptions(minimumSegmentSize: 65536, pauseWriterThreshold: 0, resumeWriterThreshold: 0));
     public MessagePackRpcSerializer Serializer { get; } = new();
     public CancellationTokenSource Cancellation { get; } = new();
     public RpcStreamAttachment Attachment { get; }
