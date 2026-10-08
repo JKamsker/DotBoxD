@@ -110,6 +110,41 @@ public sealed class BlazorComponentTests
     }
 
     [Fact]
+    public async Task Worker_disconnect_during_authorization_does_not_fault_the_Blazor_circuit()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var renderer = new BlazorUiRenderer();
+        await using var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), renderer);
+        await using var browser = new TestBlazorRenderer();
+        var authorizer = new DeferredAuthorizer();
+        await browser.MountAsync(session, authorizer);
+        var input = browser.SendAsync("oninput", new ChangeEventArgs { Value = "pending" });
+        await authorizer.Entered.Task;
+        await session.DisposeAsync();
+        await input;
+        authorizer.Reply.TrySetResult(true);
+        Assert.Empty(browser.Errors);
+        Assert.Null(renderer.Snapshot);
+    }
+
+    [Fact]
+    public async Task Explicit_host_ownership_allows_detach_and_reattach_to_the_same_session()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var renderer = new BlazorUiRenderer();
+        await using var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), renderer);
+        await using var first = new TestBlazorRenderer();
+        await first.MountAsync(session, new Authorizer(), dispose: false);
+        await first.DisposeAsync();
+        Assert.False(session.IsDisconnected);
+        await using var second = new TestBlazorRenderer();
+        await second.MountAsync(session, new Authorizer(), dispose: false);
+        await second.SendAsync("oninput", new ChangeEventArgs { Value = "reconnected" });
+        await UiFixture.WaitAsync(async () => (await session.SnapshotAsync()).State[0].Value.Text == "reconnected");
+        Assert.Equal(1, renderer.Materializations);
+    }
+
+    [Fact]
     public async Task Component_replacement_and_disposal_release_sessions_and_subscriptions()
     {
         using var sandbox = UiFixture.Sandbox();
@@ -126,5 +161,14 @@ public sealed class BlazorComponentTests
         await browser.DisposeAsync();
         Assert.True(fresh.IsDisconnected);
         Assert.Null(second.Snapshot);
+    }
+
+    private sealed class DeferredAuthorizer : IUiInteractionAuthorizer
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> Reply { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ValueTask<bool> AuthorizeAsync(System.Security.Claims.ClaimsPrincipal user, Runtime.UiSession session,
+            Runtime.UiInput input, CancellationToken cancellationToken)
+        { Entered.TrySetResult(); return new ValueTask<bool>(Reply.Task); }
     }
 }

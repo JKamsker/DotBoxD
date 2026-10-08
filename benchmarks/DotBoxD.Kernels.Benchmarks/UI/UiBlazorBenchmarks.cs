@@ -30,7 +30,7 @@ public class UiBlazorBenchmarks
     private readonly ClaimsPrincipal _user = new();
     private readonly AllowInput _authorizer = new();
 
-    [Params(100, 1_000)] public int Nodes { get; set; }
+    [Params(10, 100, 1_000)] public int Nodes { get; set; }
     [Params(100, 1_000)] public int Items { get; set; }
 
     [GlobalSetup]
@@ -44,10 +44,16 @@ public class UiBlazorBenchmarks
         _package = new UiPackage(1, 1,
             [new(1, UiPrimitive.Stack, [.. Enumerable.Range(2, Nodes - 1)], []),
              new(2, UiPrimitive.Items, [], [new(UiPropertyId.Items, StateSlotId: 2)]),
-             .. Enumerable.Range(3, Nodes - 2).Select(i => new UiNode(i, i == 3 ? UiPrimitive.TextBox : UiPrimitive.Text, [],
+             .. Enumerable.Range(3, Nodes - 2).Select(i => new UiNode(i, i == 3 ? UiPrimitive.TextBox : i == 4 ? UiPrimitive.Button : UiPrimitive.Text, [],
                  [new(UiPropertyId.Text, StateSlotId: 1, TwoWay: i == 3)]))],
             [new(1, UiValue.FromString("")), new(2, UiValue.FromItems(_rows)),
-             .. Enumerable.Range(3, 100).Select(i => new UiStateSlot(i, UiValue.FromInt32(0)))], [], [], []);
+             .. Enumerable.Range(3, 100).Select(i => new UiStateSlot(i, UiValue.FromInt32(0)))],
+            [new(1, """
+            {"id":"ui-blazor-bench","version":"1.0.0","functions":[{"id":"main","visibility":"entrypoint",
+            "parameters":[{"name":"value","type":"I32"}],"returnType":"I32",
+            "body":[{"op":"return","value":{"op":"add","left":{"var":"value"},"right":{"i32":1}}}]}]}
+            """, "main", 3)],
+            [new(1, 4, UiEventKind.Click, UiEventTarget.LocalKernel, KernelId: 1, OutputSlotId: 3)], []);
         _renderer = new BlazorUiRenderer(new UiPolicy { MaxInputEventsPerSecond = int.MaxValue });
         _session = _host.InstallAsync(_package, _renderer).AsTask().GetAwaiter().GetResult();
         _services = new ServiceCollection().AddLogging().BuildServiceProvider();
@@ -61,6 +67,13 @@ public class UiBlazorBenchmarks
         var session = await _host.InstallAsync(_package, new BlazorUiRenderer());
         await using var html = new HtmlRenderer(_services, _services.GetRequiredService<ILoggerFactory>());
         await html.Dispatcher.InvokeAsync(() => html.RenderComponentAsync<DotBoxDUi>(Parameters(session)));
+    }
+
+    [Benchmark]
+    public async Task LocalButton()
+    {
+        var snapshot = await _session.DispatchAsync(1);
+        _version = snapshot.Version;
     }
 
     [Benchmark]
