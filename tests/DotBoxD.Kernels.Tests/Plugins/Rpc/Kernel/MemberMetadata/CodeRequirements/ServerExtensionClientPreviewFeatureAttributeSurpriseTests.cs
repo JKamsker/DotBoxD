@@ -45,8 +45,7 @@ public sealed class ServerExtensionClientPreviewFeatureAttributeSurpriseTests
 
         AssertGeneratedMethodDoesNotContain(
             generatedSources,
-            "PortableServiceEchoAsync",
-            "RequiresPreviewFeaturesAttribute");
+            "PortableServiceEchoAsync");
     }
 
     private static void AssertGeneratedTypeContains(
@@ -70,17 +69,20 @@ public sealed class ServerExtensionClientPreviewFeatureAttributeSurpriseTests
 
     private static void AssertGeneratedMethodDoesNotContain(
         IReadOnlyList<string> generatedSources,
-        string methodName,
-        string unexpectedAttribute)
+        string methodName)
     {
         var source = Assert.Single(
             generatedSources,
             generatedSource => generatedSource.Contains(methodName, StringComparison.Ordinal));
-        var methodIndex = source.IndexOf(methodName, StringComparison.Ordinal);
-        var precedingMethodEnd = source.LastIndexOf('}', methodIndex);
-        var methodDeclaration = source[(precedingMethodEnd + 1)..methodIndex];
+        var generatedMethod = CSharpSyntaxTree.ParseText(source)
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(method => string.Equals(method.Identifier.ValueText, methodName, StringComparison.Ordinal));
 
-        Assert.DoesNotContain(unexpectedAttribute, methodDeclaration, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            generatedMethod.AttributeLists.SelectMany(static attributeList => attributeList.Attributes),
+            static attribute => attribute.Name.ToString() is "RequiresPreviewFeatures" or "RequiresPreviewFeaturesAttribute");
     }
 
     private const string ServiceBackedSource = """
