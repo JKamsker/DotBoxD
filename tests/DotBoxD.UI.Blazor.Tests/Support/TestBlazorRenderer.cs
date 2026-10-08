@@ -20,8 +20,8 @@ internal sealed class TestBlazorRenderer() : Renderer(new ServiceCollection().Bu
             await RenderRootComponentAsync(_componentId, Parameters(session, authorizer, dispose));
         });
 
-    public Task ReplaceAsync(UiSession session, IUiInteractionAuthorizer authorizer)
-        => Dispatcher.InvokeAsync(() => RenderRootComponentAsync(_componentId, Parameters(session, authorizer, true)));
+    public Task ReplaceAsync(UiSession session, IUiInteractionAuthorizer? authorizer, bool dispose = true)
+        => Dispatcher.InvokeAsync(() => RenderRootComponentAsync(_componentId, Parameters(session, authorizer, dispose)));
 
     private static ParameterView Parameters(UiSession session, IUiInteractionAuthorizer? authorizer, bool dispose)
         => ParameterView.FromDictionary(new Dictionary<string, object?>

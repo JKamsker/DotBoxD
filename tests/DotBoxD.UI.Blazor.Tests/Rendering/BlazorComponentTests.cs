@@ -168,6 +168,98 @@ public sealed class BlazorComponentTests
         Assert.Null(second.Snapshot);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Pending_session_replacement_cannot_attach_after_disposal_or_a_newer_replacement(bool dispose)
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var oldRenderer = new BlazorUiRenderer();
+        await using var oldSession = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), oldRenderer);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var blocker = oldRenderer.Subscribe(async () => { entered.TrySetResult(); await release.Task; });
+        var update = oldSession.SetInputAsync(1, UiPropertyId.Text, UiValue.FromString("pending")).AsTask();
+        await entered.Task;
+        blocker.Dispose();
+        var nextRenderer = new BlazorUiRenderer();
+        await using var next = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), nextRenderer);
+        var finalRenderer = new BlazorUiRenderer();
+        await using var final = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), finalRenderer);
+        await using var browser = new TestBlazorRenderer();
+        await browser.MountAsync(oldSession, new Authorizer());
+        var replacement = browser.ReplaceAsync(next, new Authorizer());
+        Task? followup = null;
+        try
+        {
+            await UiFixture.WaitAsync(() => Task.FromResult(oldSession.IsDisconnected));
+            if (dispose)
+            { await browser.DisposeAsync(); }
+            else
+            {
+                followup = browser.ReplaceAsync(final, new Authorizer());
+                await browser.FramesAsync();
+            }
+        }
+        finally { release.TrySetResult(); }
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => update);
+        await replacement;
+        if (followup is not null)
+        { await followup; }
+        Assert.True(next.IsDisconnected);
+        Assert.Empty(browser.Errors);
+        if (dispose)
+        { Assert.Null(nextRenderer.Snapshot); }
+        else
+        { Assert.False(final.IsDisconnected); }
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    public async Task Old_interaction_completion_preserves_replacement_interaction_errors(bool dispose, bool oldAllowed)
+    {
+        using var sandbox = UiFixture.Sandbox();
+        await using var oldSession = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), new BlazorUiRenderer());
+        await using var fresh = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), new BlazorUiRenderer());
+        await using var browser = new TestBlazorRenderer();
+        var authorizer = new DeferredAuthorizer();
+        await browser.MountAsync(oldSession, authorizer, dispose);
+        var input = browser.SendAsync("oninput", new ChangeEventArgs { Value = "old" });
+        await authorizer.Entered.Task;
+        await browser.ReplaceAsync(fresh, new Authorizer(!oldAllowed), dispose);
+        await browser.SendAsync("oninput", new ChangeEventArgs { Value = "fresh" });
+        authorizer.Reply.TrySetResult(oldAllowed);
+        await input;
+        var frames = await browser.FramesAsync();
+        Assert.DoesNotContain(frames, f => f.FrameType == RenderTreeFrameType.Text && f.TextContent == "Plugin disconnected.");
+        Assert.Equal(oldAllowed, frames.Any(f => f.FrameType == RenderTreeFrameType.Text && f.TextContent == "This interaction is not authorized."));
+        Assert.False(fresh.IsDisconnected);
+        Assert.Empty(browser.Errors);
+    }
+
+    [Fact]
+    public async Task Reattaching_a_retained_session_does_not_accept_its_previous_attachment_completion()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        await using var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), new BlazorUiRenderer());
+        await using var middle = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), new BlazorUiRenderer());
+        await using var browser = new TestBlazorRenderer();
+        var authorizer = new DeferredAuthorizer();
+        await browser.MountAsync(session, authorizer, dispose: false);
+        var input = browser.SendAsync("oninput", new ChangeEventArgs { Value = "old" });
+        await authorizer.Entered.Task;
+        await browser.ReplaceAsync(middle, new Authorizer(), dispose: false);
+        await browser.ReplaceAsync(session, null, dispose: false);
+        await browser.SendAsync("oninput", new ChangeEventArgs { Value = "denied" });
+        authorizer.Reply.TrySetResult(true);
+        await input;
+        var frames = await browser.FramesAsync();
+        Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Text && f.TextContent == "This interaction is not authorized.");
+        Assert.Empty(browser.Errors);
+    }
+
     private sealed class DeferredAuthorizer : IUiInteractionAuthorizer
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

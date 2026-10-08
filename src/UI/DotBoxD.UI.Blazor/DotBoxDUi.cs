@@ -13,6 +13,7 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
     private IDisposable? _subscription;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _disposed;
+    private long _attachmentVersion;
 
     [Parameter, EditorRequired] public UiSession? Session { get; set; }
     /// <summary>Supplied by trusted host authentication code, never by the plugin package.</summary>
@@ -28,20 +29,34 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
         if (_disposed || ReferenceEquals(Session, _session))
         { return; }
         var previous = _session;
+        _attachmentVersion++;
         _subscription?.Dispose();
         _subscription = null;
         _session = null;
         _renderer = null;
-        if (DisposeSessionOnDetach && previous is not null)
-        { await previous.DisposeAsync(); }
-        if (Session is null)
+        try
+        {
+            // Publish the new attachment before yielding: disposal and later parameter updates
+            // must see the session whose ownership this transition accepted.
+            Attach(Session);
+        }
+        finally
+        {
+            if (DisposeSessionOnDetach && previous is not null)
+            { await previous.DisposeAsync(); }
+        }
+    }
+
+    private void Attach(UiSession? session)
+    {
+        if (session is null)
         { return; }
-        if (Session.IsDisconnected)
-        { _session = Session; return; }
-        if (Session.Renderer is not BlazorUiRenderer renderer)
+        if (session.IsDisconnected)
+        { _session = session; return; }
+        if (session.Renderer is not BlazorUiRenderer renderer)
         { throw new InvalidOperationException("Install the UiSession with a BlazorUiRenderer before attaching DotBoxDUi."); }
         _subscription = renderer.Subscribe(RefreshAsync);
-        _session = Session;
+        _session = session;
         _renderer = renderer;
         LastInteractionError = null;
     }
@@ -54,7 +69,10 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
         builder.AddAttribute(1, "class", "dotboxd-ui");
         builder.AddAttribute(8, "style", "contain:content;isolation:isolate;overflow:auto;max-width:100%;");
         if (_renderer?.Snapshot is { } snapshot && _session is { } session && !session.IsDisconnected)
-        { UiHtmlTree.Render(builder, snapshot, snapshot.Package.RootNodeId, this, input => SubmitAsync(session, input)); }
+        {
+            var attachmentVersion = _attachmentVersion;
+            UiHtmlTree.Render(builder, snapshot, snapshot.Package.RootNodeId, this, input => SubmitAsync(session, input, attachmentVersion));
+        }
         else if (_session?.IsDisconnected == true)
         {
             builder.OpenElement(2, "p");
@@ -72,21 +90,25 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
         builder.CloseElement();
     }
 
-    private async Task SubmitAsync(UiSession session, UiInput input)
+    private bool IsAttached(UiSession session, long attachmentVersion)
+        => !_disposed && ReferenceEquals(session, _session) && attachmentVersion == _attachmentVersion;
+
+    private async Task SubmitAsync(UiSession session, UiInput input, long attachmentVersion)
     {
-        if (_disposed || !ReferenceEquals(session, _session))
+        if (!IsAttached(session, attachmentVersion))
         { return; }
+        string? outcome;
         try
         {
-            if (Authorizer is null || !await _renderer!.SubmitAsync(session, input, User, Authorizer, _lifetime.Token))
-            { LastInteractionError = "This interaction is not authorized."; }
-            else
-            { LastInteractionError = null; }
+            outcome = Authorizer is null || !await _renderer!.SubmitAsync(session, input, User, Authorizer, _lifetime.Token)
+                ? "This interaction is not authorized." : null;
         }
-        catch (UiValidationException error) { LastInteractionError = error.Message; }
-        catch (ObjectDisposedException) { LastInteractionError = "Plugin disconnected."; }
+        catch (UiValidationException error) { outcome = error.Message; }
+        catch (ObjectDisposedException) { outcome = "Plugin disconnected."; }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || session.IsDisconnected)
-        { LastInteractionError = "Plugin disconnected."; }
+        { outcome = "Plugin disconnected."; }
+        if (IsAttached(session, attachmentVersion))
+        { LastInteractionError = outcome; }
     }
 
     public async ValueTask DisposeAsync()
