@@ -47,15 +47,18 @@ internal static class UiRendererConformance
             var reordered = await session.ApplyPatchAsync(new UiStatePatch(session.Id, 3,
                 [new(4, UiValue.FromItems([new("b", "Updated"), new("a", "Alpha")]))]));
             Assert.Equal(new[] { "b", "a" }, reordered.State[3].Value.Items.Select(i => i.Key));
+            var inserted = await session.ApplyPatchAsync(new UiStatePatch(session.Id, 4,
+                [new(4, UiValue.FromItems([new("b", "Updated"), new("c", "Charlie")]))]));
+            Assert.Equal(new[] { "b", "c" }, inserted.State[3].Value.Items.Select(i => i.Key));
             await Assert.ThrowsAsync<UiValidationException>(() => session.ApplyPatchAsync(new UiStatePatch(session.Id, 3, [])).AsTask());
-            await Assert.ThrowsAsync<UiValidationException>(() => session.ApplyPatchAsync(new UiStatePatch(Guid.NewGuid(), 4, [])).AsTask());
-            await session.ApplyPatchAsync(new UiStatePatch(session.Id, 4, [new(5, UiValue.FromBoolean(false))]));
+            await Assert.ThrowsAsync<UiValidationException>(() => session.ApplyPatchAsync(new UiStatePatch(Guid.NewGuid(), 5, [])).AsTask());
+            await session.ApplyPatchAsync(new UiStatePatch(session.Id, 5, [new(5, UiValue.FromBoolean(false))]));
             await Assert.ThrowsAsync<UiValidationException>(() => session.DispatchAsync(1).AsTask());
             await Assert.ThrowsAsync<UiValidationException>(() => session.SetInputAsync(4, UiPropertyId.Text, UiValue.FromString("blocked")).AsTask());
-            await session.ApplyPatchAsync(new UiStatePatch(session.Id, 5, [new(5, UiValue.FromBoolean(true)), new(6, UiValue.FromBoolean(false))]));
+            await session.ApplyPatchAsync(new UiStatePatch(session.Id, 6, [new(5, UiValue.FromBoolean(true)), new(6, UiValue.FromBoolean(false))]));
             await Assert.ThrowsAsync<UiValidationException>(() => session.DispatchAsync(2).AsTask());
             var final = await session.SnapshotAsync();
-            Assert.Equal(6, final.Version);
+            Assert.Equal(7, final.Version);
             Assert.Equal(1, final.State[0].Value.Integer);
             Assert.Equal("ap", final.State[1].Value.Text);
         }
@@ -63,7 +66,7 @@ internal static class UiRendererConformance
         Assert.True(session.IsDisconnected);
         Assert.Null(session.Renderer);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => session.DispatchAsync(1).AsTask());
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => session.ApplyPatchAsync(new UiStatePatch(session.Id, 6, [])).AsTask());
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => session.ApplyPatchAsync(new UiStatePatch(session.Id, 7, [])).AsTask());
     }
 
     private sealed class Remote : IUiRemoteTransport

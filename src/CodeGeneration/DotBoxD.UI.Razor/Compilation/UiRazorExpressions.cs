@@ -146,6 +146,8 @@ internal sealed class UiRazorExpressions
     private static string Literal(string text, string type)
     {
         var syntax = SyntaxFactory.ParseExpression(text);
+        if (syntax is PrefixUnaryExpressionSyntax && type is not "int" and not "double")
+        { throw new NotSupportedException("Only numeric literals can be negated; boolean and string state use typed literals."); }
         var value = syntax is PrefixUnaryExpressionSyntax prefix && prefix.IsKind(SyntaxKind.UnaryMinusExpression)
             ? prefix.Operand : syntax;
         if (syntax.ContainsDiagnostics || value is not LiteralExpressionSyntax literal || !Matches(literal, type))

@@ -89,7 +89,13 @@ public sealed class AvaloniaRendererTests
         Assert.Same(beta, panel.Children[0]);
         Assert.Same(alpha, panel.Children[1]);
         Assert.Equal("Updated", Assert.IsType<TextBlock>(beta).Text);
-        Assert.Equal(1, renderer.Updates);
+        await session.ApplyPatchAsync(new UiStatePatch(session.Id, 1,
+            [new(list.Id, UiValue.FromItems([new("b", "Updated"), new("c", "Charlie")]))]));
+        Assert.Same(beta, panel.Children[0]);
+        Assert.DoesNotContain(alpha, panel.Children);
+        Assert.Equal("Charlie", Assert.IsType<TextBlock>(panel.Children[1]).Text);
+        Assert.Equal(2, renderer.Updates);
+        Assert.Equal(1, renderer.Materializations);
     }
 
     [AvaloniaFact]

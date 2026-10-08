@@ -106,6 +106,11 @@ public sealed class BlazorComponentTests
         Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Element && Equals(f.ElementKey, "b"));
         Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == "style" &&
             f.AttributeValue is string style && style.Contains("display:none", StringComparison.Ordinal));
+        await session.ApplyPatchAsync(new UiStatePatch(session.Id, 1,
+            [new(items.Id, UiValue.FromItems([new("b", "Updated"), new("c", "Charlie")]))]));
+        var inserted = await browser.FramesAsync();
+        Assert.Equal(new[] { "b", "c" }, inserted.Where(f => f.FrameType == RenderTreeFrameType.Element && f.ElementKey is string)
+            .Select(f => (string)f.ElementKey));
         Assert.Equal(1, renderer.Materializations);
     }
 

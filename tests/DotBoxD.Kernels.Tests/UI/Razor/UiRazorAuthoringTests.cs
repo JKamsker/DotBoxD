@@ -60,6 +60,9 @@ public sealed class UiRazorAuthoringTests
     }
 
     [Theory]
+    [InlineData("@state bool flag = -true;\n<UiText />")]
+    [InlineData("<UiText Enabled=\"@Ui.TwoWay(flag)\" />")]
+    [InlineData("<UiHorizontal Horizontal=\"true\" />")]
     [InlineData("<div />")]
     [InlineData("<DynamicComponent Type=\"@typeof(Counter)\" />")]
     [InlineData("<UiText Text=\"@new Microsoft.AspNetCore.Components.MarkupString(\"x\")\" />")]
