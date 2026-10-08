@@ -1,10 +1,11 @@
 # Sandboxed UI
 
-`DotBoxD.UI`, `DotBoxD.UI.Runtime` and `DotBoxD.UI.Avalonia` are optional .NET 10 packages
+`DotBoxD.UI`, `DotBoxD.UI.Runtime`, `DotBoxD.UI.Avalonia` and `DotBoxD.UI.Blazor` are optional .NET 10 packages
 implementing [issue #1453](https://github.com/JKamsker/DotBoxD/issues/1453). Plugin authors compose
 C# components and typed state in their worker. The existing plugin analyzer lowers declared local
 methods into restricted IR. Trusted host code validates the package, owns state, and renders Avalonia
 controls without loading the plugin implementation assembly.
+[Sandboxed Blazor](sandboxed-blazor.md) adds a trusted web renderer over the same package/session API.
 
 ## Trust boundary
 
@@ -77,8 +78,11 @@ Keyed Items rows are trusted TextBlocks. A batch can replace/reorder the bounded
 keys retain their controls and missing keys are removed. The runtime checks total evaluated row
 count plus static nodes against `MaxNodes` before installation or commit, so one state patch cannot
 force unbounded materialization. Custom dynamic templates and virtualization are outside v1.
-Image/resource handles are an explicit post-MVP limitation permitted by the issue's definition of
-done. No resource URIs are fetched, decoded or executed; the protocol's resource budget is zero.
+Image nodes reference declared opaque resource IDs. A trusted host grants RGBA pixels through
+`UiResourceCatalog`; shared count, pixel and byte budgets apply before kernels execute. No plugin
+resource URLs, paths or decoder input are accepted. See [sandboxed Blazor](sandboxed-blazor.md) for
+resource grants and schema-based trusted renderer extensions, and [safe Razor](safe-razor.md) for
+an optional authoring frontend over the same public builder.
 
 A `UiKernel` contains ordinary restricted IR JSON, a declared entrypoint, and an optional input
 slot ID. It has no parameters when input is absent; otherwise it takes exactly one parameter of

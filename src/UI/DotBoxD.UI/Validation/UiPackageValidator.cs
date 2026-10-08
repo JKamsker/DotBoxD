@@ -16,6 +16,10 @@ public static class UiPackageValidator
         }
 
         var nodes = Index(package.Nodes, policy.MaxNodes, n => n.Id);
+        UiResourceValidator.Validate(package, policy);
+        UiExtensionValidator.Validate(package, policy);
+        ValidateFeatures(package.RequiredFeatures);
+        ValidateFeatures(package.OptionalFeatures);
         var state = Index(package.State, policy.MaxStateSlots, s => s.Id);
         var kernels = Index(package.Kernels, policy.MaxKernels, k => k.Id);
         var events = Index(package.Events, policy.MaxEvents, e => e.Id);
@@ -24,6 +28,13 @@ public static class UiPackageValidator
         ValidateKernels(kernels, state, policy);
         UiTreeValidator.Validate(package.RootNodeId, nodes, state, kernels, policy);
         ValidateEvents(package, events, nodes, state, kernels);
+    }
+
+    private static void ValidateFeatures(ImmutableArray<UiFeature> features)
+    {
+        if (features.IsDefault || features.Length > Enum.GetValues<UiFeature>().Length ||
+            features.Any(f => !Enum.IsDefined(f)) || features.Distinct().Count() != features.Length)
+        { throw new UiValidationException("Unsupported or duplicate UI feature declaration."); }
     }
 
     private static void ValidateEndpoints(ImmutableArray<int> endpoints, UiPolicy policy)

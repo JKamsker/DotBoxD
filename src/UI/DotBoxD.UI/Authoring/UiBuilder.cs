@@ -5,6 +5,8 @@ namespace DotBoxD.UI.Authoring;
 /// <summary>Deterministic worker-side component builder over public schema primitives.</summary>
 public sealed class UiBuilder
 {
+    private readonly List<UiExtension> _extensions = [];
+    private readonly List<UiResource> _resources = [];
     private readonly List<UiNode> _nodes = [];
     private readonly List<UiStateSlot> _state = [];
     private readonly List<UiKernel> _kernels = [];
@@ -47,6 +49,18 @@ public sealed class UiBuilder
         return new UiElement(id, _elementOwner);
     }
 
+    /// <summary>Overlays construction-time properties without changing node identity or event routes.</summary>
+    public UiElement Configure(UiElement element, ImmutableArray<UiProperty> properties)
+    {
+        ValidateElement(element, nameof(element));
+        if (properties.IsDefault || properties.Any(p => p is null) || properties.Select(p => p.Id).Distinct().Count() != properties.Length)
+        { throw new ArgumentException("Properties must be present, non-null and unique.", nameof(properties)); }
+        var node = _nodes[element.Id - 1];
+        var replacements = properties.Select(p => p.Id).ToHashSet();
+        _nodes[element.Id - 1] = node with { Properties = [.. node.Properties.Where(p => !replacements.Contains(p.Id)), .. properties] };
+        return element;
+    }
+
     private void ValidateChildren(UiElement[] children)
     {
         ArgumentNullException.ThrowIfNull(children);
@@ -59,6 +73,26 @@ public sealed class UiBuilder
         if (element is null || !ReferenceEquals(element.Owner, _elementOwner))
         { throw new ArgumentException("UI elements must be created by this builder.", parameterName); }
     }
+
+    public UiElement Extension(string schemaId, string payloadJson)
+    {
+        var element = Element(UiPrimitive.Extension, []);
+        _extensions.Add(new UiExtension(element.Id, schemaId, payloadJson));
+        return element;
+    }
+
+    public int Resource(string handle)
+    {
+        var existing = _resources.FirstOrDefault(r => string.Equals(r.Handle, handle, StringComparison.Ordinal));
+        if (existing is not null)
+        { return existing.Id; }
+        var id = _resources.Count + 1;
+        _resources.Add(new UiResource(id, handle));
+        return id;
+    }
+
+    public UiElement Image(int resourceId, string alternativeText = "") => Element(UiPrimitive.Image,
+        [UiLiteral.Integer(resourceId).Property(UiPropertyId.Resource), UiLiteral.Text(alternativeText).Property(UiPropertyId.Text)]);
 
     public UiElement Stack(params UiElement[] children) => Element(UiPrimitive.Stack, [], children);
     public UiElement Grid(int columns, params UiElement[] children)
@@ -102,6 +136,12 @@ public sealed class UiBuilder
     public UiElement Button<T>(string label, UiBoundKernel<T> handler, UiState<T> output)
     {
         var button = Element(UiPrimitive.Button, [UiLiteral.Text(label).Property(UiPropertyId.Text)]);
+        return Handle(button, handler, output);
+    }
+
+    public UiElement Handle<T>(UiElement button, UiBoundKernel<T> handler, UiState<T> output)
+    {
+        ValidateElement(button, nameof(button));
         _events.Add(new UiEvent(_events.Count + 1, button.Id, UiEventKind.Click, UiEventTarget.LocalKernel,
             KernelId: handler.Id, OutputSlotId: output.Id));
         return button;
@@ -110,6 +150,12 @@ public sealed class UiBuilder
     public UiElement RemoteButton(string label, int endpointId)
     {
         var button = Element(UiPrimitive.Button, [UiLiteral.Text(label).Property(UiPropertyId.Text)]);
+        return Remote(button, endpointId);
+    }
+
+    public UiElement Remote(UiElement button, int endpointId)
+    {
+        ValidateElement(button, nameof(button));
         _endpoints.Add(endpointId);
         _events.Add(new UiEvent(_events.Count + 1, button.Id, UiEventKind.Click, UiEventTarget.Remote,
             RemoteEndpointId: endpointId));
@@ -121,7 +167,8 @@ public sealed class UiBuilder
         ArgumentNullException.ThrowIfNull(root);
         ValidateElement(root, nameof(root));
         var package = new UiPackage(UiPackage.CurrentFormatVersion, root.Id, [.. _nodes], [.. _state],
-            [.. _kernels], [.. _events], [.. _endpoints.Order()]);
+            [.. _kernels], [.. _events], [.. _endpoints.Order()])
+        { Resources = [.. _resources], Extensions = [.. _extensions] };
         UiPackageValidator.Validate(package, policy ?? new UiPolicy());
         return package;
     }

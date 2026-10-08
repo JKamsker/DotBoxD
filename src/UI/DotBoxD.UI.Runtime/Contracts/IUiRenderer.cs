@@ -10,6 +10,12 @@ namespace DotBoxD.UI.Runtime;
 /// </summary>
 public interface IUiRenderer : IAsyncDisposable
 {
+    /// <summary>V1 adapters support the closed core schema unless they advertise a smaller set.</summary>
+    UiRendererCapabilities Capabilities => UiRendererCapabilities.Core;
+
+    /// <summary>Checks trusted adapter policy before initial kernels run.</summary>
+    void ValidatePackage(UiPackage package, UiPolicy policy) => Capabilities.Validate(package);
+
     ValueTask MaterializeAsync(
         UiPackage package,
         ImmutableArray<UiPropertyValue> values,

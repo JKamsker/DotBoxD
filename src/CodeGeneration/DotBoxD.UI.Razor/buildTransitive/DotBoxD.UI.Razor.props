@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <AdditionalFiles Include="**/*.ui.razor" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+  </ItemGroup>
+</Project>

@@ -64,6 +64,7 @@ public static class UiValueValidator
             UiPropertyId.Checked => RequirePrimitive(primitive, UiPrimitive.CheckBox, UiValueKind.Boolean),
             UiPropertyId.Value => RangeKind(primitive),
             UiPropertyId.Maximum => RangeKind(primitive),
+            UiPropertyId.Resource => RequirePrimitive(primitive, UiPrimitive.Image, UiValueKind.Int32),
             UiPropertyId.Items => RequirePrimitive(primitive, UiPrimitive.Items, UiValueKind.Items),
             _ => LayoutKind(primitive, property)
         };
@@ -83,7 +84,7 @@ public static class UiValueValidator
             ? UiValueKind.Number : throw new UiValidationException("Unsupported value property.");
 
     private static UiValueKind TextKind(UiPrimitive primitive)
-        => primitive is UiPrimitive.Text or UiPrimitive.Button or UiPrimitive.TextBox or UiPrimitive.CheckBox
+        => primitive is UiPrimitive.Text or UiPrimitive.Button or UiPrimitive.TextBox or UiPrimitive.CheckBox or UiPrimitive.Image
             ? UiValueKind.String : throw new UiValidationException("Unsupported text property for UI primitive.");
 
     private static UiValueKind RequirePrimitive(UiPrimitive primitive, UiPrimitive required, UiValueKind kind)
