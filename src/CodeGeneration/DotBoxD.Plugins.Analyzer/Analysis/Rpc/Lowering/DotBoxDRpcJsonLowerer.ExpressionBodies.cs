@@ -24,6 +24,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
             else
             {
+                if (returnValueType is not null)
+                {
+                    RejectUserDefinedConversion(expression, returnValueType,
+                        $"Server extension return expression '{expression}'");
+                }
                 var value = LowerExpressionWithPrelude(expression, parts);
                 if (returnValueType is not null)
                 {

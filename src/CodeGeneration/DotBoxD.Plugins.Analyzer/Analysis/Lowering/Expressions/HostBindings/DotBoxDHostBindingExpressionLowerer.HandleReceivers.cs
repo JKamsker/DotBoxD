@@ -55,7 +55,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return new[] { receiver }.Concat(arguments).ToArray();
     }
 
-    private static bool IncludesValueReceiver(IMethodSymbol method, Compilation compilation)
+    internal static bool IncludesValueReceiver(IMethodSymbol method, Compilation compilation)
         => IncludesObjectReceiver(method, compilation) || IncludesExplicitReceiver(method, compilation);
 
     private static bool IncludesObjectReceiver(IMethodSymbol method, Compilation compilation)

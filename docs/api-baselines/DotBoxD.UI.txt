@@ -1,0 +1,140 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.UI
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public bool Equals(UiValue? other)
+public bool GenerateEndpoint { get; set; } = true
+public bool GenerateKernel { get; set; } = true
+public const int CurrentFormatVersion = 1
+public enum UiEventKind
+public enum UiEventKind.Click = 1
+public enum UiEventTarget
+public enum UiEventTarget.LocalKernel = 1
+public enum UiEventTarget.Remote = 2
+public enum UiPrimitive
+public enum UiPrimitive.Border = 3
+public enum UiPrimitive.Button = 5
+public enum UiPrimitive.CheckBox = 7
+public enum UiPrimitive.Grid = 2
+public enum UiPrimitive.Items = 10
+public enum UiPrimitive.ProgressBar = 8
+public enum UiPrimitive.ScrollViewer = 9
+public enum UiPrimitive.Slider = 11
+public enum UiPrimitive.Stack = 1
+public enum UiPrimitive.Text = 4
+public enum UiPrimitive.TextBox = 6
+public enum UiPropertyId
+public enum UiPropertyId.Checked = 6
+public enum UiPropertyId.Column = 12
+public enum UiPropertyId.Columns = 10
+public enum UiPropertyId.Enabled = 2
+public enum UiPropertyId.Horizontal = 8
+public enum UiPropertyId.Items = 7
+public enum UiPropertyId.Maximum = 5
+public enum UiPropertyId.Padding = 13
+public enum UiPropertyId.Row = 11
+public enum UiPropertyId.Spacing = 9
+public enum UiPropertyId.Text = 1
+public enum UiPropertyId.Value = 4
+public enum UiPropertyId.Visible = 3
+public enum UiValueKind
+public enum UiValueKind.Boolean = 1
+public enum UiValueKind.Int32 = 2
+public enum UiValueKind.Items = 5
+public enum UiValueKind.Number = 3
+public enum UiValueKind.String = 4
+public ImmutableArray<UiListItem> Items { get; init; } = []
+public ImmutableArray<UiPrimitive> AllowedPrimitives { get; init; } = [.. Enum.GetValues<UiPrimitive>()]
+public int EndpointId { get; } = endpointId
+public int Id { get; }
+public int MaxChildren { get; init; } = 1_000
+public int MaxDepth { get; init; } = 64
+public int MaxEvents { get; init; } = 256
+public int MaxInFlightRemoteEvents { get; init; } = 4
+public int MaxInputEventsPerSecond { get; init; } = 1_000
+public int MaxItems { get; init; } = 1_000
+public int MaxKernelBytes { get; init; } = 256 * 1024
+public int MaxKernels { get; init; } = 128
+public int MaxNodes { get; init; } = 2_000
+public int MaxPackageBytes { get; init; } = 2 * 1024 * 1024
+public int MaxPatchSlots { get; init; } = 128
+public int MaxStateBytes { get; init; } = 1024 * 1024
+public int MaxStateSlots { get; init; } = 256
+public int MaxStringLength { get; init; } = 16_384
+public interface IUiComponent
+public override int GetHashCode()
+public readonly record struct UiBinding<T>(UiValue? Literal = null, int StateSlotId = 0, int KernelId = 0, bool TwoWay = false)
+public readonly record struct UiBoundKernel<T>(int Id)
+public readonly record struct UiState<T>(int Id)
+public readonly record struct UiUnit
+public sealed class UiBuilder
+public sealed class UiLocalHandlerAttribute : Attribute
+public sealed class UiRemoteHandlerAttribute(int endpointId) : Attribute
+public sealed class UiValidationException(string message) : Exception(message)
+public sealed record UiElement
+public sealed record UiEvent( int Id, int NodeId, UiEventKind Kind, UiEventTarget Target, int KernelId = 0, int OutputSlotId = 0, int RemoteEndpointId = 0)
+public sealed record UiKernel(int Id, string ModuleJson, string Entrypoint, int InputSlotId = 0)
+public sealed record UiKernelDefinition<TInput, TOutput>(string ModuleJson, string Entrypoint)
+public sealed record UiListItem(string Key, string Text)
+public sealed record UiNode( int Id, UiPrimitive Primitive, ImmutableArray<int> Children, ImmutableArray<UiProperty> Properties)
+public sealed record UiPackage( int FormatVersion, int RootNodeId, ImmutableArray<UiNode> Nodes, ImmutableArray<UiStateSlot> State, ImmutableArray<UiKernel> Kernels, ImmutableArray<UiEvent> Events, ImmutableArray<int> RemoteEndpoints)
+public sealed record UiPolicy
+public sealed record UiProperty( UiPropertyId Id, UiValue? Literal = null, int StateSlotId = 0, int BindingKernelId = 0, bool TwoWay = false)
+public sealed record UiPropertyValue(int NodeId, UiPropertyId PropertyId, UiValue Value)
+public sealed record UiRemoteEvent(int EventId, int NodeId, int EndpointId, UiSnapshot Snapshot)
+public sealed record UiSnapshot(Guid SessionId, long Version, ImmutableArray<UiStateValue> State)
+public sealed record UiStatePatch(Guid SessionId, long ExpectedVersion, ImmutableArray<UiStateValue> Writes)
+public sealed record UiStateSlot(int Id, UiValue InitialValue)
+public sealed record UiStateValue(int SlotId, UiValue Value)
+public sealed record UiValue( UiValueKind Kind, bool Boolean = false, int Integer = 0, double Number = 0, string Text = "")
+public static class UiLiteral
+public static class UiMaterializationValidator
+public static class UiPackageJson
+public static class UiPackageValidator
+public static class UiValueValidator
+public static implicit operator UiBinding<T>(UiBoundKernel<T> kernel) => new(KernelId: kernel.Id)
+public static implicit operator UiBinding<T>(UiState<T> state) => new(StateSlotId: state.Id)
+public static int Validate(UiValue value, UiPolicy policy)
+public static string ComputeHash(UiPackage package, UiPolicy policy)
+public static string Export(UiPackage package, UiPolicy policy)
+public static UiBinding<bool> Boolean(bool value) => new(UiValue.FromBoolean(value))
+public static UiBinding<double> Number(double value) => new(UiValue.FromNumber(value))
+public static UiBinding<ImmutableArray<UiListItem>> Items(ImmutableArray<UiListItem> value) => new(UiValue.FromItems(value))
+public static UiBinding<int> Integer(int value) => new(UiValue.FromInt32(value))
+public static UiBinding<string> Text(string value) => new(UiValue.FromString(value))
+public static UiBinding<T> Input(UiState<T> state) => new(StateSlotId: state.Id, TwoWay: true)
+public static UiPackage Import(string json, UiPolicy policy)
+public static UiValue FromBoolean(bool value) => new(UiValueKind.Boolean, Boolean: value)
+public static UiValue FromInt32(int value) => new(UiValueKind.Int32, Integer: value)
+public static UiValue FromItems(ImmutableArray<UiListItem> items) => new(UiValueKind.Items) { Items = items }
+public static UiValue FromNumber(double value) => new(UiValueKind.Number, Number: value)
+public static UiValue FromString(string value) => new(UiValueKind.String, Text: value)
+public static UiValueKind PropertyKind(UiPrimitive primitive, UiPropertyId property)
+public static void Validate(int staticNodeCount, ImmutableArray<UiPropertyValue> values, UiPolicy policy)
+public static void Validate(UiPackage package, UiPolicy policy)
+public TimeSpan RemoteEventTimeout { get; init; } = TimeSpan.FromSeconds(10)
+public UiBoundKernel<TOutput> Kernel<TInput, TOutput>(UiKernelDefinition<TInput, TOutput> definition, UiState<TInput> input)
+public UiBoundKernel<TOutput> Kernel<TOutput>(UiKernelDefinition<UiUnit, TOutput> definition)
+public UiElement Border(UiElement child, double padding = 0)
+public UiElement Button<T>(string label, UiBoundKernel<T> handler, UiState<T> output)
+public UiElement CheckBox(string label, UiState<bool> value)
+public UiElement Element(UiPrimitive primitive, ImmutableArray<UiProperty> properties, params UiElement[] children)
+public UiElement Grid(int columns, params UiElement[] children)
+public UiElement Items(UiBinding<ImmutableArray<UiListItem>> value)
+public UiElement Progress(UiBinding<double> value, double maximum = 100)
+public UiElement RemoteButton(string label, int endpointId)
+public UiElement Scroll(UiElement child) => Element(UiPrimitive.ScrollViewer, [], child)
+public UiElement Slider(UiState<double> value, double maximum = 100)
+public UiElement Stack(params UiElement[] children) => Element(UiPrimitive.Stack, [], children)
+public UiElement Text(string text) => Text(UiLiteral.Text(text))
+public UiElement Text(UiBinding<string> value) => Element(UiPrimitive.Text, [value.Property(UiPropertyId.Text)])
+public UiElement TextBox(UiState<string> value)
+public UiPackage Build(UiElement root, UiPolicy? policy = null)
+public UiProperty Property(UiPropertyId id) => new(id, Literal, StateSlotId, KernelId, TwoWay)
+public UiState<bool> State(bool initial) => State<bool>(UiValue.FromBoolean(initial))
+public UiState<double> State(double initial) => State<double>(UiValue.FromNumber(initial))
+public UiState<ImmutableArray<UiListItem>> State(ImmutableArray<UiListItem> initial)
+public UiState<int> State(int initial) => State<int>(UiValue.FromInt32(initial))
+public UiState<string> State(string initial) => State<string>(UiValue.FromString(initial))
+public void Deconstruct(out int id) => id = Id
+public void Validate()

@@ -5,6 +5,16 @@
     <Project Path="samples/GameServer/Examples.GameServer.Server.Abstractions/Examples.GameServer.Server.Abstractions.csproj" />
     <Project Path="samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj" />
   </Folder>
+  <Folder Name="/samples/SandboxedUi/" />
+  <Folder Name="/samples/SandboxedUi/Contracts/">
+    <Project Path="samples/SandboxedUi/Contracts/Examples.SandboxedUi.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/samples/SandboxedUi/Host/">
+    <Project Path="samples/SandboxedUi/Host/Examples.SandboxedUi.Host.csproj" />
+  </Folder>
+  <Folder Name="/samples/SandboxedUi/Plugin/">
+    <Project Path="samples/SandboxedUi/Plugin/Examples.SandboxedUi.Plugin.csproj" />
+  </Folder>
 
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
@@ -57,8 +67,14 @@
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
+  <Folder Name="/src/UI/">
+    <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
+    <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
+    <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
+  </Folder>
 
   <Folder Name="/tests/">
+    <Project Path="tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj" />
     <Project Path="tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj" />
     <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
     <Project Path="tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj" />

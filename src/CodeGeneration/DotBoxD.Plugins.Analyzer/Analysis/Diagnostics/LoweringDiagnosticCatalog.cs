@@ -14,6 +14,12 @@ internal static class LoweringDiagnosticCatalog
     private static readonly LoweringDiagnosticCatalogEntry[] s_entries =
     [
         new(
+            "sandbox UI local/remote handler",
+            "UiHandlerModelFactory",
+            UI.UiHandlerGenerator.Unsupported,
+            "NotSupportedException routes through Fail to UiHandlerModel.Error and generator DBXU001 output.",
+            "local signature/body lowering, component container and explicit remote endpoint declarations"),
+        new(
             "event/plugin kernel class",
             "PluginKernelModelFactory",
             PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,

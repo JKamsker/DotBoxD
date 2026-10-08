@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Contracts/Examples.SandboxedUi.Contracts.csproj" />
+    <ProjectReference Include="../../../src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
+    <ProjectReference Include="../../../src/Pushdown/DotBoxD.Pushdown.Services/DotBoxD.Pushdown.Services.csproj" />
+  </ItemGroup>
+</Project>

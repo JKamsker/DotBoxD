@@ -69,13 +69,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         };
 
     private string LowerUnary(PrefixUnaryExpressionSyntax unary)
-        => unary.Kind() switch
+    {
+        RpcOperatorSemanticsValidator.ValidateUnary(unary, ModelFor(unary), _cancellationToken);
+        return unary.Kind() switch
         {
             SyntaxKind.LogicalNotExpression => Obj(("unary", Str("not")), ("operand", LowerExpression(unary.Operand))),
             SyntaxKind.UnaryMinusExpression => Obj(("unary", Str("-")), ("operand", LowerExpression(unary.Operand))),
             SyntaxKind.UnaryPlusExpression => LowerExpression(unary.Operand),
             _ => throw new NotSupportedException($"Server extension unary '{unary.Kind()}' is not supported.")
         };
+    }
 
     private string LowerBinary(BinaryExpressionSyntax binary)
         => LowerBinary(binary, LowerExpression);
@@ -83,6 +86,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string LowerBinary(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
     {
         ValidateBinarySingleSemantics(binary);
+        RpcOperatorSemanticsValidator.Validate(binary, ModelFor(binary), _cancellationToken);
 
         if (binary.Kind() == SyntaxKind.AddExpression)
         {
@@ -91,7 +95,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             if (leftIsString && rightIsString)
             {
                 Allocates = true;
-                return Call("string.concatBudgeted", null, lower(binary.Left), lower(binary.Right));
+                return LowerBinaryOperands(binary, lower, concatenate: true);
             }
 
             if (leftIsString || rightIsString)
@@ -101,7 +105,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
         }
 
-        return BinaryJson(JsonBinaryOperator(binary), lower(binary.Left), lower(binary.Right));
+        return LowerBinaryOperands(binary, lower);
     }
 
     private string LiteralJson(ExpressionSyntax expression, object? value)
@@ -120,6 +124,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
     private string LowerInvocation(InvocationExpressionSyntax invocation)
     {
+        var symbolInfo = _model.GetSymbolInfo(invocation, _cancellationToken);
+        if (symbolInfo.Symbol is IMethodSymbol calledMethod)
+        { _validateInvocation?.Invoke(calledMethod); }
+        if (TryLowerInvariantInt32Text(invocation) is { } text)
+        { return text; }
         if (TryLowerServiceHandleInvocation(invocation) is { } serviceHandleCall)
         {
             return serviceHandleCall;
@@ -129,7 +138,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return mapCall;
         }
 
-        var symbolInfo = _model.GetSymbolInfo(invocation, _cancellationToken);
         if (symbolInfo.Symbol is IMethodSymbol method &&
             DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is { } binding)
         {
@@ -204,14 +212,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (element.ArgumentList.Arguments.Count == 1 &&
             DotBoxDRpcTypeMapper.ListElementType(receiverType) is not null)
         {
-            return Call(
-                "list.get",
-                null,
-                LowerExpression(element.Expression),
-                LowerRequiredExpression(
-                    element.ArgumentList.Arguments[0].Expression,
-                    _model.Compilation.GetSpecialType(SpecialType.System_Int32),
-                    "Server extension list index"));
+            return LowerReceiverCall("list.get", element.Expression,
+                element.ArgumentList.Arguments[0].Expression,
+                _model.Compilation.GetSpecialType(SpecialType.System_Int32), "Server extension list index");
         }
         return TryLowerMapElementGet(element, receiverType)
             ?? throw new NotSupportedException($"Server extension indexing '{element}' is not supported.");
@@ -276,7 +279,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return null;
     }
 
-    private static bool HasRpcServiceAttribute(ITypeSymbol type)
+    internal static bool HasRpcServiceAttribute(ITypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {

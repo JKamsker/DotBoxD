@@ -87,3 +87,9 @@ stable actionable help surface. Runtime `DBXK` entries are also maintained in
 Legacy ShaRPC `SHARPC###` codes map to `DBXS###`; legacy Safe-IR `SGP###` codes map to `DBXK###`.
 Update old `.editorconfig` and `<NoWarn>` entries. See
 [Migration from standalone repositories](/contributing/migration-from-standalone-repos/).
+
+## Sandboxed UI authoring
+
+| Code | Cause | Bad example → correction | Alternative or fallback | Suppression policy |
+| --- | --- | --- | --- | --- |
+| <a id="dbxu001"></a>`DBXU001` | A declared local UI method cannot be lowered to restricted IR, has an unsupported signature/container, or mixes local and remote declarations. | `[UiLocalHandler] static string Read(int x) => File.ReadAllText("x");` → declare `[UiRemoteHandler(7)]` and explicitly route typed worker RPC, or use an authorized host binding. | Handwrite a public `UiKernelDefinition<TInput,TOutput>`; compose components through `UiBuilder`/raw `UiPackage`. Each method output can be opted out with `GenerateKernel = false` or `GenerateEndpoint = false`; handwritten generated-name members win. | Error; suppressing a diagnostic does not create the missing kernel. Choose an explicit execution boundary and a supported signature. |

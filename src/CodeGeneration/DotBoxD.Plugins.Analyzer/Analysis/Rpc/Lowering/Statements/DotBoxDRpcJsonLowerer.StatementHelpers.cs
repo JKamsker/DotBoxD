@@ -6,8 +6,19 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    internal bool IsLocalWriteTarget(IdentifierNameSyntax target)
+        => ModelFor(target).GetSymbolInfo(target, _cancellationToken).Symbol is ILocalSymbol or IParameterSymbol or IDiscardSymbol;
+
+    internal bool IsDiscardWriteTarget(IdentifierNameSyntax target)
+        => ModelFor(target).GetSymbolInfo(target, _cancellationToken).Symbol is IDiscardSymbol;
+
     internal string IncrementStatement(IdentifierNameSyntax target, SyntaxKind kind)
     {
+        if (!IsLocalWriteTarget(target))
+        {
+            throw new NotSupportedException($"Increment or decrement target '{target}' must be a local or parameter; use an explicit host binding for nonlocal writes.");
+        }
+
         var targetType = TypeOf(target);
         RejectRuntimeSingleResult(
             targetType,
