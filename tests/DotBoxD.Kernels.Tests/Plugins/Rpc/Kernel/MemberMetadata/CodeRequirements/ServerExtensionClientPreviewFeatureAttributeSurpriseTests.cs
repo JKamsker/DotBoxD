@@ -82,7 +82,7 @@ public sealed class ServerExtensionClientPreviewFeatureAttributeSurpriseTests
 
         Assert.DoesNotContain(
             generatedMethod.AttributeLists.SelectMany(static attributeList => attributeList.Attributes),
-            static attribute => attribute.Name.ToString() is "RequiresPreviewFeatures" or "RequiresPreviewFeaturesAttribute");
+            static attribute => attribute.Name.GetLastToken().ValueText is "RequiresPreviewFeatures" or "RequiresPreviewFeaturesAttribute");
     }
 
     private const string ServiceBackedSource = """
