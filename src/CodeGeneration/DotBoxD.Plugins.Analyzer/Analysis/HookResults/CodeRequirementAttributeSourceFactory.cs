@@ -10,6 +10,7 @@ internal static class CodeRequirementAttributeSourceFactory
         Add(attributes, compilation, "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute");
         Add(attributes, compilation, "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute");
         Add(attributes, compilation, "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute");
+        Add(attributes, compilation, "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
         return attributes;
     }
 
