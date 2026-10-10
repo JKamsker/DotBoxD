@@ -154,6 +154,9 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         }
         catch (Exception ex)
         {
+            // A handler can cancel the caller token immediately before failing. Cancellation is
+            // terminal for the dispatch and must not be reported as an isolated handler fault.
+            cancellationToken.ThrowIfCancellationRequested();
             ReportFault(ex);
             return null;
         }
