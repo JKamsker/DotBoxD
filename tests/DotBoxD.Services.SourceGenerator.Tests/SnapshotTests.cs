@@ -184,7 +184,8 @@ public class SnapshotTests
 
     private static Task RunVerify(string source)
     {
-        var (driver, _) = GeneratorTestHelper.RunGenerator(source);
+        var compilation = GeneratorTestHelper.CreateCompilation(source).WithAssemblyName("Snapshots");
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         return Verifier.Verify(driver).UseDirectory("Snapshots");
     }
 }

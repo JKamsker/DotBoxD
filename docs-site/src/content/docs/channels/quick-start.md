@@ -158,21 +158,21 @@ The source generator creates:
 1. **Proxy** (`MyServiceProxy`) - Caller-side stub that serializes calls
 2. **Dispatcher** (`MyServiceDispatcher`) - Provider-side router that deserializes and invokes
 3. **Extensions** (`peer.GetMyService()`, `peer.ProvideMyService(impl)`) - Convenience methods on `RpcPeer`
-4. **Registry factory** (`DotBoxDGenerated`) - Typed proxy/dispatcher factory backed by generated delegates
-5. **Service catalog** (`DotBoxDGenerated.Services`) - Array-backed `GeneratedService` descriptors
-6. **Registration sink** (`DotBoxDGenerated.RegisterServices(...)`) - Direct generic calls for service/proxy registrations
-7. **Generated implementation sink** (`DotBoxDGenerated.RegisterGeneratedServices(...)`) - Direct generic calls for service/proxy/dispatcher registrations
+4. **Registry factory** (internal `DotBoxDGenerated`) - Assembly-local factories backed by generated delegates
+5. **Service catalog** (`GeneratedServiceRegistry.GetServices(assembly)`) - Array-backed `GeneratedService` descriptors
+6. **Registration sink** (`GeneratedServiceRegistry.RegisterServices(assemblies, sink)`) - Direct generic calls for service/proxy registrations
+7. **Generated implementation sink** (`GeneratedServiceRegistry.RegisterGeneratedServices(assemblies, sink)`) - Direct generic calls for service/proxy/dispatcher registrations
 
-You can use the generated factory directly when building framework-style APIs:
+You can use the public runtime registry when building framework-style APIs:
 
 ```csharp
 using DotBoxD.Services.Generated;
 
 // CreateProxy takes an IRpcInvoker - pass an RpcPeer.
-var proxy = DotBoxDGenerated.CreateProxy<IMyService>(peer);
-var dispatcher = DotBoxDGenerated.CreateDispatcher<IMyService>(new MyService());
+var proxy = GeneratedServiceRegistry.CreateProxy<IMyService>(peer);
+var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IMyService>(new MyService());
 
-foreach (var service in DotBoxDGenerated.Services)
+foreach (var service in GeneratedServiceRegistry.GetServices(typeof(IMyService).Assembly))
 {
     Console.WriteLine($"{service.ServiceType.Name}: {service.ProxyType.Name}");
 }
@@ -194,7 +194,7 @@ public sealed class MySink : IRpcServiceRegistrationSink
     }
 }
 
-DotBoxDGenerated.RegisterServices(new MySink());
+GeneratedServiceRegistry.RegisterServices(new[] { typeof(IMyService).Assembly }, new MySink());
 ```
 
 If the host needs both generated implementation types, use
@@ -215,7 +215,7 @@ public sealed class GeneratedSink : IRpcGeneratedServiceRegistrationSink
     }
 }
 
-DotBoxDGenerated.RegisterGeneratedServices(new GeneratedSink());
+GeneratedServiceRegistry.RegisterGeneratedServices(new[] { typeof(IMyService).Assembly }, new GeneratedSink());
 ```
 
 ## Next Steps

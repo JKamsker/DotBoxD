@@ -220,7 +220,7 @@ public class GeneratedTypeCollisionTests
 
             namespace DotBoxD.Services.Generated
             {
-                public static class DotBoxDGeneratedExtensions
+                public static class DotBoxDGeneratedExtensions_CollisionTest
                 {
                 }
             }
@@ -235,12 +235,13 @@ public class GeneratedTypeCollisionTests
             }
             """;
 
-        var runResult = Run(source);
+        var compilation = GeneratorTestHelper.CreateCompilation(source).WithAssemblyName("CollisionTest");
+        var runResult = GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
 
         var diagnostic = runResult.Diagnostics.Single(d => d.Id == "DBXS003");
         diagnostic.GetMessage().Should().Contain(
-            "generated extension type 'DotBoxD.Services.Generated.DotBoxDGeneratedExtensions' would collide");
-        DiagnosticText(source, diagnostic).Should().Contain("DotBoxDGeneratedExtensions");
+            "generated extension type 'DotBoxD.Services.Generated.DotBoxDGeneratedExtensions_CollisionTest' would collide");
+        DiagnosticText(source, diagnostic).Should().Contain("DotBoxDGeneratedExtensions_CollisionTest");
         runResult.Results.Single().GeneratedSources
             .Should().NotContain(g => g.HintName.Contains("IFoo."));
     }

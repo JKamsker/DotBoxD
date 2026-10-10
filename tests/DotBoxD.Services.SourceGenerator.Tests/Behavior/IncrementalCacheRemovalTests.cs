@@ -105,7 +105,7 @@ public class IncrementalCacheRemovalTests
 
     private static string GeneratedExtensionsFor(params string[] sources)
     {
-        var compilation = GeneratorTestHelper.CreateCompilation(sources);
+        var compilation = GeneratorTestHelper.CreateCompilation(sources).WithAssemblyName("Ordering");
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         return driver.GetRunResult().Results.Single().GeneratedSources
             .Single(g => g.HintName == "DotBoxDRpcExtensions.g.cs")

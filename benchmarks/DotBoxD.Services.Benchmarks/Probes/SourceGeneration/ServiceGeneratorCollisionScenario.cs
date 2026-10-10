@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using DotBoxD.CodeGeneration.Services;
 using DotBoxD.Services.Attributes;
 using DotBoxD.Services.SourceGenerator.EntryPoint;
 using Microsoft.CodeAnalysis;
@@ -50,6 +51,13 @@ internal sealed class ServiceGeneratorCollisionScenario
         ServiceGeneratorCollisionCaseDefinition definition,
         bool trackSteps = false)
     {
+        var assemblyName = $"ServiceGeneratorCollision_{definition.Name}_{serviceCount}";
+        var extensionsType = GeneratedServiceTypeNames.Extensions(assemblyName);
+        definition = definition with
+        {
+            FirstSource = definition.FirstSource.Replace(GeneratedServiceTypeNames.LegacyExtensions, extensionsType),
+            SecondSource = definition.SecondSource.Replace(GeneratedServiceTypeNames.LegacyExtensions, extensionsType),
+        };
         var firstServiceSource = ServiceGeneratorCollisionSources.Services(
             serviceCount,
             definition.ServiceEdit,
@@ -75,7 +83,7 @@ internal sealed class ServiceGeneratorCollisionScenario
             ParseOptions,
             "ExistingType.cs");
         var firstCompilation = CSharpCompilation.Create(
-            $"ServiceGeneratorCollision_{definition.Name}_{serviceCount}",
+            assemblyName,
             [firstServices, firstExistingType],
             References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

@@ -7,8 +7,10 @@ namespace DotBoxD.Services.Generated
     /// <summary>
     /// Factory methods for DotBoxD-generated proxies and dispatchers.
     /// </summary>
-    public static class DotBoxDGenerated
+    internal static class DotBoxDGenerated
     {
+        private sealed class AssemblyMarker { }
+
         private static readonly global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.GeneratedMethod> s_service0Methods =
             global::System.Array.AsReadOnly(new global::DotBoxD.Services.Generated.GeneratedMethod[]
         {
@@ -45,7 +47,7 @@ namespace DotBoxD.Services.Generated
         static DotBoxDGenerated()
         {
             global::DotBoxD.Services.Generated.GeneratedServiceRegistry.RegisterServices(
-                typeof(global::DotBoxD.Services.Generated.DotBoxDGenerated).Assembly,
+                typeof(AssemblyMarker).Assembly,
                 s_services);
             global::DotBoxD.Services.Generated.GeneratedServiceRegistry.Register<global::Snap.Renamed.IHello>(
                 static client => new global::Snap.Renamed.HelloProxy(client),

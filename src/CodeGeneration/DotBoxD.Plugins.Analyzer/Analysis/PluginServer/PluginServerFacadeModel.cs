@@ -18,6 +18,7 @@ internal sealed record PluginServerFacadeModel(
     string SubscriptionRegistryName,
     string WorldType,
     string WorldExtensionSuffix,
+    string WorldExtensionsType,
     string WorldDocumentation,
     string ControlServiceType,
     string LiveSettingUpdateType,
@@ -36,7 +37,8 @@ internal sealed record PluginServerFacadeModel(
     string? EventCallbackType = null,
     string? EventCallbackProvideSuffix = null,
     string? EventCallbackReturnType = null,
-    bool EventCallbackReturnHasValue = false);
+    bool EventCallbackReturnHasValue = false,
+    string? EventCallbackExtensionsType = null);
 
 internal sealed record PluginServerControlProperty(
     string Name,

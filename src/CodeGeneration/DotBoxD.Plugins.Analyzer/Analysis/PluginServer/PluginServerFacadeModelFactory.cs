@@ -93,6 +93,7 @@ internal static partial class PluginServerFacadeModelFactory
             SubscriptionRegistryName(type.Name),
             TypeName(worldType),
             PluginServerWorldExtensionSuffixResolver.Resolve(compilation, worldType, cancellationToken),
+            PluginServerExtensionTypeResolver.TypeName(worldType),
             PluginServerXmlDocumentation.FromSymbol(
                 worldType,
                 "Generated plugin-side facade for the remote world domain.",
@@ -109,7 +110,8 @@ internal static partial class PluginServerFacadeModelFactory
             eventCallback is null ? null : TypeName(eventCallback.Value.Type),
             eventCallback?.ProvideSuffix,
             eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
-            eventCallback?.ReturnHasValue ?? false);
+            eventCallback?.ReturnHasValue ?? false,
+            eventCallback is null ? null : PluginServerExtensionTypeResolver.TypeName(eventCallback.Value.Type));
     }
 
     private static string EnsureServiceWrapper(
