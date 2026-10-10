@@ -42,6 +42,16 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
                 public void Handle(DamageEvent e, HookContext context)
                     => context.Messages.Send(e.TargetId, "portable");
             }
+
+            [RequiresPreviewFeatures]
+            [Plugin("sample.parameterless-preview")]
+            public sealed partial class ParameterlessPreviewDamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext context) => true;
+
+                public void Handle(DamageEvent e, HookContext context)
+                    => context.Messages.Send(e.TargetId, "parameterless-preview");
+            }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
@@ -54,12 +64,14 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
 
         Assert.Empty(generatorDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Empty(outputCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-        Assert.Equal(2, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Length);
+        Assert.Equal(3, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Length);
 
         AssertPreviewFeatureAttribute(
             outputCompilation.GetTypeByMetadataName("Sample.PreviewDamagePluginPackage"),
             "Preview plugin package",
             "https://example.test/preview-plugin");
+        AssertParameterlessPreviewFeatureAttribute(
+            outputCompilation.GetTypeByMetadataName("Sample.ParameterlessPreviewDamagePluginPackage"));
         AssertNoPreviewFeatureAttribute(
             outputCompilation.GetTypeByMetadataName("Sample.PortableDamagePluginPackage"));
     }
@@ -83,6 +95,17 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
         Assert.DoesNotContain(
             packageType.GetAttributes(),
             attribute => attribute.AttributeClass?.ToDisplayString() == RequiresPreviewFeaturesAttribute);
+    }
+
+    private static void AssertParameterlessPreviewFeatureAttribute(INamedTypeSymbol? packageType)
+    {
+        Assert.NotNull(packageType);
+        var attribute = Assert.Single(
+            packageType.GetAttributes(),
+            candidate => candidate.AttributeClass?.ToDisplayString() == RequiresPreviewFeaturesAttribute);
+
+        Assert.Empty(attribute.ConstructorArguments);
+        Assert.Empty(attribute.NamedArguments);
     }
 
     private static CSharpCompilation CreateCompilation(string source)

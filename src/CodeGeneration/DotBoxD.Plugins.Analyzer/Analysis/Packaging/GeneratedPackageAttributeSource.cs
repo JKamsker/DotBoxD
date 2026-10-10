@@ -96,6 +96,11 @@ internal static class GeneratedPackageAttributeSource
 
     private static string? TryRequiresPreviewFeaturesAttribute(AttributeData attribute)
     {
+        if (attribute.ConstructorArguments.IsEmpty)
+        {
+            return "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]";
+        }
+
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string message)
         {
