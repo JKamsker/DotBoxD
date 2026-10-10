@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Instrumentation installs process-wide callbacks in fixture assemblies, preventing
+               collectible contexts from unloading. Shipping libraries remain instrumented. -->
+          <Exclude>[*.Tests]*,[DotBoxD.Services.Tests.GeneratedFixtures]*,[DotBoxD.Services.TestContracts]*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
