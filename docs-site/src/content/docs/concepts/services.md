@@ -68,7 +68,8 @@ fuel-metered IR.
 Diagnostics from the generator use the `DBXS###` prefix - see
 [reference/diagnostics.md](/reference/diagnostics/).
 
-**See also:** the annotated [GameServer walkthrough](/examples/gameserver-walkthrough/) for a
+**See also:** [unloadable RPC hosts](/channels/collectible-hosts/) for collectible context lifetime
+and serializer setup, or the annotated [GameServer walkthrough](/examples/gameserver-walkthrough/) for a
 guided tour, or the raw GameServer sample under
 [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer), the
 [Channels (RPC) guide](/channels/quick-start/) (quick-start, API reference, Unity integration, transports,

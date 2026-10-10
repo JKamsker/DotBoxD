@@ -55,6 +55,17 @@ public sealed class MessagePackRpcSerializer : ISerializer
     /// Creates MessagePack options that include DotBoxD's payload formatters before user resolvers.
     /// </summary>
     public static MessagePackSerializerOptions CreateOptions(params IFormatterResolver[] resolvers)
+        => CreateOptions(resolvers, allowDynamicResolvers: true);
+
+    /// <summary>
+    /// Creates fresh options for unloadable hosts using supplied formatters and built-in scalar
+    /// formatters. Missing DTO formatters fail instead of reaching MessagePack's static dynamic caches.
+    /// Keep these options and their serializer scoped to the collectible context.
+    /// </summary>
+    public static MessagePackSerializerOptions CreateCollectibleOptions(params IFormatterResolver[] resolvers)
+        => CreateOptions(resolvers, allowDynamicResolvers: false);
+
+    private static MessagePackSerializerOptions CreateOptions(IFormatterResolver[] resolvers, bool allowDynamicResolvers)
     {
         // A null array (CreateOptions(null)) is legal C# for a params parameter and would otherwise be
         // treated as "no resolvers", silently dropping all the caller's custom formatters — the same
@@ -66,7 +77,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         var extraCount = resolvers.Length;
-        var effectiveResolvers = new IFormatterResolver[extraCount + 4];
+        var effectiveResolvers = new IFormatterResolver[extraCount + (allowDynamicResolvers ? 4 : 3)];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
@@ -77,8 +88,15 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
         effectiveResolvers[extraCount] = WellFormedStringResolver.Instance;
         effectiveResolvers[extraCount + 1] = NativeDateTimeResolver.Instance;
-        effectiveResolvers[extraCount + 2] = StandardResolver.Instance;
-        effectiveResolvers[extraCount + 3] = ContractlessStandardResolver.Instance;
+        if (allowDynamicResolvers)
+        {
+            effectiveResolvers[extraCount + 2] = StandardResolver.Instance;
+            effectiveResolvers[extraCount + 3] = ContractlessStandardResolver.Instance;
+        }
+        else
+        {
+            effectiveResolvers[extraCount + 2] = BuiltinResolver.Instance;
+        }
 
         return MessagePackSerializerOptions.Standard
             .WithResolver(CompositeResolver.Create(
@@ -173,7 +191,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         try
         {
             var reader = new MessagePackReader(data);
-            var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
+            var value = RuntimeTypeCodec.For(type).Deserialize(ref reader, _options);
             ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
             return value;
         }
@@ -238,43 +256,4 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 : ReadOnlyMemory<byte>.Empty;
         }
     }
-}
-
-internal static class RpcEnvelopeStringValidation
-{
-    public static void ThrowIfMalformedUtf16(string? value, string envelopeName, string fieldName)
-    {
-        if (value is null)
-        {
-            return;
-        }
-
-        for (var i = 0; i < value.Length; i++)
-        {
-            var current = value[i];
-            if (char.IsHighSurrogate(current))
-            {
-                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
-                {
-                    i++;
-                    continue;
-                }
-
-                throw MalformedUtf16(envelopeName, fieldName);
-            }
-
-            if (char.IsLowSurrogate(current))
-            {
-                throw MalformedUtf16(envelopeName, fieldName);
-            }
-        }
-    }
-
-    private static RpcEnvelopeValidationException MalformedUtf16(string envelopeName, string fieldName)
-        => new(
-            $"RPC {envelopeName} {fieldName} contains malformed UTF-16 text with an unpaired surrogate.");
-}
-
-internal sealed class RpcEnvelopeValidationException(string message) : MessagePackSerializationException(message)
-{
 }

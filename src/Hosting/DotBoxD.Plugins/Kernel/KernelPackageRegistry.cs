@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using DotBoxD.Plugins.Runtime;
 
 namespace DotBoxD.Plugins.Kernel;
@@ -21,7 +23,32 @@ public static class KernelPackageRegistry
     private const string FactoryMethod = "Create";
 
     private static readonly object Gate = new();
-    private static readonly Dictionary<Type, Func<PluginPackage>> Factories = [];
+    private static readonly ConditionalWeakTable<Type, Func<PluginPackage>> Factories = new();
+
+    /// <summary>Removes a kernel factory. Returns one if removed, or zero if absent.</summary>
+    public static int Unregister(Type kernelType)
+    {
+        ArgumentNullException.ThrowIfNull(kernelType);
+        lock (Gate)
+            return Factories.Remove(kernelType) ? 1 : 0;
+    }
+
+    /// <summary>Removes all factories whose kernel types are declared in the supplied load context.</summary>
+    public static int UnregisterLoadContext(AssemblyLoadContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        lock (Gate)
+        {
+            var removed = 0;
+            foreach (var entry in Factories)
+            {
+                if (AssemblyLoadContext.GetLoadContext(entry.Key.Assembly) == context && Factories.Remove(entry.Key))
+                    removed++;
+            }
+
+            return removed;
+        }
+    }
 
     /// <summary>Registers a package factory for a kernel type (typically from a generated [ModuleInitializer]).</summary>
     public static void Register(Type kernelType, Func<PluginPackage> factory)
@@ -30,7 +57,7 @@ public static class KernelPackageRegistry
         ArgumentNullException.ThrowIfNull(factory);
         lock (Gate)
         {
-            Factories[kernelType] = factory;
+            Factories.AddOrUpdate(kernelType, factory);
         }
     }
 
@@ -57,7 +84,7 @@ public static class KernelPackageRegistry
         {
             if (!Factories.TryGetValue(kernelType, out var current))
             {
-                Factories[kernelType] = factory;
+                Factories.Add(kernelType, factory);
             }
             else
             {
