@@ -255,6 +255,8 @@ public static IReadOnlyList<GeneratedService> GetServices(IEnumerable<Assembly> 
 public static IServiceDispatcher CreateDispatcher(Type serviceInterface, object implementation)
 public static IServiceDispatcher CreateDispatcher<TService>(TService implementation) where TService : class
 public static Meter Metrics { get; } = new(InstrumentationName)
+public static int Unregister(Type serviceInterface)
+public static int UnregisterAssembly(Assembly assembly)
 public static object CreateProxy(Type serviceInterface, IRpcInvoker invoker)
 public static Payload Empty { get; } = new(Array.Empty<byte>(), 0)
 public static Payload FrameMessage<T>( ISerializer serializer, int messageId, MessageType type, T envelope, ReadOnlySpan<byte> payload)

@@ -44,7 +44,7 @@
     {
       "name": "MessagePack envelope boundaries",
       "packagePatterns": [ "DotBoxD.Codecs.MessagePack" ],
-      "filePatterns": [ "*/MessagePackRpcSerializer.cs", "*/RpcRequestFormatter.cs", "*/RpcResponseFormatter.cs", "*/WellFormedStringFormatter.cs" ],
+      "filePatterns": [ "*/MessagePackRpcSerializer.cs", "*/RpcRequestFormatter.cs", "*/RpcResponseFormatter.cs", "*/WellFormedStringFormatter.cs", "*/RpcEnvelopeStringValidation.cs", "*/RuntimeTypeCodec.cs" ],
       "minimumLineCoverage": 95,
       "minimumBranchCoverage": 95
     },

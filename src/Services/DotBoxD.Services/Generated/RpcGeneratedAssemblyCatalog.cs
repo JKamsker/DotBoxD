@@ -7,8 +7,7 @@ internal static class RpcGeneratedAssemblyCatalog
 {
     private const string GeneratedFactoryTypeName = "DotBoxD.Services.Generated.DotBoxDGenerated";
 
-    // Discovery caches follow assembly lifetime. Explicit global service registrations retain their
-    // own factories through GeneratedServiceRegistry, independently of these lookup results.
+    // Discovery caches follow assembly lifetime, like the weak-key service factory registrations.
     private static readonly ConditionalWeakTable<Assembly, AssemblyCache> s_caches = new();
 
     public static bool EnsureRegistered(Assembly assembly)

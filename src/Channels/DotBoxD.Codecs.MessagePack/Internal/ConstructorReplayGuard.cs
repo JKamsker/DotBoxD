@@ -254,11 +254,12 @@ internal sealed class ConstructorReplayGuard
         MessagePackSerializer.Serialize(serialized, value, options);
 
         var reader = new MessagePackReader(serialized.WrittenMemory);
-        var replayed = MessagePackSerializer.Deserialize(value!.GetType(), ref reader, options);
+        var codec = RuntimeTypeCodec.For(value!.GetType());
+        var replayed = codec.Deserialize(ref reader, options);
         ThrowIfTrailingBytes(serialized.WrittenCount, checked((int)reader.Consumed));
 
         var replayedSerialized = new ArrayBufferWriter<byte>();
-        MessagePackSerializer.Serialize(value.GetType(), replayedSerialized, replayed, options, CancellationToken.None);
+        codec.Serialize(replayedSerialized, replayed, options);
         if (!serialized.WrittenSpan.SequenceEqual(replayedSerialized.WrittenSpan))
         {
             ThrowChangingValues(value.GetType());
