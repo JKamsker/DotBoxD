@@ -126,7 +126,7 @@ function Get-CoverageSourceFile([string] $file, [string[]] $sources) {
         $_.Replace('\', '/').TrimEnd('/') + '/' + $normalized
     })) {
         if ($candidate -match '(^|/)src/(?<source>.+)$') {
-            return $Matches["source"]
+            return 'src/' + $Matches["source"]
         }
     }
     return $normalized

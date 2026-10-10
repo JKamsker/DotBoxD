@@ -8,6 +8,7 @@ public sealed class CoverageSourcePathTests
     [InlineData("/workspace/repo/src/CodeGeneration/", "Generator.cs")]
     [InlineData("C:\\workspace\\repo\\src\\CodeGeneration\\", "Generator.cs")]
     [InlineData("/", "workspace/repo/src/CodeGeneration/Generator.cs")]
+    [InlineData("", "src/CodeGeneration/Generator.cs")]
     public async Task Coverage_reports_merge_the_same_source_line_across_different_roots(
         string sourceRoot,
         string filename)
