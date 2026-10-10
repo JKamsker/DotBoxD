@@ -98,7 +98,17 @@ internal static class GeneratedPackageAttributeSource
     {
         if (attribute.ConstructorArguments.IsEmpty)
         {
-            return "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]";
+            var parameterlessBuilder = new StringBuilder("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (argument.Key == "Url" && argument.Value.Value is string url)
+                {
+                    parameterlessBuilder.Append("(Url = ").Append(LiteralReader.StringLiteral(url)).Append(')');
+                }
+            }
+
+            parameterlessBuilder.Append(']');
+            return parameterlessBuilder.ToString();
         }
 
         if (attribute.ConstructorArguments.Length != 1 ||

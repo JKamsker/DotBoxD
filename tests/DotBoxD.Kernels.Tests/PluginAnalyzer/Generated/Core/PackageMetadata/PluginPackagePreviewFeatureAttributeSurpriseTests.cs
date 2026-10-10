@@ -52,6 +52,16 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
                 public void Handle(DamageEvent e, HookContext context)
                     => context.Messages.Send(e.TargetId, "parameterless-preview");
             }
+
+            [RequiresPreviewFeatures(Url = "https://example.test/parameterless-preview-plugin")]
+            [Plugin("sample.parameterless-preview-url")]
+            public sealed partial class ParameterlessPreviewUrlDamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext context) => true;
+
+                public void Handle(DamageEvent e, HookContext context)
+                    => context.Messages.Send(e.TargetId, "parameterless-preview-url");
+            }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
@@ -64,7 +74,7 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
 
         Assert.Empty(generatorDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Empty(outputCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-        Assert.Equal(3, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Length);
+        Assert.Equal(4, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Length);
 
         AssertPreviewFeatureAttribute(
             outputCompilation.GetTypeByMetadataName("Sample.PreviewDamagePluginPackage"),
@@ -72,6 +82,9 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
             "https://example.test/preview-plugin");
         AssertParameterlessPreviewFeatureAttribute(
             outputCompilation.GetTypeByMetadataName("Sample.ParameterlessPreviewDamagePluginPackage"));
+        AssertParameterlessPreviewFeatureAttribute(
+            outputCompilation.GetTypeByMetadataName("Sample.ParameterlessPreviewUrlDamagePluginPackage"),
+            "https://example.test/parameterless-preview-plugin");
         AssertNoPreviewFeatureAttribute(
             outputCompilation.GetTypeByMetadataName("Sample.PortableDamagePluginPackage"));
     }
@@ -97,7 +110,7 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
             attribute => attribute.AttributeClass?.ToDisplayString() == RequiresPreviewFeaturesAttribute);
     }
 
-    private static void AssertParameterlessPreviewFeatureAttribute(INamedTypeSymbol? packageType)
+    private static void AssertParameterlessPreviewFeatureAttribute(INamedTypeSymbol? packageType, string? url = null)
     {
         Assert.NotNull(packageType);
         var attribute = Assert.Single(
@@ -105,7 +118,15 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
             candidate => candidate.AttributeClass?.ToDisplayString() == RequiresPreviewFeaturesAttribute);
 
         Assert.Empty(attribute.ConstructorArguments);
-        Assert.Empty(attribute.NamedArguments);
+        if (url is null)
+        {
+            Assert.Empty(attribute.NamedArguments);
+            return;
+        }
+
+        Assert.Contains(
+            attribute.NamedArguments,
+            argument => argument.Key == "Url" && argument.Value.Value is string actualUrl && actualUrl == url);
     }
 
     private static CSharpCompilation CreateCompilation(string source)
