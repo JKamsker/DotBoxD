@@ -31,7 +31,8 @@ internal static class CodeRequirementAttributeSourceFactory
             arguments.Add(LiteralReader.StringLiteral(message));
         }
         else if (attribute.ConstructorArguments.Length != 0 ||
-                 attributeName != "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute")
+                 (attributeName != "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute" &&
+                  attributeName != "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute"))
         {
             return null;
         }

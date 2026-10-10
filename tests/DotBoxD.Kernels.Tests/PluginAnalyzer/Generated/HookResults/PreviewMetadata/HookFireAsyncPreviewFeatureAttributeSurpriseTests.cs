@@ -33,6 +33,12 @@ public sealed class HookFireAsyncPreviewFeatureAttributeSurpriseTests
             "FireAsync(",
             fireAsyncSource,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]\n" +
+            "    public static global::System.Threading.Tasks.ValueTask<global::Regression.Game.DefaultPreviewDamageResult?> " +
+            "FireAsync(",
+            fireAsyncSource,
+            StringComparison.Ordinal);
     }
 
     private const string Source = """
@@ -47,6 +53,13 @@ public sealed class HookFireAsyncPreviewFeatureAttributeSurpriseTests
 
         [HookResult]
         public readonly partial record struct PreviewDamageResult(bool Success, string? Reason, int Amount);
+
+        [RequiresPreviewFeatures]
+        [Hook("combat.preview-default", typeof(DefaultPreviewDamageResult))]
+        public sealed record DefaultPreviewDamageContext(int Amount);
+
+        [HookResult]
+        public readonly partial record struct DefaultPreviewDamageResult(bool Success, string? Reason, int Amount);
 
         [Hook("combat.portable", typeof(PortableDamageResult))]
         public sealed record PortableDamageContext(int Amount);
