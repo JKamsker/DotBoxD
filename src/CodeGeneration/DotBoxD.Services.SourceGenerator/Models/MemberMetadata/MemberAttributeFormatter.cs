@@ -11,6 +11,8 @@ internal static class MemberAttributeFormatter
         "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute";
     private const string RequiresDynamicCodeAttribute =
         "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
+    private const string RequiresPreviewFeaturesAttribute =
+        "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
     private const string RequiresUnreferencedCodeAttribute =
         "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
 
@@ -37,7 +39,8 @@ internal static class MemberAttributeFormatter
             }
             else if (attributeType is RequiresAssemblyFilesAttribute or
                 RequiresDynamicCodeAttribute or
-                RequiresUnreferencedCodeAttribute)
+                RequiresUnreferencedCodeAttribute or
+                RequiresPreviewFeaturesAttribute)
             {
                 AppendCodeRequirementAttribute(attributes, attr, attributeType);
             }
@@ -94,8 +97,7 @@ internal static class MemberAttributeFormatter
         string attributeType)
     {
         var hasMessage = attr.ConstructorArguments.Length == 1;
-        if (!hasMessage &&
-            (attributeType != RequiresAssemblyFilesAttribute || attr.ConstructorArguments.Length != 0))
+        if (!HasSupportedCodeRequirementConstructor(attr, attributeType))
         {
             return;
         }
@@ -126,6 +128,19 @@ internal static class MemberAttributeFormatter
         }
 
         sb.AppendLine("]");
+    }
+
+    private static bool HasSupportedCodeRequirementConstructor(
+        AttributeData attr,
+        string attributeType)
+    {
+        if (attr.ConstructorArguments.Length == 1)
+        {
+            return true;
+        }
+
+        return attr.ConstructorArguments.Length == 0 &&
+            attributeType is RequiresAssemblyFilesAttribute or RequiresPreviewFeaturesAttribute;
     }
 
     private static void AppendStringArgument(StringBuilder sb, TypedConstant argument)
