@@ -8,7 +8,7 @@ public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = de
 public async Task StartAsync(CancellationToken ct = default)
 public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
 public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
-public async ValueTask DisposeAsync()
+public ValueTask DisposeAsync()
 public async ValueTask ReleaseAsync(string serviceName, string instanceId)
 public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
 public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)

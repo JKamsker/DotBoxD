@@ -245,22 +245,46 @@ public sealed partial class RpcHost
             }
         }
     }
-
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         Task disposeTask;
+        TaskCompletionSource<bool>? disposalCompletion = null;
         lock (_lifecycleLock)
         {
             if (_disposeTask is null)
             {
                 Volatile.Write(ref _disposed, 1);
-                _disposeTask = DisposeCoreAsync();
+                disposalCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposeTask = disposalCompletion.Task;
             }
 
             disposeTask = _disposeTask;
         }
 
-        await disposeTask.ConfigureAwait(false);
+        if (_disposalContext.IsDisposingListener)
+        {
+            return default;
+        }
+
+        if (disposalCompletion is not null)
+        {
+            _ = CompleteDisposeAsync(disposalCompletion);
+        }
+
+        return new ValueTask(disposeTask);
+    }
+
+    private async Task CompleteDisposeAsync(TaskCompletionSource<bool> disposalCompletion)
+    {
+        try
+        {
+            await DisposeCoreAsync().ConfigureAwait(false);
+            disposalCompletion.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            disposalCompletion.TrySetException(ex);
+        }
     }
 
     private async Task DisposeCoreAsync()
@@ -269,7 +293,7 @@ public sealed partial class RpcHost
             () => StopAsync(),
             _peers.CloseAllAsync,
             _peers.AwaitCleanupAsync,
-            () => _listener.DisposeAsync().AsTask()).ConfigureAwait(false);
+            () => _disposalContext.DisposeListenerAsync(_listener)).ConfigureAwait(false);
     }
 
     private readonly record struct StartRecovery(CancellationTokenSource Cts, bool DisposeCts, Exception? Failure);
