@@ -176,6 +176,7 @@ internal static class ProxyInvocationEmitter
         sb.AppendLine($"{indent}}}");
         sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalException} {exceptionName})");
         sb.AppendLine($"{indent}{{");
+        ProxyFaultedReturnEmitter.AppendCallerCancellationFaultReturn(sb, method, ct, indent + "    ");
         sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.Build(method, exceptionName)};");
         sb.AppendLine($"{indent}}}");
     }
