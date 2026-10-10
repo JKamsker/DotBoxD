@@ -31,8 +31,7 @@ internal static class CodeRequirementAttributeSourceFactory
             arguments.Add(LiteralReader.StringLiteral(message));
         }
         else if (attribute.ConstructorArguments.Length != 0 ||
-                 (attributeName != "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute" &&
-                  attributeName != "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute"))
+                 !AllowsParameterlessConstructor(attributeName))
         {
             return null;
         }
@@ -60,4 +59,8 @@ internal static class CodeRequirementAttributeSourceFactory
             attributes.Add(attribute, "global::" + metadataName);
         }
     }
+
+    private static bool AllowsParameterlessConstructor(string attributeName)
+        => attributeName is "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute"
+            or "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
 }
