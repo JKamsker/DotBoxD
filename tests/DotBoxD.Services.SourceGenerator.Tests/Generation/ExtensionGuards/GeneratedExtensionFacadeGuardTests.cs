@@ -1,3 +1,4 @@
+using DotBoxD.CodeGeneration.Services;
 using System.Reflection;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Testing;
@@ -56,7 +57,7 @@ public sealed class GeneratedExtensionFacadeGuardTests
             }
             """);
 
-        return assembly.GetType("DotBoxD.Services.Generated.DotBoxDGeneratedExtensions", throwOnError: true)!;
+        return assembly.GetType("DotBoxD.Services.Generated." + GeneratedServiceTypeNames.Extensions(assembly.GetName().Name!), throwOnError: true)!;
     }
 
     private static MethodInfo GetExtensionMethod(Type extensions, string methodName) =>

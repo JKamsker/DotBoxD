@@ -26,17 +26,13 @@ internal static class GamePluginHost
                 // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push
                 // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
                 var eventCallback =
-                    global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(peer);
+                    peer.GetPluginEventCallback();
                 var service = new GamePluginControlService(server, session, sink, world, eventCallback);
 
                 // Two services per connection: the control-plane (install IR, settings, hold) and the domain
                 // world surface. ProvideGameWorldAccess is generated from [RpcService] on the interface.
-                global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGamePluginControlService(
-                    peer,
-                    service);
-                global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGameWorldAccess(
-                    peer,
-                    new GameWorldAccess(world));
+                peer.ProvideGamePluginControlService(service);
+                peer.ProvideGameWorldAccess(new GameWorldAccess(world));
                 return service;
             });
 }

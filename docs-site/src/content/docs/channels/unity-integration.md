@@ -966,7 +966,8 @@ public static class MessagePackAOTSetup
     private static void Initialize()
     {
         // Directly root the generated RPC registry so IL2CPP cannot strip it.
-        _ = DotBoxD.Services.Generated.DotBoxDGenerated.Services;
+        _ = DotBoxD.Services.Generated.GeneratedServiceRegistry.GetServices(
+            typeof(IGameService).Assembly);
 
         // Replace YourGameGeneratedResolver with the resolver produced by this
         // application's MessagePack source-generator configuration.

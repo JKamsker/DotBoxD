@@ -101,13 +101,11 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
-                peer,
-                callbackSink));
+            peer => peer.ProvidePluginEventCallback(callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
         var pushProxy =
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
+            serverPeer.GetPluginEventCallback();
 
         // --- Server side: install the lowered package and wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -170,13 +168,11 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
-                peer,
-                callbackSink));
+            peer => peer.ProvidePluginEventCallback(callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
         var pushProxy =
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
+            serverPeer.GetPluginEventCallback();
 
         // --- Server side: install + wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -232,13 +228,11 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
-                peer,
-                callbackSink));
+            peer => peer.ProvidePluginEventCallback(callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
         var pushProxy =
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
+            serverPeer.GetPluginEventCallback();
 
         using var server = PluginServer.Create(defaultPolicy: ProjectionPolicy());
         var kernel = await server.InstallAsync(lowered!);

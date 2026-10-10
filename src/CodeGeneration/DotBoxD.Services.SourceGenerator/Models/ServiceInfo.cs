@@ -77,7 +77,8 @@ internal sealed record ServiceModel(
     string RawServiceName = "",
     string ObsoleteAttribute = "",
     string TypeAttributePrefix = "",
-    string ExperimentalDiagnosticId = "");
+    string ExperimentalDiagnosticId = "",
+    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions");
 
 /// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
 internal sealed record ServicePropertyModel(

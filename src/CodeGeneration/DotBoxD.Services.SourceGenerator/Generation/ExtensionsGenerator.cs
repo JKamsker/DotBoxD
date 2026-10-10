@@ -32,7 +32,7 @@ internal static class ExtensionsGenerator
             sb.AppendLine("    [global::System.CLSCompliant(false)]");
         }
 
-        sb.AppendLine("    public static class DotBoxDGeneratedExtensions");
+        sb.Append("    public static class ").AppendLine(services.Array[0].GeneratedExtensionsType);
         sb.AppendLine("    {");
 
         foreach (var service in services)

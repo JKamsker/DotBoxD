@@ -13,9 +13,7 @@ public sealed class GamePluginControlServiceIpcRegressionTests
         var control = new EchoControlService();
         await using var host = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
         {
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGamePluginControlService(
-                peer,
-                control);
+            peer.ProvideGamePluginControlService(control);
         });
         await host.StartAsync();
         await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
