@@ -160,7 +160,17 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
             ObjectDisposedException.ThrowIf(_disposed, this);
             BlazorInputAdmission.Validate(_snapshot!, input, _inputPolicy);
         }
-        if (!await authorizer.AuthorizeAsync(user, session, input, token).AsTask().WaitAsync(token).ConfigureAwait(false))
+        bool authorized;
+        try
+        {
+            authorized = await authorizer.AuthorizeAsync(user, session, input, token).AsTask().WaitAsync(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+        }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(token);
+        }
+        if (!authorized)
         { return false; }
         token.ThrowIfCancellationRequested();
         lock (_sync)
