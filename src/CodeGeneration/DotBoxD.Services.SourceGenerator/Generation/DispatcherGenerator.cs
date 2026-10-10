@@ -62,6 +62,7 @@ internal static class DispatcherGenerator
         EmitDispatchEndpoint(sb, service, qualifiedInterface, isInstanceScoped: false);
         EmitDispatchEndpoint(sb, service, qualifiedInterface, isInstanceScoped: true);
         EmitDispatchCore(sb, service, qualifiedInterface, ct);
+        EmitAwaitWithCancellationPrecedenceHelpers(sb);
 
         sb.AppendLine("    }");
 
@@ -171,5 +172,44 @@ internal static class DispatcherGenerator
         sb.AppendLine("            }");
         sb.AppendLine("        }");
     }
+
+    private static void EmitAwaitWithCancellationPrecedenceHelpers(StringBuilder sb)
+    {
+        AppendAwaitWithCancellationPrecedenceHelper(sb, ServicesGeneratorTypeNames.GlobalTask, isGeneric: false);
+        AppendAwaitWithCancellationPrecedenceHelper(sb, ServicesGeneratorTypeNames.GlobalValueTask, isGeneric: false);
+        AppendAwaitWithCancellationPrecedenceHelper(
+            sb,
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, "T"),
+            isGeneric: true);
+        AppendAwaitWithCancellationPrecedenceHelper(
+            sb,
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, "T"),
+            isGeneric: true);
+    }
+
+    private static void AppendAwaitWithCancellationPrecedenceHelper(
+        StringBuilder sb,
+        string taskType,
+        bool isGeneric)
+    {
+        const string taskName = "task";
+        var generic = isGeneric ? "<T>" : string.Empty;
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {taskType} __dotboxd_awaitWithCancellationPrecedenceAsync{generic}({taskType} {taskName}, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            try");
+        sb.AppendLine("            {");
+        sb.AppendLine($"                {GetAwaitReturnStatement(isGeneric, taskName)}");
+        sb.AppendLine("            }");
+        sb.AppendLine($"            catch ({ServicesGeneratorTypeNames.GlobalException}) when (ct.IsCancellationRequested)");
+        sb.AppendLine("            {");
+        sb.AppendLine("                ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("                throw;");
+        sb.AppendLine("            }");
+        sb.AppendLine("        }");
+    }
+
+    private static string GetAwaitReturnStatement(bool isGeneric, string taskName) =>
+        isGeneric ? $"return await {taskName};" : $"await {taskName};";
 
 }
