@@ -118,6 +118,35 @@ public sealed class EnumerableBoundedCollectionTests
     }
 
     [Theory]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values)", false)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, -1)", false)]
+    [InlineData("int[]", "[]", "Enumerable.LastOrDefault(Values)", false)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, static _ => true)", true)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, static _ => true, -1)", true)]
+    public async Task Last_or_default_preserves_indexed_fast_paths(
+        string collectionType,
+        string initializer,
+        string expression,
+        bool reportsScan)
+    {
+        var source = $$"""
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("bounded-last-or-default")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly {{collectionType}} Values = {{initializer}};
+                public bool ShouldHandle(string e, HookContext context) => {{expression}} >= 0;
+                public void Handle(string e, HookContext context) { }
+            }
+            """;
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedLastOrDefault");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
+
+    [Theory]
     [InlineData("Dictionary<int, int>", "Map.Keys.Any()", false)]
     [InlineData("Dictionary<int, int>", "Enumerable.Any(Map.Keys)", false)]
     [InlineData("Dictionary<int, int>", "Map.Values.Any()", false)]
