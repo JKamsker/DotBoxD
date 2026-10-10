@@ -9,7 +9,7 @@ internal static class EnumerableScanPolicy
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
-            method.Name is not ("Contains" or "Any") ||
+            method.Name is not ("Contains" or "Any" or "SingleOrDefault") ||
             typeName != "System.Linq.Enumerable")
         {
             return false;
