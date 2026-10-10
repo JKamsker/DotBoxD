@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
 
 namespace DotBoxD.Kernels.Game.Plugin.Tests.Regression;
 

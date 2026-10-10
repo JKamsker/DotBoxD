@@ -6,6 +6,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
 using DotBoxD.Services.Peer;
 using DotBoxD.Transports.NamedPipes;
 

@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Game.Server.Simulation;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
 namespace DotBoxD.Kernels.Game.Server.Ipc;
