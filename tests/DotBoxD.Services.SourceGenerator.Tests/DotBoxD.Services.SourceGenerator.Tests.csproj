@@ -5,6 +5,7 @@
     <RollForward>LatestMajor</RollForward>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath Condition="'$(VSTestCollect)' == 'XPlat Code Coverage'">$(MSBuildProjectDirectory)/coverlet.runsettings</RunSettingsFilePath>
     <!-- CI is a mixed xUnit v2/v3 solution and still uses the VSTest orchestration path. -->
     <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <Nullable>enable</Nullable>

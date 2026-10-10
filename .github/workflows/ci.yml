@@ -908,8 +908,8 @@ jobs:
       - name: Build coverage prerequisites
         run: dotnet build samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj -c Release --no-restore
 
-      # Collect line and branch coverage from the two suites that exercise the bulk of
-      # the shipping code, then enforce the global, area, and critical-component floors.
+      # Collect runtime and generator coverage, then enforce the global, area, and
+      # critical-component floors across the shipping code.
       - name: Coverage thresholds
         shell: pwsh
         run: |
@@ -925,6 +925,9 @@ jobs:
             --filter "Category!=AllocationMeasurement" `
             --collect "XPlat Code Coverage" --results-directory artifacts/coverage
           if ($LASTEXITCODE -ne 0) { throw "Kernels coverage test run failed (exit $LASTEXITCODE)." }
+          dotnet test tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj -c Release --no-restore `
+            --collect "XPlat Code Coverage" --results-directory artifacts/coverage
+          if ($LASTEXITCODE -ne 0) { throw "Services generator coverage test run failed (exit $LASTEXITCODE)." }
           ./eng/scripts/check-coverage.ps1 -CoverageDirectory artifacts/coverage
 
       - name: Upload coverage summary

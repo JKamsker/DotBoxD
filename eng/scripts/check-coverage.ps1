@@ -118,6 +118,20 @@ function Test-ShippingSourceFile([string] $file) {
         $normalized -match '(^|/)(Channels|CodeGeneration|Hosting|Kernels|Meta|Pushdown|Services)/'
 }
 
+function Get-CoverageSourceFile([string] $file, [string[]] $sources) {
+    $normalized = $file.Replace('\', '/')
+    # Coverlet chooses a common source root per report. A generator-only report can
+    # therefore spell the same file differently from a runtime integration report.
+    foreach ($candidate in @($normalized) + @($sources | ForEach-Object {
+        $_.Replace('\', '/').TrimEnd('/') + '/' + $normalized
+    })) {
+        if ($candidate -match '(^|/)src/(?<source>.+)$') {
+            return $Matches["source"]
+        }
+    }
+    return $normalized
+}
+
 function Test-CoveragePattern([string] $name, [string[]] $patterns) {
     foreach ($pattern in $patterns) {
         if ($name -like $pattern) {
@@ -177,6 +191,7 @@ function Add-BranchCoverage($bucket, [string] $file, [int] $lineNumber, [int] $v
 
 foreach ($report in $reports) {
     [xml] $document = Get-Content -Raw -LiteralPath $report.FullName
+    $sources = @($document.coverage.sources.source | ForEach-Object { [string] $_ })
     foreach ($package in @($document.coverage.packages.package)) {
         $packageName = [string] $package.name
         if ($null -eq $package -or -not (Test-ShippingPackage $packageName)) {
@@ -184,7 +199,7 @@ foreach ($report in $reports) {
         }
 
         foreach ($class in @($package.classes.class)) {
-            $file = ([string] $class.filename).Replace('\', '/')
+            $file = Get-CoverageSourceFile ([string] $class.filename) $sources
             if ($null -eq $class -or -not (Test-ShippingSourceFile $file)) {
                 continue
             }
