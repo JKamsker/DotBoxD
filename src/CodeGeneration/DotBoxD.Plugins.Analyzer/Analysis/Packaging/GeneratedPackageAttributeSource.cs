@@ -8,6 +8,8 @@ internal static class GeneratedPackageAttributeSource
     private const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
     private const string RequiresDynamicCodeAttribute = "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
     private const string RequiresUnreferencedCodeAttribute = "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
+    private const string RequiresPreviewFeaturesAttribute =
+        "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
     private const string SupportedOSPlatformAttribute = "System.Runtime.Versioning.SupportedOSPlatformAttribute";
 
     public static EquatableArray<string> FromKernel(INamedTypeSymbol kernelType, Compilation compilation)
@@ -24,6 +26,12 @@ internal static class GeneratedPackageAttributeSource
             if (TryCodeRequirementAttribute(attribute, compilation) is { } codeRequirementSource)
             {
                 attributes.Add(codeRequirementSource);
+            }
+
+            if (IsFrameworkAttribute(attribute, compilation, RequiresPreviewFeaturesAttribute) &&
+                TryRequiresPreviewFeaturesAttribute(attribute) is { } previewFeaturesSource)
+            {
+                attributes.Add(previewFeaturesSource);
             }
 
             if (IsFrameworkAttribute(attribute, compilation, SupportedOSPlatformAttribute) &&
@@ -84,6 +92,27 @@ internal static class GeneratedPackageAttributeSource
 
         return "[global::System.Runtime.Versioning.SupportedOSPlatformAttribute(" +
                LiteralReader.StringLiteral(platformName) + ")]";
+    }
+
+    private static string? TryRequiresPreviewFeaturesAttribute(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.IsEmpty)
+        {
+            return "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]";
+        }
+
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string message)
+        {
+            return null;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute(")
+            .Append(LiteralReader.StringLiteral(message));
+        AppendUrl(builder, attribute);
+        builder.Append(")]");
+        return builder.ToString();
     }
 
     private static string? TryCodeRequirementAttribute(AttributeData attribute, Compilation compilation)
