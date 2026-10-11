@@ -23,6 +23,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
     private readonly Dictionary<(int Node, UiPropertyId Property), UiInput> _latest = [];
     private BlazorUiSnapshot? _snapshot;
     private Func<Task>? _changed;
+    private Task? _disposeTask;
     private bool _disposed;
     private bool _installed;
 
@@ -194,13 +195,20 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         { await changed().ConfigureAwait(false); }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_sync)
+        {
+            _disposeTask ??= DisposeCoreAsync();
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private async Task DisposeCoreAsync()
     {
         Func<Task>? changed;
         lock (_sync)
         {
-            if (_disposed)
-            { return; }
             _disposed = true;
             _snapshot = null;
             _resolved = ImmutableDictionary<int, UiResolvedExtension<IUiBlazorExtension>>.Empty;
