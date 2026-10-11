@@ -7,6 +7,8 @@ internal static class RpcTypeMetadataAttributeSource
 {
     private const string ExperimentalAttributeMetadataName = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
     private const string ObsoleteAttributeMetadataName = "System.ObsoleteAttribute";
+    private const string RequiresPreviewFeaturesAttributeMetadataName =
+        "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
     private const string SupportedOSPlatformAttributeMetadataName =
         "System.Runtime.Versioning.SupportedOSPlatformAttribute";
     private const string UnsupportedOSPlatformAttributeMetadataName =
@@ -22,6 +24,8 @@ internal static class RpcTypeMetadataAttributeSource
     {
         var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeMetadataName);
         var obsoleteAttribute = compilation.GetTypeByMetadataName(ObsoleteAttributeMetadataName);
+        var requiresPreviewFeaturesAttribute =
+            compilation.GetTypeByMetadataName(RequiresPreviewFeaturesAttributeMetadataName);
         var supportedOSPlatformAttribute = compilation.GetTypeByMetadataName(SupportedOSPlatformAttributeMetadataName);
         var unsupportedOSPlatformAttribute = compilation.GetTypeByMetadataName(UnsupportedOSPlatformAttributeMetadataName);
         var obsoletedOSPlatformAttribute = compilation.GetTypeByMetadataName(ObsoletedOSPlatformAttributeMetadataName);
@@ -41,6 +45,14 @@ internal static class RpcTypeMetadataAttributeSource
             else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoleteAttribute))
             {
                 AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
+            }
+            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, requiresPreviewFeaturesAttribute))
+            {
+                AppendAttribute(
+                    builder,
+                    attribute,
+                    indent,
+                    "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
             }
             else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, supportedOSPlatformAttribute))
             {
