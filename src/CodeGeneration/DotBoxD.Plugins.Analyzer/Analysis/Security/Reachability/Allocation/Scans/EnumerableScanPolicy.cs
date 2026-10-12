@@ -9,7 +9,7 @@ internal static class EnumerableScanPolicy
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
-            method.Name is not ("Contains" or "Any") ||
+            method.Name is not ("Contains" or "Any" or "First") ||
             typeName != "System.Linq.Enumerable")
         {
             return false;
@@ -19,6 +19,11 @@ internal static class EnumerableScanPolicy
         while (source is IConversionOperation { IsImplicit: true } conversion)
         {
             source = conversion.Operand;
+        }
+
+        if (method.Name == "First" && method.Parameters.Length == 2)
+        {
+            return true;
         }
 
         return !IsBoundedCollectionCall(method, source);
