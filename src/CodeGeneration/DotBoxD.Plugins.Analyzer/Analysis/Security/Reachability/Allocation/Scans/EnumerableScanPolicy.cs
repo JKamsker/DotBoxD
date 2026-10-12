@@ -21,9 +21,9 @@ internal static class EnumerableScanPolicy
             source = conversion.Operand;
         }
 
-        if (method.Name == "First" && method.Parameters.Length == 2)
+        if (method.Name == "First")
         {
-            return true;
+            return method.Parameters.Length == 2;
         }
 
         return !IsBoundedCollectionCall(method, source);

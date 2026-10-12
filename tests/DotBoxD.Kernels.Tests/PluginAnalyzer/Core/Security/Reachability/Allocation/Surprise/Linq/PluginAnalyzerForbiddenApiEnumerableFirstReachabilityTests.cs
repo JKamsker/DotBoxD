@@ -35,6 +35,16 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableFirstReachabilityTests
     }
 
     [Fact]
+    public async Task Does_not_report_retained_list_first_without_predicate()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("return Enumerable.First(Retained) == 0;"),
+            "DotBoxDPluginAnalyzerEnumerableFirstWithoutPredicateReachabilityTest");
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Fact]
     public async Task Does_not_report_bounded_list_add_and_count_control()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
