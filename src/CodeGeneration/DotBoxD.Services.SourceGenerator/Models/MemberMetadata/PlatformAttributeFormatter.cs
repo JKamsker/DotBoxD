@@ -12,7 +12,9 @@ internal static class PlatformAttributeFormatter
         type.ToDisplayString() is
             "System.Runtime.Versioning.SupportedOSPlatformAttribute" or
             "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" or
-            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" &&
+            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" or
+            "System.Runtime.Versioning.SupportedOSPlatformGuardAttribute" or
+            "System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute" &&
         ReturnTypeClassifier.IsTrustedFrameworkType(type);
 
     public static void Append(StringBuilder builder, AttributeData attribute)
