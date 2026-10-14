@@ -14,6 +14,17 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableMinReachabilityTests
     }
 
     [Fact]
+    public async Task Reports_retained_list_scan_via_static_enumerable_min()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("return Enumerable.Min(Retained) >= 0;"),
+            "DotBoxDPluginAnalyzerEnumerableMinDirectReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.Min", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Does_not_report_bounded_list_add_and_count_control()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
