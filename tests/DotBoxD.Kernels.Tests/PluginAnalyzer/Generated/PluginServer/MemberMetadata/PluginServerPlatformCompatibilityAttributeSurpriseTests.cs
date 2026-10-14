@@ -100,6 +100,12 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
             {
                 [SupportedOSPlatform("windows")]
                 ValueTask<int> WindowsRenameAsync(string value);
+
+                [SupportedOSPlatformGuard("windows")]
+                bool IsWindows();
+
+                [UnsupportedOSPlatformGuard("windows")]
+                bool IsNotWindows();
             }
         }
 

@@ -10,8 +10,12 @@ internal static class PluginServerPlatformCompatibilityAttributeFormatter
         {
             "System.Runtime.Versioning.SupportedOSPlatformAttribute" =>
                 "global::System.Runtime.Versioning.SupportedOSPlatformAttribute",
+            "System.Runtime.Versioning.SupportedOSPlatformGuardAttribute" =>
+                "global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute",
             "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" =>
                 "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute",
+            "System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute" =>
+                "global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute",
             "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" =>
                 "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute",
             _ => null,
