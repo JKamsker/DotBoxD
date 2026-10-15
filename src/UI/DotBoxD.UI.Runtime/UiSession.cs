@@ -17,6 +17,7 @@ public sealed class UiSession : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _disposeLock = new();
+    private readonly TaskCompletionSource _resourcesReleased = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Task? _disposeTask;
     private int _closed;
     private int _inFlight;
@@ -232,21 +233,39 @@ public sealed class UiSession : IAsyncDisposable
     {
         lock (_disposeLock)
         {
-            _disposeTask ??= DisposeCoreAsync();
-            return new ValueTask(_disposeTask);
+            var starting = _disposeTask is null;
+            if (_disposeTask is null)
+            {
+                // Publish the disposal state before cancellation can invoke a re-entrant callback.
+                _disposeTask = Task.CompletedTask;
+                _disposeTask = DisposeCoreAsync();
+            }
+            return new ValueTask(starting || !_lifetime.IsCancellationRequested ? _disposeTask : _resourcesReleased.Task);
         }
     }
 
     private async Task DisposeCoreAsync()
     {
         Interlocked.Exchange(ref _closed, 1);
+        var cancellation = _lifetime.CancelAsync();
         try
         {
-            await _lifetime.CancelAsync().ConfigureAwait(false);
+            await ReleaseResourcesAsync().ConfigureAwait(false);
+            _resourcesReleased.TrySetResult();
         }
+        catch (Exception error) { _resourcesReleased.TrySetException(error); throw; }
         finally
         {
-            await ReleaseResourcesAsync().ConfigureAwait(false);
+            try
+            {
+                await cancellation.ConfigureAwait(false);
+            }
+            // Preserve the original release failure when both the callback and teardown fault.
+            catch when (!_resourcesReleased.Task.IsCompletedSuccessfully) { }
+            finally
+            {
+                _lifetime.Dispose();
+            }
         }
     }
 
@@ -267,7 +286,6 @@ public sealed class UiSession : IAsyncDisposable
         finally
         {
             _gate.Release();
-            _lifetime.Dispose();
         }
     }
 
