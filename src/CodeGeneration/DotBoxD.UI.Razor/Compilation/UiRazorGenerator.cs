@@ -46,30 +46,44 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var syntax = (ClassDeclarationSyntax)context.TargetNode;
         var attribute = context.Attributes[0];
         var path = attribute.ConstructorArguments[0].Value as string ?? "";
-        var skip = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false) ||
-            HasHandwrittenRender(type, context.SemanticModel.Compilation);
+        var render = GetRenderKind(type, context.SemanticModel.Compilation);
+        var generationDisabled = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false);
+        var skip = generationDisabled || render == RenderKind.Handwritten;
         var valid = !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
             type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is ClassDeclarationSyntax c && c.Modifiers.Any(SyntaxKind.PartialKeyword));
         return new Component(type.ToDisplayString(), syntax.Identifier.Text,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
-            string.Join(" ", syntax.Modifiers.Select(m => m.Text)), path, syntax.SyntaxTree.FilePath, skip, valid);
+            string.Join(" ", syntax.Modifiers.Select(m => m.Text)), path, syntax.SyntaxTree.FilePath, skip, valid,
+            render == RenderKind.Incompatible && !generationDisabled
+                ? "Render(UiBuilder) must be an instance method returning UiElement, or set GenerateRender = false."
+                : null);
     }
 
-    private static bool HasHandwrittenRender(INamedTypeSymbol type, Compilation compilation)
+    private static RenderKind GetRenderKind(INamedTypeSymbol type, Compilation compilation)
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.GetMembers("Render").OfType<IMethodSymbol>().Any(m => m.Arity == 0 && m.Parameters.Length == 1 &&
-                m.Parameters[0].RefKind == RefKind.None &&
-                m.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder" && compilation.IsSymbolAccessibleWithin(m, type)))
-            { return true; }
+            foreach (var method in current.GetMembers("Render").OfType<IMethodSymbol>())
+            {
+                if (!IsRenderSignature(method) || !compilation.IsSymbolAccessibleWithin(method, type))
+                { continue; }
+                if (!method.IsStatic && method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement")
+                { return RenderKind.Handwritten; }
+                if (SymbolEqualityComparer.Default.Equals(current, type))
+                { return RenderKind.Incompatible; }
+            }
         }
-        return false;
+        return RenderKind.None;
     }
+
+    private static bool IsRenderSignature(IMethodSymbol method) => method.Arity == 0 && method.Parameters.Length == 1 &&
+        method.Parameters[0].RefKind == RefKind.None && method.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder";
 
     private static Output Generate(Component component, EquatableArray<RazorFile> files, CancellationToken token)
     {
         var hint = component.FullName.Replace("@", "") + ".UiRazor.g.cs";
+        if (component.RenderError is { } renderError)
+        { return new Output(hint, component.SourcePath, "", null, renderError); }
         if (component.Skip)
         { return new Output(hint, component.SourcePath, "", null, null); }
         if (!component.Valid)
@@ -93,6 +107,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
 
     private sealed record RazorFile(string Path, string Text);
     private sealed record Component(string FullName, string Name, string Namespace, string Modifiers,
-        string Path, string SourcePath, bool Skip, bool Valid);
+        string Path, string SourcePath, bool Skip, bool Valid, string? RenderError);
     private sealed record Output(string Hint, string Path, string FileText, string? Source, string? Error);
+    private enum RenderKind { None, Handwritten, Incompatible }
 }
