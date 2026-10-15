@@ -5,71 +5,38 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal static class RpcMethodMetadataAttributeSource
 {
+    private static readonly IReadOnlyDictionary<string, string> FrameworkAttributeTypes =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["System.Diagnostics.CodeAnalysis.ExperimentalAttribute"] =
+                "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute",
+            ["System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute"] =
+                "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute",
+            ["System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute"] =
+                "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute",
+            ["System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute"] =
+                "global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute",
+            ["System.ObsoleteAttribute"] = "global::System.ObsoleteAttribute",
+            ["System.Runtime.Versioning.ObsoletedOSPlatformAttribute"] =
+                "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute",
+            ["System.Runtime.Versioning.SupportedOSPlatformAttribute"] =
+                "global::System.Runtime.Versioning.SupportedOSPlatformAttribute",
+            ["System.Runtime.Versioning.SupportedOSPlatformGuardAttribute"] =
+                "global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute",
+            ["System.Runtime.Versioning.UnsupportedOSPlatformAttribute"] =
+                "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute",
+            ["System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute"] =
+                "global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute"
+        };
+
     public static void Append(StringBuilder builder, IMethodSymbol method, string indent)
     {
         foreach (var attribute in method.GetAttributes())
         {
-            switch (GetFrameworkAttributeName(attribute))
+            var attributeName = GetFrameworkAttributeName(attribute);
+            if (attributeName is not null && FrameworkAttributeTypes.TryGetValue(attributeName, out var attributeType))
             {
-                case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute");
-                    break;
-
-                case "System.ObsoleteAttribute":
-                    AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
-                    break;
-
-                case "System.Runtime.Versioning.ObsoletedOSPlatformAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute");
-                    break;
-
-                case "System.Runtime.Versioning.SupportedOSPlatformAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Runtime.Versioning.SupportedOSPlatformAttribute");
-                    break;
-
-                case "System.Runtime.Versioning.UnsupportedOSPlatformAttribute":
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute");
-                    break;
+                AppendAttribute(builder, attribute, indent, attributeType);
             }
         }
     }
