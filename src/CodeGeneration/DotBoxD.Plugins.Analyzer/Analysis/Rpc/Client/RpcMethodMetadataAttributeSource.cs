@@ -63,12 +63,28 @@ internal static class RpcMethodMetadataAttributeSource
                         "global::System.Runtime.Versioning.SupportedOSPlatformAttribute");
                     break;
 
+                case "System.Runtime.Versioning.SupportedOSPlatformGuardAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute");
+                    break;
+
                 case "System.Runtime.Versioning.UnsupportedOSPlatformAttribute":
                     AppendAttribute(
                         builder,
                         attribute,
                         indent,
                         "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute");
+                    break;
+
+                case "System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute");
                     break;
             }
         }
