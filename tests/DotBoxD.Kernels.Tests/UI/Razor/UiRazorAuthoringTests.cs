@@ -124,6 +124,16 @@ public sealed class UiRazorAuthoringTests
         Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Render_property_reports_a_focused_diagnostic_instead_of_colliding_with_generated_Render()
+    {
+        var source = Component.Replace("[UiLocalHandler] public static int Increment",
+            "public string Render { get; } = \"manual\"; [UiLocalHandler] public static int Increment", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("public", true)]
     [InlineData("protected", true)]
