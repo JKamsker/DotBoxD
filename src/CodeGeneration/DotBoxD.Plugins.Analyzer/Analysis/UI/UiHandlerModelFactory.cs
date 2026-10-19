@@ -45,27 +45,30 @@ internal static class UiHandlerModelFactory
 
     private static bool HasHandwrittenFacet(IMethodSymbol handler, string name, bool remote, Compilation compilation)
     {
-        foreach (var member in AccessibleMembers(handler.ContainingType, name, compilation))
+        var hasIncompatibleMember = false;
+        for (var current = handler.ContainingType; current is not null; current = current.BaseType)
         {
-            if (IsCompatibleFacet(member, handler, remote, compilation))
+            var members = current.GetMembers(name)
+                .Where(member => compilation.IsSymbolAccessibleWithin(member, handler.ContainingType))
+                .ToArray();
+            if (members.Length == 0)
+            { continue; }
+            if (members.Any(member => IsCompatibleFacet(member, handler, remote, compilation)))
             { return true; }
+            hasIncompatibleMember = true;
+            if (remote || members.Any(HidesInheritedLocalFacet))
+            { break; }
+        }
+        if (hasIncompatibleMember)
+        {
             throw new NotSupportedException("handwritten " + name + " must be " +
-                (remote ? "a const int endpoint ID" : "a static parameterless UiKernelDefinition matching the handler input and output types"));
+            (remote ? "a const int endpoint ID" : "a static parameterless UiKernelDefinition matching the handler input and output types"));
         }
         return false;
     }
 
-    private static IEnumerable<ISymbol> AccessibleMembers(INamedTypeSymbol type, string name, Compilation compilation)
-    {
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            foreach (var member in current.GetMembers(name))
-            {
-                if (compilation.IsSymbolAccessibleWithin(member, type))
-                { yield return member; }
-            }
-        }
-    }
+    private static bool HidesInheritedLocalFacet(ISymbol member) =>
+        member is not IMethodSymbol || member is IMethodSymbol { Arity: 0, Parameters.Length: 0 };
 
     private static bool IsCompatibleFacet(ISymbol member, IMethodSymbol handler, bool remote, Compilation compilation)
     {

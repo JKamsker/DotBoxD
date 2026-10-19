@@ -178,6 +178,23 @@ public sealed class UiAuthoringTests
         Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
+    [Fact]
+    public void Compatible_handwritten_facet_overload_wins_over_incompatible_overload()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+                public static string IncrementUiKernel(int ignored) => "incompatible";
+                public static UiKernelDefinition<int,int> IncrementUiKernel() => new("manual", "main");
+            }
+            """);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Result.GeneratedTrees);
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+    }
+
     [Theory]
     [InlineData("public static class Manual")]
     [InlineData("public static class Manual<T>")]
