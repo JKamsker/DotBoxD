@@ -69,6 +69,22 @@ public sealed class UiPackageJsonTests
         Assert.Equal(UiPackageJson.ComputeHash(CompactPackage(), policy), UiPackageJson.ComputeHash(imported, policy));
     }
 
+    [Fact]
+    public void Export_and_hash_reject_unpaired_surrogate_kernel_entrypoints()
+    {
+        var policy = new UiPolicy();
+        var malformed = CompactPackage() with { Kernels = [new UiKernel(1, CompactKernel, "\ud800")] };
+        var validPair = CompactPackage() with { Kernels = [new UiKernel(1, CompactKernel, "\ud83d\ude00")] };
+
+        Assert.Throws<UiValidationException>(() => UiPackageJson.Export(malformed, policy));
+        Assert.Throws<UiValidationException>(() => UiPackageJson.ComputeHash(malformed, policy));
+
+        var json = UiPackageJson.Export(validPair, policy);
+        var imported = UiPackageJson.Import(json, policy);
+        Assert.Equal(validPair.Kernels[0].Entrypoint, imported.Kernels[0].Entrypoint);
+        Assert.Equal(UiPackageJson.ComputeHash(validPair, policy), UiPackageJson.ComputeHash(imported, policy));
+    }
+
     private static string CompactWireJson()
     {
         var wire = JsonNode.Parse(UiPackageJson.Export(CompactPackage(), new UiPolicy()))!;
