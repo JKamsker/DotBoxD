@@ -160,6 +160,24 @@ public sealed class UiAuthoringTests
         Assert.DoesNotContain("RemoteUiEndpoint", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Incompatible_handwritten_facet_names_fail_closed()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+                public static string IncrementUiKernel => "incompatible";
+                [UiRemoteHandler(7)] public static void Search() { }
+                public static string SearchUiEndpoint => "incompatible";
+            }
+            """);
+        Assert.Equal(2, result.Diagnostics.Count(d => d.Id == "DBXU001"));
+        Assert.Empty(result.Result.GeneratedTrees);
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+    }
+
     [Theory]
     [InlineData("public static class Manual")]
     [InlineData("public static class Manual<T>")]
