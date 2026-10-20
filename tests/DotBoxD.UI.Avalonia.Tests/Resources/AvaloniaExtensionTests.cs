@@ -28,6 +28,36 @@ public sealed class AvaloniaExtensionTests
         Assert.Null(renderer.Root);
     }
 
+    [AvaloniaFact]
+    public async Task Extension_disposal_during_creation_fails_without_publishing_a_session()
+    {
+        var builder = new UiBuilder();
+        var policy = new UiPolicy { AllowedExtensionSchemas = ["test.dispose"] };
+        var package = builder.Build(builder.Extension("test.dispose", "{}"), policy);
+        var extension = new DisposeDuringCreate();
+        var renderer = new AvaloniaUiRenderer(extensions: [extension]);
+        extension.Renderer = renderer;
+        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings());
+        var host = new UiHost(sandbox, SandboxPolicyBuilder.Create().Build(), policy);
+
+        UiSession? session = null;
+        Exception? error = null;
+        try
+        { session = await host.InstallAsync(package, renderer); }
+        catch (Exception exception)
+        { error = exception; }
+        await extension.Disposal.WaitAsync(TestContext.Current.CancellationToken);
+        if (session is not null)
+        { await session.DisposeAsync(); }
+
+        Assert.Null(session);
+        Assert.IsType<ObjectDisposedException>(error);
+        Assert.True(renderer.IsDisposed);
+        Assert.Null(renderer.Root);
+        Assert.Equal(0, renderer.Materializations);
+        Assert.False(extension.RepeatedDisposalCompletedDuringCreation);
+    }
+
     private sealed class Badge : IUiAvaloniaExtension
     {
         public string SchemaId => "test.badge";
@@ -38,5 +68,20 @@ public sealed class AvaloniaExtensionTests
             { throw new UiValidationException("Bad badge schema."); }
         }
         public Control Create(JsonElement payload) => new TextBlock { Text = payload.GetProperty("text").GetString() };
+    }
+
+    private sealed class DisposeDuringCreate : IUiAvaloniaExtension
+    {
+        public string SchemaId => "test.dispose";
+        public AvaloniaUiRenderer Renderer { private get; set; } = null!;
+        public Task Disposal { get; private set; } = Task.CompletedTask;
+        public bool RepeatedDisposalCompletedDuringCreation { get; private set; }
+        public void Validate(JsonElement payload) { }
+        public Control Create(JsonElement payload)
+        {
+            Disposal = Renderer.DisposeAsync().AsTask();
+            RepeatedDisposalCompletedDuringCreation = Renderer.DisposeAsync().AsTask().IsCompleted;
+            return new TextBlock();
+        }
     }
 }
