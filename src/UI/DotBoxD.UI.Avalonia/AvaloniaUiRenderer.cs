@@ -67,6 +67,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     public async ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiPropertyValue> values, CancellationToken cancellationToken)
     {
         await Dispatcher.UIThread.InvokeAsync(() => Materialize(package, values), DispatcherPriority.Normal, cancellationToken);
+        await Dispatcher.UIThread.InvokeAsync(() => PublishMaterialization(package), DispatcherPriority.Normal, cancellationToken);
     }
 
     private void Materialize(UiPackage package, ImmutableArray<UiPropertyValue> values)
@@ -92,6 +93,11 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
             { UiControlFactory.Attach(_controls[node.Id], _controls[child]); }
         }
         Apply(values);
+    }
+
+    private void PublishMaterialization(UiPackage package)
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _root = _controls[package.RootNodeId];
         Materializations++;
     }
