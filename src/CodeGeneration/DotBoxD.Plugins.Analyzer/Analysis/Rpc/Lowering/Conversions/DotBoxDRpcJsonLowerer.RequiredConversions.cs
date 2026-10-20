@@ -18,20 +18,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string description)
-        => ApplyRequiredConversion(
-            expression,
-            targetType,
-            LowerExpression(expression),
-            description);
+    {
+        RejectUserDefinedConversion(expression, targetType, description);
+        return ApplyRequiredConversion(expression, targetType, LowerExpression(expression), description);
+    }
 
     internal string LowerRequiredExpressionWithPrelude(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string description,
         List<string> output)
-        => ApplyRequiredConversion(
-            expression,
-            targetType,
-            LowerExpressionWithPrelude(expression, output),
-            description);
+    {
+        RejectUserDefinedConversion(expression, targetType, description);
+        return ApplyRequiredConversion(expression, targetType, LowerExpressionWithPrelude(expression, output), description);
+    }
 }

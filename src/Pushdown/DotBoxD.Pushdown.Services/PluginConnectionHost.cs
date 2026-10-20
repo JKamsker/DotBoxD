@@ -30,10 +30,20 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
 
     private RpcHost _host = null!;
     private PluginSession? _session;
+    private PluginServer? _server;
+    private Func<RpcPeer, PluginSession, TConnection>? _configure;
     private int _accepted;
     private int _sessionDisposed;
 
-    private PluginConnectionHost(string pipeName) => PipeName = pipeName;
+    private PluginConnectionHost(
+        string pipeName,
+        PluginServer server,
+        Func<RpcPeer, PluginSession, TConnection> configure)
+    {
+        PipeName = pipeName;
+        _server = server;
+        _configure = configure;
+    }
 
     /// <summary>The named pipe the plugin peer dials, or empty when started over a non-pipe transport.</summary>
     public string PipeName { get; }
@@ -98,49 +108,8 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
             // Validate the server before starting transport; the real per-peer session is still minted on accept.
         }
 
-        var self = new PluginConnectionHost<TConnection>(pipeName);
-        self._host = listen(peer =>
-        {
-            // Single-connection contract: service only the FIRST peer. The transport may accept more (a named
-            // pipe allows multiple instances by default), so actively close later peers instead of leaving a
-            // live, un-provisioned connection parked in the host.
-            if (Interlocked.Exchange(ref self._accepted, 1) != 0)
-            {
-                _ = peer.DisposeAsync();
-                return;
-            }
-
-            // Everything from minting the session onward runs inside the try. The caller provides its services
-            // over the session (before the peer starts) and returns whatever it wants to await on Connected. If
-            // CreateSession, the Disconnected wiring, or configure throws, dispose the just-minted session and
-            // surface the failure on Connected/Disconnected instead of stranding both awaiters (and burning the
-            // accept-once latch) on a half-provisioned peer.
-            try
-            {
-                var session = server.CreateSession();
-                self._session = session;
-                peer.Disconnected += (_, _) =>
-                {
-                    self.DisposeSessionOnce();        // revoke + unregister the kernels this peer owned
-                    self._disconnected.TrySetResult();
-                };
-
-                var connection = configure(peer, session);
-                if (connection is null)
-                {
-                    throw new InvalidOperationException("The configure callback returned null.");
-                }
-
-                self._connected.TrySetResult(connection);
-            }
-            catch (Exception ex)
-            {
-                self.DisposeSessionOnce();
-                self._connected.TrySetException(ex);
-                self._disconnected.TrySetException(ex);
-                throw;
-            }
-        });
+        var self = new PluginConnectionHost<TConnection>(pipeName, server, configure);
+        self._host = listen(self.ConfigurePeer);
         try
         {
             await self._host.StartAsync().ConfigureAwait(false);
@@ -162,11 +131,56 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         return self;
     }
 
+    private void ConfigurePeer(RpcPeer peer)
+    {
+        // Single-connection contract: service only the FIRST peer. The transport may accept more (a named
+        // pipe allows multiple instances by default), so actively close later peers instead of leaving a
+        // live, un-provisioned connection parked in the host.
+        if (Interlocked.Exchange(ref _accepted, 1) != 0)
+        {
+            _ = peer.DisposeAsync();
+            return;
+        }
+
+        // Everything from minting the session onward runs inside the try. The caller provides its services
+        // over the session (before the peer starts) and returns whatever it wants to await on Connected. If
+        // CreateSession, the Disconnected wiring, or configure throws, dispose the just-minted session and
+        // surface the failure on Connected/Disconnected instead of stranding both awaiters (and burning the
+        // accept-once latch) on a half-provisioned peer.
+        var server = Interlocked.Exchange(ref _server, null)!;
+        var configure = Interlocked.Exchange(ref _configure, null)!;
+        try
+        {
+            var session = server.CreateSession();
+            _session = session;
+            peer.Disconnected += (_, _) =>
+            {
+                DisposeSessionOnce();        // revoke + unregister the kernels this peer owned
+                _disconnected.TrySetResult();
+            };
+
+            var connection = configure(peer, session);
+            if (connection is null)
+            {
+                throw new InvalidOperationException("The configure callback returned null.");
+            }
+
+            _connected.TrySetResult(connection);
+        }
+        catch (Exception ex)
+        {
+            DisposeSessionOnce();
+            _connected.TrySetException(ex);
+            _disconnected.TrySetException(ex);
+            throw;
+        }
+    }
+
     private void DisposeSessionOnce()
     {
         if (Interlocked.Exchange(ref _sessionDisposed, 1) == 0)
         {
-            _session?.Dispose();
+            Interlocked.Exchange(ref _session, null)?.Dispose();
         }
     }
 
@@ -180,6 +194,9 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     /// </summary>
     private void CompleteLifecycle()
     {
+        // Shutdown has drained configuration; a stopped single-connection host cannot use these again.
+        Interlocked.Exchange(ref _server, null);
+        Interlocked.Exchange(ref _configure, null);
         _connected.TrySetCanceled();
         _disconnected.TrySetResult();
     }

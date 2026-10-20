@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/CodeGeneration/DotBoxD.UI.Razor/DotBoxD.UI.Razor.csproj" />
     <!-- Serialize test collections: the sandbox deadline/quota/network tests are wall-clock-sensitive
          and flip to Timeout under thread-pool contention on CPU-limited CI runners. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
@@ -24,7 +25,7 @@
     <PackageReference Include="Mono.Cecil" />
     <PackageReference Include="System.Threading.Tasks.Extensions" PrivateAssets="all" NoWarn="NU1510" />
     <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
-    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
@@ -34,6 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginAbstractions\DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.MergeableIr\DotBoxD.Kernels.TestFixtures.MergeableIr.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginLocal\DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />

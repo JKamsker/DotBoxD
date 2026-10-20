@@ -79,6 +79,8 @@ internal static class RpcJsonStatementLowerer
             var localSymbol = lowerer.Model.GetDeclaredSymbol(declarator, lowerer.CancellationToken) as ILocalSymbol
                 ?? throw new NotSupportedException(
                     $"Server extension local '{localName}' could not be resolved.");
+            lowerer.RejectUserDefinedConversion(initializer.Value, localSymbol.Type,
+                $"Server extension local '{localName}' initializer");
             var value = lowerer.LowerExpressionWithPrelude(initializer.Value, output);
             output.Add(DotBoxDRpcJsonLowerer.SetStatement(
                 localName,
@@ -182,6 +184,11 @@ internal static class RpcJsonStatementLowerer
             return;
         }
 
+        if (lowerer.ReturnValueType is { } resultType)
+        {
+            lowerer.RejectUserDefinedConversion(returned.Expression, resultType,
+                $"Server extension return expression '{returned.Expression}'");
+        }
         var value = lowerer.LowerExpressionWithPrelude(returned.Expression, output);
         if (lowerer.ReturnValueType is not null)
         {

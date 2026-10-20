@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Trusted sandbox UI sessions, kernel execution and versioned remote events.</Description>
+    <PackageTags>dotboxd;sandbox;ui;hosting</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DotBoxD.UI/DotBoxD.UI.csproj" />
+    <ProjectReference Include="../../Hosting/DotBoxD.Hosting/DotBoxD.Hosting.csproj" />
+  </ItemGroup>
+</Project>

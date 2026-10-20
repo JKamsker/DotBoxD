@@ -1,0 +1,4 @@
+Event query dispatch probe
+Broad single subscriber     161.7 ms    161.7 ns/op   80,000,000 B     80.0 B/op
+Indexed hit                 379.9 ms    379.9 ns/op  168,000,000 B    168.0 B/op
+Indexed miss                182.0 ms    182.0 ns/op   88,000,000 B     88.0 B/op

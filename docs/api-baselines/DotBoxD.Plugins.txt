@@ -578,6 +578,8 @@ public static KernelRpcValue Record(KernelRpcValue[] fields)
 public static KernelRpcValue String(string value)
 public static KernelRpcValue Unit()
 public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
+public static int Unregister(Type kernelType)
+public static int UnregisterLoadContext(AssemblyLoadContext context)
 public static object? FromSandboxValue(SandboxValue value, Type type)
 public static partial class KernelRpcBinaryCodec
 public static partial class KernelRpcMarshaller

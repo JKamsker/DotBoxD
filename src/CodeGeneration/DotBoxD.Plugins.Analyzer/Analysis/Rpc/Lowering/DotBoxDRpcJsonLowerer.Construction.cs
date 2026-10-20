@@ -15,9 +15,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         List<string>? expressionPrelude = null,
         Func<string, string>? reserveGeneratedName = null,
         string? serverContextParameterName = null,
-        ITypeSymbol? serverContextType = null)
+        ITypeSymbol? serverContextType = null,
+        Action<BaseObjectCreationExpressionSyntax, INamedTypeSymbol>? validateRecordCreation = null,
+        bool allowLiveSettings = true,
+        Action<IMethodSymbol>? validateInvocation = null)
     {
         _model = model;
+        _allowLiveSettings = allowLiveSettings;
+        _validateInvocation = validateInvocation;
         _capabilities = capabilities;
         _effects = effects;
         _cancellationToken = cancellationToken;
@@ -25,6 +30,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _inlineStack = inlineStack;
         _expressionPrelude = expressionPrelude;
         _reserveGeneratedName = reserveGeneratedName;
+        _validateRecordCreation = validateRecordCreation;
         _serverContextParameterName = serverContextParameterName;
         _serverContextType = serverContextType;
         _serverContextHostBindings = new ServerContextHostBindingResolver(
@@ -48,6 +54,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         var named = RequireRecordDto(creation, created);
+        _validateRecordCreation?.Invoke(creation, named);
         Allocates = true;
         var fields = DotBoxDRpcTypeMapper.RecordFields(named);
         var args = LowerRecordCreationArguments(creation, named, fields);

@@ -1,3 +1,4 @@
+using DotBoxD.CodeGeneration.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -92,7 +93,8 @@ internal static partial class ServiceModelFactory
 
         foreach (var propertySymbol in members.Properties)
         {
-            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
+            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, context.SemanticModel.Compilation,
+                    ct, out var property, out var propertyLocation))
             {
                 continue;
             }
@@ -124,7 +126,8 @@ internal static partial class ServiceModelFactory
                 RawServiceName: serviceName,
                 ObsoleteAttribute: obsoleteAttribute.Source,
                 TypeAttributePrefix: typeAttributePrefix,
-                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
+                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId,
+                GeneratedExtensionsType: GeneratedServiceTypeNames.Extensions(interfaceSymbol.ContainingAssembly.Name)),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
@@ -192,6 +195,7 @@ internal static partial class ServiceModelFactory
             var method = MethodModelFactory.Build(
                 buildContext.DisplayName,
                 methodSymbol,
+                compilation,
                 cancellationTokenSymbol,
                 rpcStreamHandleSymbol,
                 validationCache,
