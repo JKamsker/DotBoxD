@@ -1,0 +1,17 @@
+Subscription churn: registration/removal of N handles, three samples (one at 10,000), median [min, max], setup included.
+shared/10 register=0.21 ms [0.12, 118.08] 48760 B remove=0.05 ms [0.03, 4.69] 14304 B
+shared/100 register=1.27 ms [1.27, 1.54] 636024 B remove=0.42 ms [0.41, 0.50] 279664 B
+shared/1000 register=18.11 ms [15.26, 20.94] 20303288 B remove=13.07 ms [12.96, 14.41] 16680496 B
+shared/10000 register=1158.42 ms [1158.42, 1158.42] 1579638416 B remove=2027.28 ms [2027.28, 2027.28] 1543055696 B
+many/10 register=0.20 ms [0.19, 21.02] 76584 B remove=0.03 ms [0.02, 0.45] 17688 B
+many/100 register=2.60 ms [2.55, 2.64] 1008568 B remove=0.28 ms [0.28, 0.45] 211848 B
+many/1000 register=29.07 ms [28.25, 30.55] 10840168 B remove=3.11 ms [3.09, 6.01] 2573656 B
+many/10000 register=390.25 ms [390.25, 390.25] 155563072 B remove=74.43 ms [74.43, 74.43] 70854744 B
+broad/10 register=1.16 ms [1.14, 9.67] 74280 B remove=0.01 ms [0.01, 0.15] 2496 B
+broad/100 register=11.72 ms [11.50, 12.23] 773928 B remove=0.11 ms [0.11, 0.12] 61176 B
+broad/1000 register=119.04 ms [118.64, 126.83] 11340096 B remove=5.85 ms [4.96, 8.11] 4211976 B
+broad/10000 register=1319.16 ms [1319.16, 1319.16] 474066272 B remove=492.75 ms [492.75, 492.75] 402242952 B
+mixed/10 register=0.90 ms [0.88, 1.47] 69888 B remove=0.02 ms [0.02, 0.02] 9200 B
+mixed/100 register=9.72 ms [9.51, 9.78] 864240 B remove=0.29 ms [0.26, 0.32] 125904 B
+mixed/1000 register=82.71 ms [79.32, 91.77] 9929152 B remove=5.12 ms [3.25, 6.38] 2272360 B
+mixed/10000 register=881.12 ms [881.12, 881.12] 202092864 B remove=136.34 ms [136.34, 136.34] 123972472 B

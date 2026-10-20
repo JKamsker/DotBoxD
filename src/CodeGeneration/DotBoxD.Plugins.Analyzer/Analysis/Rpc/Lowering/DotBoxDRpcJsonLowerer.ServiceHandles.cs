@@ -143,6 +143,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return false;
         }
 
+        _validateInvocation?.Invoke(method);
+
         if (invocation.ArgumentList.Arguments.Count != 1)
         {
             throw new NotSupportedException(

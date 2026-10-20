@@ -5,6 +5,9 @@ if (args.Length == 1)
 {
     switch (args[0])
     {
+        case "--probe-buffered-pipe":
+            RpcBufferedPipeProbe.Run();
+            return;
         case "--probe-peer-proxy-cache":
             RpcPeerProxyCacheProbe.Run();
             return;

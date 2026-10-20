@@ -5,6 +5,7 @@
     <RollForward>LatestMajor</RollForward>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath Condition="'$(VSTestCollect)' == 'XPlat Code Coverage'">$(MSBuildProjectDirectory)/coverlet.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>

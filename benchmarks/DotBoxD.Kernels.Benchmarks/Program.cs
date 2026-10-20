@@ -241,9 +241,8 @@ if (DotBoxD.Kernels.Benchmarks.Plugins.PluginProbeDispatcher.TryRun(args))
     return;
 }
 
-if (args.Contains("--probe-event-query-dispatch", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.Queryable.QueryProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.Queryable.EventQueryDispatchProbe.Run();
     return;
 }
 

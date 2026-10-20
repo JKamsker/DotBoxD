@@ -9,8 +9,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 /// such contract keeps the original facade (no local handlers). Two guards keep the emitted facade compilable:
 /// a shape guard requires the <c>[RpcService]</c> interface to carry the expected
 /// <c>OnEventAsync(string, ReadOnlyMemory&lt;byte&gt;, CancellationToken) -&gt; ValueTask</c>/<c>ValueTask&lt;T&gt;</c> method, and a transport guard requires
-/// the compilation to actually expose the generated <c>DotBoxDGeneratedExtensions.Provide{suffix}</c> extension
-/// (absent or ambiguous — e.g. a test stub — falls back to the original wiring instead of a dangling call).
+/// referenced contracts to expose their assembly-specific generated <c>Provide{suffix}</c> extension
+/// (local contracts are generated in the same pass; legacy extension containers remain supported).
 /// </summary>
 internal static class PluginServerEventCallbackResolver
 {
@@ -141,20 +141,25 @@ internal static class PluginServerEventCallbackResolver
     private static bool ReturnHasValue(ITypeSymbol type)
         => type is INamedTypeSymbol { IsGenericType: true };
 
-    // The Provide{suffix} extension is generated into DotBoxDGeneratedExtensions by the services source
-    // generator in the assembly that declares the contract. GetTypeByMetadataName returns null when that type is
-    // absent or ambiguous (defined in both source and a reference), so a test that stubs only the Get* members
-    // falls back to the original wiring rather than referencing a method that does not exist.
+    // Look in the contract assembly so another generating assembly cannot hide its extensions.
+    // Legacy contracts and handwritten extension providers remain supported.
     private static bool HasProvideExtension(
         Compilation compilation,
         string provideSuffix,
         INamedTypeSymbol callbackType)
     {
-        var extensions = compilation.GetTypeByMetadataName("DotBoxD.Services.Generated.DotBoxDGeneratedExtensions");
+        var extensions = PluginServerExtensionTypeResolver.Resolve(callbackType);
         var rpcPeerType = compilation.GetTypeByMetadataName("DotBoxD.Services.Peer.RpcPeer");
-        if (extensions is null || rpcPeerType is null)
+        if (rpcPeerType is null)
         {
             return false;
+        }
+
+        if (extensions is null)
+        {
+            // Other generators run against the same input compilation, so local generated
+            // extensions are not visible yet. Referenced contracts must expose the method.
+            return SymbolEqualityComparer.Default.Equals(callbackType.ContainingAssembly, compilation.Assembly);
         }
 
         foreach (var member in extensions.GetMembers("Provide" + provideSuffix))

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Renderer-neutral, bounded sandbox UI packages and validation.</Description>
+    <PackageTags>dotboxd;sandbox;ui;schema</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Kernels/DotBoxD.Kernels.Serialization.Json/DotBoxD.Kernels.Serialization.Json.csproj" />
+  </ItemGroup>
+</Project>

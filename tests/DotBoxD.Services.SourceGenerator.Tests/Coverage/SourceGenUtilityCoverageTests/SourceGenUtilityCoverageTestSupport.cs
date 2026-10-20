@@ -8,7 +8,7 @@ internal static class SourceGenUtilityCoverageTestSupport
 {
     internal static string ExtensionsTextFor(params string[] sources)
     {
-        var compilation = GeneratorTestHelper.CreateCompilation(sources);
+        var compilation = GeneratorTestHelper.CreateCompilation(sources).WithAssemblyName("Ordering");
         var runResult = GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
         return runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName == "DotBoxDRpcExtensions.g.cs")

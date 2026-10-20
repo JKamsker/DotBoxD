@@ -7,7 +7,7 @@ namespace DotBoxD.Services.SourceGenerator.Tests.Generation;
 public class GeneratedFactoryRegistryTests
 {
     [Fact]
-    public void GeneratedFactory_PublicSurfaceCompilesFromConsumerAssembly()
+    public void RuntimeRegistry_PublicSurfaceCompilesFromConsumerAssembly()
     {
         var generatedAssembly = CompileGeneratedReference("""
             using DotBoxD.Services.Attributes;
@@ -29,7 +29,7 @@ public class GeneratedFactoryRegistryTests
             {
                 public static class Probe
                 {
-                    public static int ServiceCount => DotBoxDGenerated.Services.Count;
+                    public static int ServiceCount => GeneratedServiceRegistry.GetServices(typeof(PublicFactory.Sample.IGreeter).Assembly).Count;
                 }
             }
             """).AddReferences(generatedAssembly);

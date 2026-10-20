@@ -1,0 +1,6 @@
+Already-buffered pipe: 1 MiB per transfer, 32 transfers/sample, five samples; setup included.
+segment=  256     670.5 us/transfer [644.9, 737.0]    1676888 B/transfer frames=credits=16
+segment= 1024     285.1 us/transfer [272.8, 309.9]    1209944 B/transfer frames=credits=16
+segment= 4096     200.7 us/transfer [186.4, 217.2]    1093208 B/transfer frames=credits=16
+segment=16384     179.0 us/transfer [163.2, 190.8]    1062440 B/transfer frames=credits=64
+segment=65536     134.1 us/transfer [123.8, 141.8]    1052792 B/transfer frames=credits=16

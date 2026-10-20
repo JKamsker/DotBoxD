@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Runtime assemblies are covered by the Services and Kernels suites. -->
+          <Include>[DotBoxD.Services.SourceGenerator]*</Include>
+          <ExcludeByFile>**/obj/**/*.cs,**/bin/**/*.cs</ExcludeByFile>
+          <SingleHit>true</SingleHit>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

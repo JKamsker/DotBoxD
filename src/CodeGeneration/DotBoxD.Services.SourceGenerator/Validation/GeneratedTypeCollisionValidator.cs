@@ -37,12 +37,12 @@ internal static class GeneratedTypeCollisionValidator
                 dispatcher);
         }
 
-        var extensions = GeneratedTypeCollisionKeys.Extensions;
+        var extensions = GeneratedTypeCollisionKeys.Extensions(model);
         if (existingTypes.Contains(extensions, ct))
         {
             return RejectedService(
                 model,
-                $"generated extension type '{ServicesGeneratorTypeNames.GeneratedNamespace}.{ServicesGeneratorTypeNames.GeneratedExtensionsType}' would collide with an existing type",
+                $"generated extension type '{ServicesGeneratorTypeNames.GeneratedNamespace}.{model.GeneratedExtensionsType}' would collide with an existing type",
                 extensions);
         }
 
@@ -139,7 +139,7 @@ internal sealed class PrimaryGeneratedTypeCollisionInputComparer :
             return true;
         }
 
-        if (!HasSameMembership(x.Right, y.Right, GeneratedTypeCollisionKeys.Extensions) ||
+        if (!HasSameMembership(x.Right, y.Right, GeneratedTypeCollisionKeys.Extensions(model)) ||
             !HasSameMembership(x.Right, y.Right, GeneratedTypeCollisionKeys.Factory))
         {
             return false;

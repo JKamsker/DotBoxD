@@ -5,54 +5,77 @@ namespace DotBoxD.Queryable.Authoring;
 
 internal sealed class EventQueryDispatcherSnapshot<TEvent>
 {
-    public static readonly EventQueryDispatcherSnapshot<TEvent> Empty = new([]);
+    public static readonly EventQueryDispatcherSnapshot<TEvent> Empty = new([], [], 0);
 
     private const string Separator = "\u0001";
     private const int MaxRetainedKeyCapacity = 1024;
 
-    private readonly EventQuerySubscriptionEntry<TEvent>[] _all;
     private readonly EventQuerySubscriptionEntry<TEvent>[] _broad;
     private readonly EventQueryRoutingGroup<TEvent>[] _groups;
+    private readonly long _nextOrder;
 
-    private EventQueryDispatcherSnapshot(EventQuerySubscriptionEntry<TEvent>[] all)
+    private EventQueryDispatcherSnapshot(EventQuerySubscriptionEntry<TEvent>[] broad, EventQueryRoutingGroup<TEvent>[] groups, long nextOrder)
     {
-        _all = all;
-        var broad = new List<EventQuerySubscriptionEntry<TEvent>>();
-        var builders = new Dictionary<string, EventQueryRoutingGroup<TEvent>>(StringComparer.Ordinal);
-        foreach (var entry in all)
-        {
-            if (!entry.IsRoutable)
-            {
-                broad.Add(entry);
-                continue;
-            }
-
-            var paths = entry.RoutingKeys
-                .Select(k => new EventQueryRoutingPath(k.Path, k.NumericRouting))
-                .OrderBy(p => p.Path, StringComparer.Ordinal)
-                .ToArray();
-
-            var groupKey = string.Join(Separator, paths.Select(p => $"{p.NumericRouting}:{p.Path}"));
-            if (!builders.TryGetValue(groupKey, out var group))
-            {
-                group = new EventQueryRoutingGroup<TEvent>(paths);
-                builders[groupKey] = group;
-            }
-
-            group.Add(CompositeKey(entry, paths), entry);
-        }
-
-        _broad = [.. broad];
-        _groups = [.. builders.Values];
+        _broad = broad;
+        _groups = groups;
+        _nextOrder = nextOrder;
     }
 
-    public bool IsEmpty => _all.Length == 0;
+    public bool IsEmpty => _broad.Length == 0 && _groups.Length == 0;
 
     public EventQuerySubscriptionEntry<TEvent>[] Broad => _broad;
     public EventQueryRoutingGroup<TEvent>[] Groups => _groups;
-    public EventQueryDispatcherSnapshot<TEvent> With(EventQuerySubscriptionEntry<TEvent> entry) => new([.. _all, entry]);
+    public EventQueryDispatcherSnapshot<TEvent> With(EventQuerySubscriptionEntry<TEvent> entry)
+    {
+        entry.RegistrationOrder = _nextOrder;
+        if (!entry.IsRoutable)
+        {
+            return new([.. _broad, entry], _groups, _nextOrder + 1);
+        }
+
+        var (paths, groupKey, key) = Route(entry);
+        var index = Array.FindIndex(_groups, group => group.Key == groupKey);
+        if (index < 0)
+        {
+            return new(_broad, [.. _groups, new EventQueryRoutingGroup<TEvent>(groupKey, paths).With(key, entry)], _nextOrder + 1);
+        }
+
+        var groups = (EventQueryRoutingGroup<TEvent>[])_groups.Clone();
+        groups[index] = groups[index].With(key, entry);
+        return new(_broad, groups, _nextOrder + 1);
+    }
+
     public EventQueryDispatcherSnapshot<TEvent> Without(EventQuerySubscriptionEntry<TEvent> entry)
-        => new(_all.Where(e => !ReferenceEquals(e, entry)).ToArray());
+    {
+        if (!entry.IsRoutable)
+        {
+            return new(_broad.Where(candidate => !ReferenceEquals(candidate, entry)).ToArray(), _groups, _nextOrder);
+        }
+
+        var (_, groupKey, key) = Route(entry);
+        var index = Array.FindIndex(_groups, group => group.Key == groupKey);
+        var updated = _groups[index].Without(key, entry);
+        var groups = (EventQueryRoutingGroup<TEvent>[])_groups.Clone();
+        if (updated is null)
+        {
+            groups = groups.Where((_, i) => i != index).ToArray();
+        }
+        else
+        {
+            groups[index] = updated;
+            Array.Sort(groups, static (left, right) => left.FirstRegistrationOrder.CompareTo(right.FirstRegistrationOrder));
+        }
+
+        return new(_broad, groups, _nextOrder);
+    }
+
+    private static (EventQueryRoutingPath[] Paths, string GroupKey, string Key) Route(EventQuerySubscriptionEntry<TEvent> entry)
+    {
+        var paths = entry.RoutingKeys.Select(key => new EventQueryRoutingPath(key.Path, key.NumericRouting))
+            .OrderBy(path => path.Path, StringComparer.Ordinal).ToArray();
+        var groupKey = string.Join(Separator, paths.Select(path => $"{path.NumericRouting}:{path.Path}"));
+        return (paths, groupKey, CompositeKey(entry, paths));
+    }
 
     // Reused on the hot TryEventKey path; nested same-thread calls allocate their own builder.
     [ThreadStatic] private static StringBuilder? _eventKeyBuilder;

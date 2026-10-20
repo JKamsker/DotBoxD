@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
@@ -9,6 +8,9 @@ namespace DotBoxD.Services.Streaming.Frames;
 internal sealed class RpcPipeAttachment : RpcStreamAttachment
 {
     private const int ChunkSize = 64 * 1024;
+    // Small-segment probes show the win; larger segments do not justify coalescing's
+    // extra sequence-copy work. Keep this threshold below the 16 KiB control.
+    private const int MaxSegmentToCoalesce = 4 * 1024;
     private Pipe? _pipe;
     private readonly bool _completeReader;
 
@@ -46,9 +48,18 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
 
                     while (!remaining.IsEmpty)
                     {
-                        var chunk = GetNextChunk(remaining);
-                        var length = chunk.Length;
-                        await streams.SendStreamItemAsync(Handle.StreamId, chunk, ct).ConfigureAwait(false);
+                        // Coalesce only bytes already returned by this read; never wait to fill a frame.
+                        var first = remaining.First;
+                        var length = Math.Min(first.Length, ChunkSize);
+                        if (first.Length <= MaxSegmentToCoalesce && !remaining.IsSingleSegment)
+                        {
+                            length = (int)Math.Min(remaining.Length, ChunkSize);
+                            await streams.SendStreamItemAsync(Handle.StreamId, remaining.Slice(0, length), ct).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await streams.SendStreamItemAsync(Handle.StreamId, first.Slice(0, length), ct).ConfigureAwait(false);
+                        }
                         remaining = remaining.Slice(length);
                     }
                 }
@@ -73,19 +84,6 @@ internal sealed class RpcPipeAttachment : RpcStreamAttachment
         {
             await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
         }
-    }
-
-    private static ReadOnlyMemory<byte> GetNextChunk(ReadOnlySequence<byte> remaining)
-    {
-        foreach (var segment in remaining)
-        {
-            if (!segment.IsEmpty)
-            {
-                return segment.Slice(0, Math.Min(segment.Length, ChunkSize));
-            }
-        }
-
-        throw new InvalidOperationException("Nonempty pipe buffer contained no bytes.");
     }
 
     private protected override async ValueTask DisposeSourceCoreAsync()

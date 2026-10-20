@@ -1,0 +1,48 @@
+@implements IAsyncDisposable
+@inject WorkerPath Worker
+<section>
+    <h2>@Name</h2>
+    @if (_owner is null)
+    {
+        <p role="status">@(_error ?? "Starting plugin…")</p>
+    }
+    else
+    {
+        <DotBoxDUi Session="_owner.Session" User="_user" Authorizer="_authorizer" />
+        <button type="button" @onclick="CrashAsync">Disconnect worker</button>
+    }
+</section>
+@code {
+    [Parameter] public string Name { get; set; } = "Viewer";
+    private ViewerSession? _owner;
+    private ClaimsPrincipal _user = new();
+    private ViewerAuthorizer? _authorizer;
+    private readonly CancellationTokenSource _lifetime = new();
+    private string? _error;
+    private bool _disposed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var owner = await ViewerSession.CreateAsync(Worker.Value, _lifetime.Token);
+            if (_disposed) { await owner.DisposeAsync(); return; }
+            _owner = owner;
+            _user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, Name)], "Demo"));
+            _authorizer = new ViewerAuthorizer(_owner.Session.Id, Name);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception error) { _error = error.Message; }
+    }
+
+    private Task CrashAsync() => _owner!.CrashAsync(_lifetime.Token);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) { return; }
+        _disposed = true;
+        await _lifetime.CancelAsync();
+        if (_owner is not null) { await _owner.DisposeAsync(); }
+        _lifetime.Dispose();
+    }
+}

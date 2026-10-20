@@ -1,3 +1,4 @@
+using DotBoxD.CodeGeneration.Services;
 using System.Reflection;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Server;
@@ -201,7 +202,7 @@ public class BehavioralTests
     {
         var (assembly, _) = CompileWithGenerator(ServiceSource);
 
-        var extType = assembly.GetType("DotBoxD.Services.Generated.DotBoxDGeneratedExtensions");
+        var extType = assembly.GetType("DotBoxD.Services.Generated." + GeneratedServiceTypeNames.Extensions(assembly.GetName().Name!));
         extType.Should().NotBeNull();
 
         var getMethod = extType!.GetMethod("GetMath", BindingFlags.Public | BindingFlags.Static);
