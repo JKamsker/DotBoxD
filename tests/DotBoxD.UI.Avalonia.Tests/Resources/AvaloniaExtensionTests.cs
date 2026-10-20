@@ -55,6 +55,7 @@ public sealed class AvaloniaExtensionTests
         Assert.True(renderer.IsDisposed);
         Assert.Null(renderer.Root);
         Assert.Equal(0, renderer.Materializations);
+        Assert.False(extension.RepeatedDisposalCompletedDuringCreation);
     }
 
     private sealed class Badge : IUiAvaloniaExtension
@@ -74,10 +75,12 @@ public sealed class AvaloniaExtensionTests
         public string SchemaId => "test.dispose";
         public AvaloniaUiRenderer Renderer { private get; set; } = null!;
         public Task Disposal { get; private set; } = Task.CompletedTask;
+        public bool RepeatedDisposalCompletedDuringCreation { get; private set; }
         public void Validate(JsonElement payload) { }
         public Control Create(JsonElement payload)
         {
             Disposal = Renderer.DisposeAsync().AsTask();
+            RepeatedDisposalCompletedDuringCreation = Renderer.DisposeAsync().AsTask().IsCompleted;
             return new TextBlock();
         }
     }

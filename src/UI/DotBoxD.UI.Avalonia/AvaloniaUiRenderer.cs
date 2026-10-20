@@ -22,6 +22,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     private readonly Dictionary<(int Node, UiPropertyId Property), UiPropertyValue> _deferred = [];
     private readonly UiInputQueue _queue;
     private readonly UiControlInput _input;
+    private readonly TaskCompletionSource _disposeCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Control? _root;
     private int _disposeStarted;
     private bool _installed;
@@ -160,22 +161,34 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
-        { return; }
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        if (Interlocked.Exchange(ref _disposeStarted, 1) == 0)
         {
-            _queue.Complete();
-            _input.Clear();
-            foreach (var list in _lists.Values)
-            { list.Clear(); }
-            foreach (var control in _controls.Values)
-            { UiControlFactory.Detach(control); }
-            _images.Dispose();
-            _resolved = ImmutableDictionary<int, UiResolvedExtension<IUiAvaloniaExtension>>.Empty;
-            _lists.Clear();
-            _deferred.Clear();
-            _controls.Clear();
-            _root = null;
-        });
+            try
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    _queue.Complete();
+                    _input.Clear();
+                    foreach (var list in _lists.Values)
+                    { list.Clear(); }
+                    foreach (var control in _controls.Values)
+                    { UiControlFactory.Detach(control); }
+                    _images.Dispose();
+                    _resolved = ImmutableDictionary<int, UiResolvedExtension<IUiAvaloniaExtension>>.Empty;
+                    _lists.Clear();
+                    _deferred.Clear();
+                    _controls.Clear();
+                    _root = null;
+                });
+                _disposeCompletion.SetResult();
+            }
+            catch (Exception exception)
+            {
+                _disposeCompletion.SetException(exception);
+                throw;
+            }
+        }
+
+        await _disposeCompletion.Task.ConfigureAwait(false);
     }
 }
