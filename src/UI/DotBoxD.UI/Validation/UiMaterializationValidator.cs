@@ -10,6 +10,9 @@ public static class UiMaterializationValidator
         long count = staticNodeCount;
         foreach (var property in values)
         {
+            if (property is null)
+            { throw new UiValidationException("UI materialization contains a null property entry."); }
+
             UiValueValidator.Validate(property.Value, policy);
             if (property.PropertyId == UiPropertyId.Items)
             {
