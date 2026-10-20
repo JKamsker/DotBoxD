@@ -23,7 +23,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     private readonly UiInputQueue _queue;
     private readonly UiControlInput _input;
     private Control? _root;
-    private bool _disposed;
+    private int _disposeStarted;
     private bool _installed;
 
     public AvaloniaUiRenderer(int inputCapacity = 128, UiResourceCatalog? resources = null, IEnumerable<IUiAvaloniaExtension>? extensions = null)
@@ -44,7 +44,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
 
     /// <summary>UI-thread-only access for the trusted compositor/window owner.</summary>
     public Control? Root { get { Dispatcher.UIThread.VerifyAccess(); return _root; } }
-    public bool IsDisposed => Volatile.Read(ref _disposed);
+    public bool IsDisposed => Volatile.Read(ref _disposeStarted) != 0;
     public int Materializations { get; private set; }
     public int Updates { get; private set; }
 
@@ -54,7 +54,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
             if (_queue.Acknowledge(input))
             {
                 var value = _deferred.Remove((input.NodeId, input.PropertyId), out var deferred)
@@ -71,7 +71,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
 
     private void Materialize(UiPackage package, ImmutableArray<UiPropertyValue> values)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         if (_installed)
         { throw new InvalidOperationException("An Avalonia renderer owns one UI session."); }
         _installed = true;
@@ -80,6 +80,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
         {
             var control = _resolved.TryGetValue(node.Id, out var extension) ? extension.Schema.Create(extension.Payload)
                 : UiControlFactory.Create(node.Primitive);
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
             _controls.Add(node.Id, control);
             if (node.Primitive == UiPrimitive.Items)
             { _lists.Add(node.Id, new UiKeyedRows((StackPanel)control)); }
@@ -99,7 +100,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
             Apply(changes);
             Updates++;
         }, DispatcherPriority.Normal, cancellationToken);
@@ -139,7 +140,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
         { throw new ArgumentOutOfRangeException(nameof(pixels)); }
         return await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
             var root = _root ?? throw new InvalidOperationException("UI is not materialized.");
             var size = new Size(pixels.Width * 96 / dpi.X, pixels.Height * 96 / dpi.Y);
             root.Measure(size);
@@ -153,11 +154,10 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        { return; }
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (_disposed)
-            { return; }
-            _disposed = true;
             _queue.Complete();
             _input.Clear();
             foreach (var list in _lists.Values)
