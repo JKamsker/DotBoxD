@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Description>Safe Razor authoring compiler over renderer-neutral sandbox UI primitives.</Description>
+    <PackageTags>dotboxd;sandbox;ui;razor;source-generator</PackageTags>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" PrivateAssets="all" />
+    <Compile Include="../DotBoxD.Plugins.Analyzer/Compatibility/IsExternalInit.cs" Link="Compilation/IsExternalInit.cs" />
+    <Compile Include="../DotBoxD.Plugins.Analyzer/Analysis/EquatableArray.cs" Link="Compilation/EquatableArray.cs" />
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)$(AssemblyName).xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="buildTransitive/DotBoxD.UI.Razor.props" Pack="true" PackagePath="buildTransitive" />
+  </ItemGroup>
+</Project>

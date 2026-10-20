@@ -16,10 +16,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         var symbol = _model.GetSymbolInfo(identifier, _cancellationToken).Symbol;
-        if (symbol is ILocalSymbol or IParameterSymbol ||
-            symbol is IPropertySymbol property && IsLiveSetting(property))
+        if (symbol is ILocalSymbol or IParameterSymbol)
         {
             return Var(name);
+        }
+
+        if (symbol is IPropertySymbol property && IsLiveSetting(property))
+        {
+            return LowerLiveSetting(name);
         }
 
         throw new NotSupportedException(
@@ -35,7 +39,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return null;
         }
 
-        return Var(member.Name.Identifier.ValueText);
+        return LowerLiveSetting(member.Name.Identifier.ValueText);
+    }
+
+    private string LowerLiveSetting(string name)
+    {
+        if (!_allowLiveSettings)
+        {
+            throw new NotSupportedException(
+                "Local UI kernels cannot read live settings; pass the value through a UI state/input slot or use a remote handler.");
+        }
+
+        return Var(name);
     }
 
     private static bool IsLiveSetting(IPropertySymbol property)

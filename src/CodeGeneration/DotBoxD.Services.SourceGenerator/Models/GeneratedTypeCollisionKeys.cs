@@ -15,9 +15,9 @@ internal static class GeneratedTypeCollisionKeys
     public static ExistingTypeKey AsyncSibling(ServiceModel model) =>
         new(model.Namespace, NamingHelpers.AsyncSiblingInterfaceName(model.InterfaceName), 0);
 
-    public static ExistingTypeKey Extensions { get; } = new(
+    public static ExistingTypeKey Extensions(ServiceModel model) => new(
         ServicesGeneratorTypeNames.GeneratedNamespace,
-        ServicesGeneratorTypeNames.GeneratedExtensionsType,
+        model.GeneratedExtensionsType,
         0);
 
     public static ExistingTypeKey Factory { get; } = new(

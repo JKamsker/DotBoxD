@@ -7,8 +7,8 @@ namespace DotBoxD.Queryable.Authoring;
 /// One registered query within a dispatcher: its filter, equality routing keys, projection, handler, and
 /// observability handle. Evaluation is tiered — the portable filter is interpreted until it has been
 /// evaluated <see cref="PromotionThreshold"/> times, after which it is compiled once to a delegate and the
-/// hot path uses the compiled form. Compilation preserves interpreted semantics (it calls the same reader
-/// and comparer); a compile failure falls back to interpretation permanently.
+/// hot path uses the compiled form. Compilation preserves interpreted member/comparison semantics;
+/// a compile failure falls back to interpretation permanently.
 /// </summary>
 internal sealed class EventQuerySubscriptionEntry<TEvent>
 {
@@ -39,6 +39,9 @@ internal sealed class EventQuerySubscriptionEntry<TEvent>
     public Func<object?, HookContext, ValueTask> Dispatch { get; }
 
     public EventQuerySubscriptionHandle Handle { get; }
+
+    // Assigned once, before publication, to preserve routing-group dispatch order on removal.
+    public long RegistrationOrder { get; set; }
 
     /// <summary>Whether this subscription can be index-routed (has at least one equality key).</summary>
     public bool IsRoutable => RoutingKeys.Count > 0;

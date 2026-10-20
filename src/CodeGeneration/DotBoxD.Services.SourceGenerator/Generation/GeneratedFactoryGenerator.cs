@@ -10,7 +10,6 @@ internal static class GeneratedFactoryGenerator
 {
     public static string Generate(
         EquatableArray<ServiceModel> services,
-        bool emitClsNonCompliantAttribute,
         CancellationToken ct = default)
     {
         var sb = new StringBuilder();
@@ -28,13 +27,10 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine("    /// Factory methods for DotBoxD-generated proxies and dispatchers.");
         sb.AppendLine("    /// </summary>");
-        if (emitClsNonCompliantAttribute)
-        {
-            sb.AppendLine("    [global::System.CLSCompliant(false)]");
-        }
-
-        sb.AppendLine("    public static class DotBoxDGenerated");
+        sb.AppendLine("    internal static class DotBoxDGenerated");
         sb.AppendLine("    {");
+        sb.AppendLine("        private sealed class AssemblyMarker { }");
+        sb.AppendLine();
         GeneratedFactoryMetadataEmitter.AppendMethodArrays(sb, services, ct);
         sb.AppendLine();
         sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyList, ServicesGeneratorTypeNames.GlobalGeneratedService)} s_services =");
@@ -68,7 +64,7 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("        static DotBoxDGenerated()");
         sb.AppendLine("        {");
         sb.AppendLine($"            {ServicesGeneratorTypeNames.GlobalGeneratedServiceRegistry}.{ServicesGeneratorMemberNames.GeneratedServiceRegistry.RegisterServices}(");
-        sb.AppendLine($"                typeof({ServicesGeneratorTypeNames.GlobalDotBoxDGenerated}).Assembly,");
+        sb.AppendLine($"                typeof(AssemblyMarker).Assembly,");
         sb.AppendLine("                s_services);");
 
         for (var i = 0; i < services.Array.Length; i++)

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Trusted Blazor rendering and authorized bounded input for sandbox UI packages.</Description>
+    <PackageTags>dotboxd;sandbox;ui;blazor</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
+  </ItemGroup>
+</Project>

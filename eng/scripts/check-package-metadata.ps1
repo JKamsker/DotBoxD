@@ -45,6 +45,26 @@ $expectedLicenseExpression = "MIT"
 $expectedRepositoryUrl = "https://github.com/JKamsker/DotBoxD"
 $expectedRepositoryType = "git"
 $expectedPackageMetadata = @{
+    "DotBoxD.UI.Razor" = @{
+        Description = "Safe Razor authoring compiler over renderer-neutral sandbox UI primitives."
+        Tags = @("dotboxd", "sandbox", "ui", "razor", "source-generator")
+    }
+    "DotBoxD.UI.Blazor" = @{
+        Description = "Trusted Blazor rendering and authorized bounded input for sandbox UI packages."
+        Tags = @("dotboxd", "sandbox", "ui", "blazor")
+    }
+    "DotBoxD.UI.Avalonia" = @{
+        Description = "Trusted Avalonia rendering and bounded semantic input for sandbox UI packages."
+        Tags = @("dotboxd", "sandbox", "ui", "avalonia")
+    }
+    "DotBoxD.UI" = @{
+        Description = "Renderer-neutral, bounded sandbox UI packages and validation."
+        Tags = @("dotboxd", "sandbox", "ui", "schema")
+    }
+    "DotBoxD.UI.Runtime" = @{
+        Description = "Trusted sandbox UI sessions, kernel execution and versioned remote events."
+        Tags = @("dotboxd", "sandbox", "ui", "hosting")
+    }
     "DotBoxD.Kernels" = @{
         Description = "Core DotBoxD.Kernels model, policy, resource metering, diagnostics, and canonical hashing primitives."
         Tags = @("dotboxd", "core", "policy", "resources", "hashing")
@@ -229,9 +249,12 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
         }
     }
 
-    if ($id -eq "DotBoxD.Plugins.Analyzer") {
-        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll")
-        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml")
+    if ($id -in @("DotBoxD.Plugins.Analyzer", "DotBoxD.UI.Razor")) {
+        [void] $allowedExact.Add("analyzers/dotnet/cs/$id.dll")
+        [void] $allowedExact.Add("analyzers/dotnet/cs/$id.xml")
+        if ($id -eq "DotBoxD.UI.Razor") {
+            [void] $allowedExact.Add("buildTransitive/DotBoxD.UI.Razor.props")
+        }
     } else {
         [void] $allowedExact.Add("lib/$tfm/$id.dll")
         [void] $allowedExact.Add("lib/$tfm/$id.xml")
@@ -356,7 +379,7 @@ function AssertSymbolPackage(
     [string] $version,
     [string] $tfm,
     [System.Collections.IDictionary] $symbolPackages) {
-    if ($id -eq "DotBoxD.Plugins.Analyzer") {
+    if ($id -in @("DotBoxD.Plugins.Analyzer", "DotBoxD.UI.Razor")) {
         return
     }
 
@@ -376,6 +399,11 @@ function AssertSymbolPackage(
 }
 
 $expectedIds = [string[]] @(
+    "DotBoxD.UI.Razor",
+    "DotBoxD.UI.Blazor",
+    "DotBoxD.UI.Avalonia",
+    "DotBoxD.UI",
+    "DotBoxD.UI.Runtime",
     "DotBoxD.Kernels",
     "DotBoxD.Kernels.Validation",
     "DotBoxD.Kernels.Runtime",
@@ -499,9 +527,12 @@ foreach ($package in $packages) {
             throw "Package $($package.Name) repository commit '$([string] $repository.commit)' does not match current commit '$normalizedExpectedRepositoryCommit'."
         }
 
-        if ($id -eq "DotBoxD.Plugins.Analyzer") {
-            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll" $package.Name
-            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml" $package.Name
+        if ($id -in @("DotBoxD.Plugins.Analyzer", "DotBoxD.UI.Razor")) {
+            AssertZipEntry $zip "analyzers/dotnet/cs/$id.dll" $package.Name
+            AssertZipEntry $zip "analyzers/dotnet/cs/$id.xml" $package.Name
+            if ($id -eq "DotBoxD.UI.Razor") {
+                AssertZipEntry $zip "buildTransitive/DotBoxD.UI.Razor.props" $package.Name
+            }
             AssertNoZipEntryPrefix $zip "lib/" $package.Name
         } else {
             AssertZipEntry $zip "lib/$packageTfm/$id.dll" $package.Name

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DotBoxD.Services.Server;
 
@@ -9,11 +8,30 @@ namespace DotBoxD.Services.Generated;
 /// </summary>
 public static class GeneratedServiceRegistry
 {
-    private static readonly ConcurrentDictionary<Type, RegisteredService> s_services = new();
-    private static readonly object s_registrationLock = new();
-    private static long s_registrationVersion;
+    internal static long CurrentRegistrationVersion => GeneratedServiceRegistrationStore.CurrentVersion;
 
-    internal static long CurrentRegistrationVersion => Volatile.Read(ref s_registrationVersion);
+    /// <summary>
+    /// Removes a service's factories. Returns one if removed, or zero if absent.
+    /// Existing proxies and dispatchers remain usable; future resolution requires registration again.
+    /// </summary>
+    public static int Unregister(Type serviceInterface)
+    {
+        if (serviceInterface is null)
+            throw new ArgumentNullException(nameof(serviceInterface));
+        return GeneratedServiceRegistrationStore.Unregister(serviceInterface);
+    }
+
+    /// <summary>
+    /// Removes factories whose service interface is declared in <paramref name="assembly"/>.
+    /// Returns the number removed. Generated static constructors are not rerun after removal.
+    /// </summary>
+    public static int UnregisterAssembly(Assembly assembly)
+    {
+        if (assembly is null)
+            throw new ArgumentNullException(nameof(assembly));
+
+        return GeneratedServiceRegistrationStore.UnregisterAssembly(assembly);
+    }
 
     /// <summary>
     /// Registers generated factories for a service interface.
@@ -52,17 +70,8 @@ public static class GeneratedServiceRegistry
 
         GeneratedServiceMetadataValidator.ValidateForRegistration<TService>(service, nameof(service));
 
-        lock (s_registrationLock)
-        {
-            var version = s_registrationVersion + 1;
-            var snapshot = GeneratedServiceCatalogSnapshot.Snapshot(service);
-            s_services[typeof(TService)] = new RegisteredService(
-                invoker => proxyFactory(invoker)!,
-                dispatcherFactory,
-                snapshot,
-                version);
-            Volatile.Write(ref s_registrationVersion, version);
-        }
+        GeneratedServiceRegistrationStore.Register(typeof(TService),
+            invoker => proxyFactory(invoker)!, dispatcherFactory, service);
     }
 
     /// <summary>
@@ -203,9 +212,7 @@ public static class GeneratedServiceRegistry
     /// Creates the generated client proxy for <paramref name="serviceInterface"/>.
     /// </summary>
     public static object CreateProxy(Type serviceInterface, IRpcInvoker invoker)
-    {
-        return CreateProxy(serviceInterface, invoker, out _);
-    }
+        => CreateProxy(serviceInterface, invoker, out _);
 
     internal static object CreateProxy(Type serviceInterface, IRpcInvoker invoker, out long registrationVersion)
     {
@@ -224,7 +231,7 @@ public static class GeneratedServiceRegistry
         out long registryVersion)
     {
         registryVersion = CurrentRegistrationVersion;
-        return s_services.TryGetValue(serviceInterface, out var registration) &&
+        return GeneratedServiceRegistrationStore.TryGetValue(serviceInterface, out var registration) &&
             registration.Version == registrationVersion;
     }
 
@@ -268,13 +275,13 @@ public static class GeneratedServiceRegistry
                 nameof(serviceInterface));
         }
 
-        if (s_services.TryGetValue(serviceInterface, out var registration))
+        if (GeneratedServiceRegistrationStore.TryGetValue(serviceInterface, out var registration))
         {
             return registration;
         }
 
         var generatedTypeFound = RpcGeneratedAssemblyCatalog.EnsureRegistered(serviceInterface.Assembly);
-        if (s_services.TryGetValue(serviceInterface, out registration))
+        if (GeneratedServiceRegistrationStore.TryGetValue(serviceInterface, out registration))
         {
             return registration;
         }
@@ -290,5 +297,4 @@ public static class GeneratedServiceRegistry
     }
 
     private static string FormatType(Type type) => type.FullName ?? type.Name;
-
 }

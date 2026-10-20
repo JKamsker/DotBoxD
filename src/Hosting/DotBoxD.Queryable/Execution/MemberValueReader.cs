@@ -19,6 +19,8 @@ public sealed class MemberValueReader
     private readonly ConditionalWeakTable<Type, ConcurrentDictionary<string, MemberInfo[]>> _chains = new();
     private readonly Type? _rootType;
 
+    internal Type? DeclaredRootType => _rootType;
+
     /// <summary>Creates a reader that resolves paths from each target's runtime type.</summary>
     public MemberValueReader()
     {
@@ -84,7 +86,7 @@ public sealed class MemberValueReader
         return current;
     }
 
-    private static MemberInfo[] ResolveChain(Type rootType, string path)
+    internal static MemberInfo[] ResolveChain(Type rootType, string path)
     {
         var segments = path.Split('.');
         var chain = new MemberInfo[segments.Length];

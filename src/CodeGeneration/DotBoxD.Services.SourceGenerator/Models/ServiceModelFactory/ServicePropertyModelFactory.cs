@@ -17,6 +17,7 @@ internal static class ServicePropertyModelFactory
 
     public static bool TryBuild(
         IPropertySymbol propertySymbol,
+        Compilation compilation,
         CancellationToken ct,
         out ServicePropertyModel property,
         out DiagnosticLocation location)
@@ -34,7 +35,7 @@ internal static class ServicePropertyModelFactory
                 BuildPropertyAttributePrefix(propertySymbol, ct),
                 IsInstanceId: true,
                 SubService: null,
-                MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
+                MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, compilation, ct));
             return true;
         }
 
@@ -56,7 +57,7 @@ internal static class ServicePropertyModelFactory
             BuildPropertyAttributePrefix(propertySymbol, ct),
             IsInstanceId: false,
             subService,
-            MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
+            MemberAttributeFormatter.BuildPrefix(propertySymbol, compilation, ct));
         return true;
     }
 

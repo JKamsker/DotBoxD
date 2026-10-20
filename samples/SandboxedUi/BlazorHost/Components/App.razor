@@ -1,0 +1,25 @@
+@page "/"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/" />
+    <title>DotBoxD sandboxed Blazor</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; }
+        main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; }
+        section { border: 1px solid #888; padding: 1rem; }
+        button, input { margin: .25rem; padding: .5rem; }
+    </style>
+</head>
+<body>
+    <h1>Sandboxed plugin UI</h1>
+    <p>Two independent demo viewers: local counter, worker search, and a host-authorized player score.</p>
+    <main>
+        <ViewerPanel Name="Alice" @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+        <ViewerPanel Name="Bob" @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+    </main>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

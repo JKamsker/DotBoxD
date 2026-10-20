@@ -1,0 +1,110 @@
+using System.Reflection;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.UI;
+using DotBoxD.UI.Runtime;
+
+namespace DotBoxD.Kernels.Tests.UI.Authoring;
+
+public sealed class UiOperandOrderTests
+{
+    [Theory]
+    [InlineData("=> Next() - Identity(Next());", false, 2, ExecutionMode.Interpreted)]
+    [InlineData("=> Next() - Identity(Next());", false, 2, ExecutionMode.Compiled)]
+    [InlineData("=> Next() - (Identity(Next()) - Next());", false, 3, ExecutionMode.Interpreted)]
+    [InlineData("=> Next() - (Identity(Next()) - Next());", false, 3, ExecutionMode.Compiled)]
+    [InlineData("=> Identity(Next()) - Identity(Next());", false, 2, ExecutionMode.Interpreted)]
+    [InlineData("=> Identity(Next()) - Identity(Next());", false, 2, ExecutionMode.Compiled)]
+    [InlineData("=> Next().ToString(CultureInfo.InvariantCulture) + Text(Next());", true, 2, ExecutionMode.Interpreted)]
+    [InlineData("=> Next().ToString(CultureInfo.InvariantCulture) + Text(Next());", true, 2, ExecutionMode.Compiled)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[Next()] = Identity(Next()); return map[1]; }", false, 2, ExecutionMode.Interpreted)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[Next()] = Identity(Next()); return map[1]; }", false, 2, ExecutionMode.Compiled)]
+    public async Task Eager_operands_preserve_native_host_call_order_in_both_kernel_modes(
+        string body, bool text, int calls, ExecutionMode mode)
+    {
+        var expected = UiOperandOrderFixture.Native(body, text);
+        var (binding, counter) = UiOperandOrderFixture.NextBinding();
+        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(binding).UseCompilerIfAvailable());
+        await using var session = await Host(sandbox, mode).InstallAsync(
+            UiOperandOrderFixture.Package(body, text), new RecordingUiRenderer());
+        var value = (await session.DispatchAsync(1)).State.Single(s => s.SlotId == 2).Value;
+        Assert.Equal(expected, text ? value.Text : (object)value.Integer);
+        Assert.Equal(calls, counter());
+    }
+
+    [Theory]
+    [InlineData("=> 10 / value + Identity(Next());", ExecutionMode.Interpreted)]
+    [InlineData("=> 10 / value + Identity(Next());", ExecutionMode.Compiled)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[10 / value] = Identity(Next()); return value; }", ExecutionMode.Interpreted)]
+    [InlineData("{ var map = new System.Collections.Generic.Dictionary<int, int>(); map[10 / value] = Identity(Next()); return value; }", ExecutionMode.Compiled)]
+    public async Task Earlier_operand_failure_prevents_later_host_calls(string body, ExecutionMode mode)
+    {
+        Assert.IsType<DivideByZeroException>(Assert.Throws<TargetInvocationException>(
+            () => UiOperandOrderFixture.Native(body)).InnerException);
+        var (binding, counter) = UiOperandOrderFixture.NextBinding();
+        using var sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings().AddBinding(binding).UseCompilerIfAvailable());
+        await using var session = await Host(sandbox, mode).InstallAsync(
+            UiOperandOrderFixture.Package(body), new RecordingUiRenderer());
+        await Assert.ThrowsAsync<UiValidationException>(() => session.DispatchAsync(1).AsTask());
+        Assert.Equal(0, counter());
+        Assert.Equal(0, (await session.SnapshotAsync()).Version);
+    }
+
+    [Theory]
+    [InlineData("=> Values()[Identity(Index())];", "review.values", ExecutionMode.Interpreted)]
+    [InlineData("=> Values()[Identity(Index())];", "review.values", ExecutionMode.Compiled)]
+    [InlineData("=> Mapping()[Identity(Index())];", "review.map", ExecutionMode.Interpreted)]
+    [InlineData("=> Mapping()[Identity(Index())];", "review.map", ExecutionMode.Compiled)]
+    [InlineData("{ if (Keys().ContainsKey(Identity(Index()))) { return 0; } return 1; }", "review.keys", ExecutionMode.Interpreted)]
+    [InlineData("{ if (Keys().ContainsKey(Identity(Index()))) { return 0; } return 1; }", "review.keys", ExecutionMode.Compiled)]
+    public async Task Collection_receivers_precede_index_temporaries(string body, string receiver, ExecutionMode mode)
+    {
+        var expected = UiOperandOrderFixture.Native(body);
+        var (bindings, calls) = UiOperandOrderFixture.CollectionBindings();
+        using var sandbox = SandboxHost.Create(b =>
+        {
+            b.AddDefaultPureBindings().UseCompilerIfAvailable();
+            foreach (var binding in bindings)
+            {
+                b.AddBinding(binding);
+            }
+        });
+        await using var session = await CollectionHost(sandbox, mode).InstallAsync(
+            UiOperandOrderFixture.Package(body), new RecordingUiRenderer());
+        Assert.Equal(expected, (await session.DispatchAsync(1)).State.Single(s => s.SlotId == 2).Value.Integer);
+        Assert.Equal([receiver, "review.index"], calls);
+    }
+
+    [Theory]
+    [InlineData("=> Values()[Identity(Index())];", "review.values", ExecutionMode.Interpreted)]
+    [InlineData("=> Values()[Identity(Index())];", "review.values", ExecutionMode.Compiled)]
+    [InlineData("=> Mapping()[Identity(Index())];", "review.map", ExecutionMode.Interpreted)]
+    [InlineData("=> Mapping()[Identity(Index())];", "review.map", ExecutionMode.Compiled)]
+    [InlineData("{ if (Keys().ContainsKey(Identity(Index()))) { return 0; } return 1; }", "review.keys", ExecutionMode.Interpreted)]
+    [InlineData("{ if (Keys().ContainsKey(Identity(Index()))) { return 0; } return 1; }", "review.keys", ExecutionMode.Compiled)]
+    public async Task Failed_collection_receivers_prevent_index_host_calls(string body, string receiver, ExecutionMode mode)
+    {
+        var (bindings, calls) = UiOperandOrderFixture.CollectionBindings(failReceiver: true);
+        using var sandbox = SandboxHost.Create(b =>
+        {
+            b.AddDefaultPureBindings().UseCompilerIfAvailable();
+            foreach (var binding in bindings)
+            {
+                b.AddBinding(binding);
+            }
+        });
+        await using var session = await CollectionHost(sandbox, mode).InstallAsync(
+            UiOperandOrderFixture.Package(body), new RecordingUiRenderer());
+        await Assert.ThrowsAsync<UiValidationException>(() => session.DispatchAsync(1).AsTask());
+        Assert.Equal([receiver], calls);
+        Assert.Equal(0, (await session.SnapshotAsync()).Version);
+    }
+
+    private static UiHost CollectionHost(SandboxHost sandbox, ExecutionMode mode) => new(sandbox,
+        SandboxPolicyBuilder.Create().Grant("review.order", new { }, SandboxEffect.HostStateWrite).Build(),
+        execution: new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
+
+    private static UiHost Host(SandboxHost sandbox, ExecutionMode mode) => new(sandbox,
+        SandboxPolicyBuilder.Create().Grant("review.next", new { }, SandboxEffect.HostStateWrite).Build(),
+        execution: new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
+}

@@ -1,0 +1,22 @@
+I64 packing prototype: construction and one complete indexed read; five samples; no runtime integration.
+32/generic/construct                                  657.7 ns/op [601.6, 691.3]     1392.0 B/op
+32/packed/construct                                    71.3 ns/op [68.2, 73.9]      304.0 B/op
+32/generic/indexed-sum                                515.8 ns/op [494.7, 525.9]        0.0 B/op
+32/packed/indexed-sum                                 274.2 ns/op [272.2, 309.6]      768.0 B/op
+32/packed/public-list-boundary                       1270.1 ns/op [1237.0, 1357.4]     1920.0 B/op
+256/generic/construct                                4015.4 ns/op [3542.9, 4373.2]    10352.0 B/op
+256/packed/construct                                  192.7 ns/op [178.4, 204.0]     2096.0 B/op
+256/generic/indexed-sum                              4108.3 ns/op [3980.7, 4276.7]        0.0 B/op
+256/packed/indexed-sum                               2078.0 ns/op [2049.4, 2101.9]     6144.0 B/op
+256/packed/public-list-boundary                      6658.3 ns/op [6611.1, 6986.1]    14464.0 B/op
+4096/generic/construct                              57018.4 ns/op [56391.8, 60687.7]   163952.0 B/op
+4096/packed/construct                                1697.1 ns/op [1584.0, 2109.4]    32816.0 B/op
+4096/generic/indexed-sum                            64124.2 ns/op [62681.6, 70905.7]        0.0 B/op
+4096/packed/indexed-sum                             32830.7 ns/op [32451.2, 33249.6]    98304.0 B/op
+4096/packed/public-list-boundary                   102942.2 ns/op [100067.2, 112879.1]   229504.0 B/op
+65536/generic/construct                           3963312.5 ns/op [3104537.5, 4580443.8]  2621554.5 B/op
+65536/packed/construct                              51862.5 ns/op [48993.8, 140331.2]   524847.0 B/op
+65536/generic/indexed-sum                         1014875.0 ns/op [963600.0, 1030775.0]        0.0 B/op
+65536/packed/indexed-sum                           565450.0 ns/op [548675.0, 720925.0]  1572864.0 B/op
+65536/packed/public-list-boundary                 5395543.8 ns/op [5225043.8, 5605950.0]  3670144.0 B/op
+checksum: 2212986880; retained: ListValue

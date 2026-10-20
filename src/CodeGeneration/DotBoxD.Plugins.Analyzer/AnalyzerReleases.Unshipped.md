@@ -13,3 +13,5 @@ DBXK114 | DotBoxD.Kernels.Generation | Error | Run chain could not be lowered; g
 DBXK115 | DotBoxD.Kernels.Generation | Error | Duplicate generated server-extension graft signatures are rejected
 DBXK116 | DotBoxD.Kernels.Generation | Error | [NativeOnly] context helpers are rejected outside declared contexts and from lowered server-side IR
 DBXK117 | DotBoxD.Kernels.Generation | Error | Unexpected plugin source generator failures are reported without failing the whole generation pass
+
+DBXU001 | DotBoxD.UI | Error | Unsupported sandbox UI handler; use an explicit worker endpoint or host binding

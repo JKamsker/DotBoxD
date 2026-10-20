@@ -34,6 +34,13 @@
     <PackageVersion Include="FodyHelpers" Version="6.9.3" />
     <PackageVersion Include="Mono.Cecil" Version="0.11.6" />
 
+    <!-- Trusted sandbox UI renderer and offscreen validation -->
+    <PackageVersion Include="Avalonia.Themes.Simple" Version="12.1.3" />
+    <PackageVersion Include="Avalonia" Version="12.1.3" />
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.3" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.3" />
+    <PackageVersion Include="Avalonia.Skia" Version="12.1.3" />
+
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 
