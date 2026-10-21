@@ -124,6 +124,20 @@ public sealed class UiRazorAuthoringTests
         Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Explicit_IUiComponent_Render_is_the_handwritten_opt_out()
+    {
+        const string markup = "<UiText Text=\"generated\" />";
+        var source = Component.Replace("public partial class Counter", "public partial class Counter : IUiComponent", StringComparison.Ordinal)
+            .Replace("[UiLocalHandler] public static int Increment",
+                "UiElement IUiComponent.Render(UiBuilder builder) => builder.Text(\"manual\"); [UiLocalHandler] public static int Increment", StringComparison.Ordinal)
+            .Replace("new Counter().Render(builder)", "((IUiComponent)new Counter()).Render(builder)", StringComparison.Ordinal);
+        var result = Generate(source, markup);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.Equal("manual", Assert.Single(Package(source, markup).Nodes).Properties[0].Literal!.Text);
+    }
+
     [Theory]
     [InlineData("public", true)]
     [InlineData("protected", true)]
