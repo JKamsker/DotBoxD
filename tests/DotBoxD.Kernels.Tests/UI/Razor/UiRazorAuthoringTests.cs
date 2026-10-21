@@ -124,6 +124,17 @@ public sealed class UiRazorAuthoringTests
         Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Record_components_are_generated_instead_of_silently_ignored()
+    {
+        var source = Component.Replace("public partial class Counter", "public partial record class Counter", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.Contains(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Output.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
+    }
+
     [Theory]
     [InlineData("public", true)]
     [InlineData("protected", true)]
