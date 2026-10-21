@@ -261,7 +261,7 @@ public sealed partial class RpcHost
             disposeTask = _disposeTask;
         }
 
-        if (_disposalContext.IsDisposingListener)
+        if (_disposalContext.IsDisposingListener && !disposeTask.IsCompleted)
         {
             return default;
         }
