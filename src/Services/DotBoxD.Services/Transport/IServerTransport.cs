@@ -19,4 +19,10 @@ public interface IServerTransport : IAsyncDisposable
     /// Stops listening for connections.
     /// </summary>
     Task StopAsync(CancellationToken ct = default);
+
+    /// <remarks>
+    /// If disposal re-enters the owning <c>RpcHost</c>, await that call from the disposal execution
+    /// context. Do not dispatch it through APIs that suppress <see cref="ExecutionContext"/> flow,
+    /// because the host cannot distinguish that detached work from an unrelated concurrent disposal.
+    /// </remarks>
 }
