@@ -55,12 +55,14 @@ internal static class UiHandlerModelFactory
 
     private static void RequireSourceContainer(MethodDeclarationSyntax syntax)
     {
-        if (syntax.Parent is not ClassDeclarationSyntax and not StructDeclarationSyntax)
+        if (syntax.Parent is not TypeDeclarationSyntax)
         { throw new NotSupportedException("UI handlers require a partial class or struct"); }
     }
 
     private static void RequireContainer(IMethodSymbol method)
     {
+        if (method.ContainingType.TypeKind is not (TypeKind.Class or TypeKind.Struct))
+        { throw new NotSupportedException("UI handlers require a partial class or struct"); }
         if (method.ContainingType.IsFileLocal)
         { throw new NotSupportedException("file-local types cannot receive generated members in a separate source file; use a non-file-local partial type"); }
         if (method.ContainingType.ContainingType is not null || method.ContainingType.IsGenericType ||
