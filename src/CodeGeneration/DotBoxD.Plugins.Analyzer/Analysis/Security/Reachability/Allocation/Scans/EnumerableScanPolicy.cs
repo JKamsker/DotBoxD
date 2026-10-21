@@ -97,18 +97,14 @@ internal static class EnumerableScanPolicy
         => source?.Type switch
         {
             IArrayTypeSymbol array => SymbolEqualityComparer.Default.Equals(array.ElementType, method.TypeArguments[0]),
-            INamedTypeSymbol type => ImplementsCompatibleList(type, method.TypeArguments[0]),
+            INamedTypeSymbol type => IsCompatibleFrameworkList(type, method.TypeArguments[0]),
             _ => false,
         };
 
-    private static bool ImplementsCompatibleList(INamedTypeSymbol type, ITypeSymbol elementType)
-        => IsCompatibleList(type, elementType) ||
-           type.AllInterfaces.Any(interfaceType => IsCompatibleList(interfaceType, elementType));
-
-    private static bool IsCompatibleList(INamedTypeSymbol type, ITypeSymbol elementType)
+    private static bool IsCompatibleFrameworkList(INamedTypeSymbol type, ITypeSymbol elementType)
         => FrameworkCollectionIdentity.IsFrameworkType(type) &&
            type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ==
-               "System.Collections.Generic.IList<T>" &&
+               "System.Collections.Generic.List<T>" &&
            SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], elementType);
 
     private static bool HasBoundedCount(string typeName)
