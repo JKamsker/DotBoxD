@@ -7,6 +7,8 @@ public static class UiMaterializationValidator
 {
     public static void Validate(int staticNodeCount, ImmutableArray<UiPropertyValue> values, UiPolicy policy)
     {
+        ValidateUniqueProperties(values);
+
         long count = staticNodeCount;
         foreach (var property in values)
         {
@@ -23,6 +25,16 @@ public static class UiMaterializationValidator
         ValidateRanges(values);
         if (count > policy.MaxNodes)
         { throw new UiValidationException("UI materialization exceeds the host node limit."); }
+    }
+
+    private static void ValidateUniqueProperties(ImmutableArray<UiPropertyValue> values)
+    {
+        var properties = new HashSet<(int NodeId, UiPropertyId PropertyId)>();
+        foreach (var property in values)
+        {
+            if (!properties.Add((property.NodeId, property.PropertyId)))
+            { throw new UiValidationException("UI materialization contains duplicate node properties."); }
+        }
     }
 
     private static void ValidateRanges(ImmutableArray<UiPropertyValue> values)
