@@ -134,6 +134,7 @@ public sealed class AvaloniaUiRenderer : IUiRenderer, IUiInputSource
     /// <summary>Trusted offscreen CPU snapshot. The caller owns/disposes the bitmap and composites it.</summary>
     public async ValueTask<RenderTargetBitmap> CaptureAsync(PixelSize pixels, Vector dpi, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (pixels.Width <= 0 || pixels.Height <= 0 || (long)pixels.Width * pixels.Height > 16_777_216 ||
             !double.IsFinite(dpi.X) || !double.IsFinite(dpi.Y) || dpi.X <= 0 || dpi.Y <= 0)
         { throw new ArgumentOutOfRangeException(nameof(pixels)); }
