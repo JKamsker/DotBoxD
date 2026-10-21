@@ -29,6 +29,16 @@ public static class UiPackageJson
             UiJsonBudget.Validate(document.RootElement, policy);
             var package = JsonSerializer.Deserialize(json, UiJsonContext.Default.UiPackage)
                 ?? throw new UiValidationException("UI package must be an object.");
+            // Source-generated parameterized construction supplies default immutable arrays for
+            // absent init properties. Preserve older v1 packages without accepting explicit null.
+            if (!document.RootElement.TryGetProperty("requiredFeatures", out _))
+            { package = package with { RequiredFeatures = [] }; }
+            if (!document.RootElement.TryGetProperty("optionalFeatures", out _))
+            { package = package with { OptionalFeatures = [] }; }
+            if (!document.RootElement.TryGetProperty("extensions", out _))
+            { package = package with { Extensions = [] }; }
+            if (!document.RootElement.TryGetProperty("resources", out _))
+            { package = package with { Resources = [] }; }
             UiPackageValidator.Validate(package, policy);
             var normalized = NormalizeKernels(package, policy);
             _ = SerializeBounded(normalized, policy);
@@ -55,7 +65,11 @@ public static class UiPackageJson
             })],
             State = [.. package.State.OrderBy(s => s.Id)],
             Events = [.. package.Events.OrderBy(e => e.Id)],
-            RemoteEndpoints = [.. package.RemoteEndpoints.Order()]
+            Extensions = [.. package.Extensions.OrderBy(e => e.NodeId)],
+            Resources = [.. package.Resources.OrderBy(r => r.Id)],
+            RemoteEndpoints = [.. package.RemoteEndpoints.Order()],
+            RequiredFeatures = [.. package.RequiredFeatures.Order()],
+            OptionalFeatures = [.. package.OptionalFeatures.Order()]
         };
         return SerializeBounded(normalized, policy);
     }

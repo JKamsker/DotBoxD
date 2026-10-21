@@ -105,6 +105,7 @@ internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeKey> Types)
         name.EndsWith("Proxy", System.StringComparison.Ordinal) ||
         name.EndsWith("Dispatcher", System.StringComparison.Ordinal) ||
         name.EndsWith("Async", System.StringComparison.Ordinal) ||
+        name.StartsWith("DotBoxDGeneratedExtensions_", System.StringComparison.Ordinal) ||
         name == "DotBoxDGeneratedExtensions" ||
         name == "DotBoxDGenerated";
 

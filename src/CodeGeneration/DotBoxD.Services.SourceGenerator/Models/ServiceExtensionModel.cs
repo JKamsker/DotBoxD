@@ -15,7 +15,8 @@ internal sealed record ServiceExtensionModel(
     string ObsoleteAttribute,
     string ExperimentalDiagnosticId,
     EquatableArray<ServicePropertyModel> Properties,
-    EquatableArray<SubServiceInfo> MethodSubServices)
+    EquatableArray<SubServiceInfo> MethodSubServices,
+    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions")
 {
     public static ServiceExtensionModel From(ServiceModel service)
     {
@@ -42,6 +43,7 @@ internal sealed record ServiceExtensionModel(
             service.ObsoleteAttribute,
             service.ExperimentalDiagnosticId,
             service.Properties,
-            methodSubServices.ToEquatableArray());
+            methodSubServices.ToEquatableArray(),
+            service.GeneratedExtensionsType);
     }
 }

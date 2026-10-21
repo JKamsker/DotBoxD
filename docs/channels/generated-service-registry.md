@@ -23,10 +23,9 @@ the generator emits:
 - `ChatServiceProxy` in the service namespace
 - `ChatServiceDispatcher` in the service namespace
 - peer extension methods such as `ProvideChatService(...)` and `GetChatService()`
-- `DotBoxD.Services.Generated.DotBoxDGenerated`, a public factory and registration type
-- `DotBoxDGenerated.Services`, an array-backed catalog of generated service descriptors
-- `DotBoxDGenerated.RegisterServices(...)`, a generic registration callback for generated proxy implementations
-- `DotBoxDGenerated.RegisterGeneratedServices(...)`, a generic callback for service/proxy/dispatcher triples
+- `DotBoxD.Services.Generated.DotBoxDGenerated`, an internal assembly-local factory and catalog
+- a public extension class with an assembly-specific name, containing the peer extension methods
+- direct generic registration callbacks used by the public runtime registry
 
 The generated `DotBoxDGenerated` type registers the service with
 `DotBoxD.Services.Generated.GeneratedServiceRegistry` through generated delegates. No runtime
@@ -41,7 +40,7 @@ Each `GeneratedService` descriptor contains:
 
 ## Typed Factory Usage
 
-Use `DotBoxD.Services.Generated.DotBoxDGenerated` when you want a generic API that does not depend
+Use `DotBoxD.Services.Generated.GeneratedServiceRegistry` when you want a generic API that does not depend
 on the generated proxy or dispatcher type names:
 
 ```csharp
@@ -50,11 +49,11 @@ using DotBoxD.Services.Server;
 using DotBoxD.Services.Generated;
 
 RpcPeer peer = /* connected peer */;
-IChatService proxy = DotBoxDGenerated.CreateProxy<IChatService>(peer);
+IChatService proxy = GeneratedServiceRegistry.CreateProxy<IChatService>(peer);
 
 var implementation = new ChatService();
 IServiceDispatcher dispatcher =
-    DotBoxDGenerated.CreateDispatcher<IChatService>(implementation);
+    GeneratedServiceRegistry.CreateDispatcher<IChatService>(implementation);
 peer.Provide(dispatcher);
 ```
 
@@ -72,13 +71,13 @@ dispatcher overload instead.
 
 ## Generated Service Catalog
 
-Use `DotBoxDGenerated.Services` when you need the list of generated services without
+Use `GeneratedServiceRegistry.GetServices(typeof(IChatService).Assembly)` when you need the list of generated services without
 scanning the assembly for generated proxy or dispatcher types:
 
 ```csharp
 using DotBoxD.Services.Generated;
 
-var services = DotBoxDGenerated.Services;
+var services = GeneratedServiceRegistry.GetServices(typeof(IChatService).Assembly);
 for (var i = 0; i < services.Count; i++)
 {
     var service = services[i];
@@ -87,7 +86,7 @@ for (var i = 0; i < services.Count; i++)
 }
 ```
 
-`Services` is backed by one generated static array per service assembly. Accessing it
+`GetServices` returns an array-backed catalog cached per service assembly. Accessing it
 does not allocate another buffer and does not enumerate assembly types.
 
 ## Registration Sink
@@ -116,10 +115,11 @@ public sealed class MySink : IRpcServiceRegistrationSink
     }
 }
 
-DotBoxDGenerated.RegisterServices(new MySink(services));
+GeneratedServiceRegistry.RegisterServices(
+    new[] { typeof(IChatService).Assembly }, new MySink(services));
 ```
 
-For each valid `[RpcService]` interface generated into the assembly,
+For each valid `[RpcService]` interface generated into the requested assemblies,
 `RegisterServices` calls:
 
 ```csharp
@@ -149,7 +149,8 @@ public sealed class GeneratedSink : IRpcGeneratedServiceRegistrationSink
     }
 }
 
-DotBoxDGenerated.RegisterGeneratedServices(new GeneratedSink());
+GeneratedServiceRegistry.RegisterGeneratedServices(
+    new[] { typeof(IChatService).Assembly }, new GeneratedSink());
 ```
 
 For the same `IChatService`, the generated method emits a direct generic call:
@@ -169,11 +170,11 @@ using DotBoxD.Services.Generated;
 
 Type serviceType = typeof(IChatService);
 RpcPeer peer = /* connected peer */;
-object proxy = DotBoxDGenerated.CreateProxy(serviceType, peer);
+object proxy = GeneratedServiceRegistry.CreateProxy(serviceType, peer);
 
 object implementation = new ChatService();
 IServiceDispatcher dispatcher =
-    DotBoxDGenerated.CreateDispatcher(serviceType, implementation);
+    GeneratedServiceRegistry.CreateDispatcher(serviceType, implementation);
 peer.Provide(dispatcher);
 ```
 
@@ -230,15 +231,28 @@ var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IChatService>(impleme
 Like the typed factory, `CreateProxy<IChatService>` takes an `IRpcInvoker`, so pass the
 connected `RpcPeer`.
 
-Normally you should call `DotBoxD.Services.Generated.DotBoxDGenerated` from the service assembly.
-The runtime registry is useful when infrastructure code should not reference the
-generated namespace directly.
+Use the public runtime registry from any consuming assembly. The internal generated factory
+is an implementation detail; the runtime registry provides its catalog, factories, and sink callbacks.
 
 ## Assembly Scope
 
 The registry is generated per compilation. If a solution has multiple shared contract
 assemblies, each assembly gets its own `DotBoxD.Services.Generated.DotBoxDGenerated` type that
-registers the services declared in that assembly.
+registers the services declared in that assembly. The factory is internal so referencing multiple
+contract assemblies does not introduce competing public types.
+
+The peer extension class has a deterministic assembly-specific name. Keep calling methods such
+as `peer.GetChatService()` and `peer.ProvideChatService(implementation)` with
+`using DotBoxD.Services.Generated;`; avoid naming the extension container directly.
+
+### Migrating existing callers
+
+Calls to `DotBoxDGenerated.CreateProxy` / `CreateDispatcher` should use
+`GeneratedServiceRegistry.CreateProxy` / `CreateDispatcher`. Replace `DotBoxDGenerated.Services`
+with `GeneratedServiceRegistry.GetServices(typeof(IChatService).Assembly)`. For sink registration,
+pass the contract assembly set to `GeneratedServiceRegistry.RegisterServices` or
+`RegisterGeneratedServices`, as shown above. These public APIs also work when the caller
+references several generating assemblies. Existing compiled public factories remain discoverable.
 
 When a registry lookup is requested and the service has not been registered yet,
 `GeneratedServiceRegistry` performs one targeted lookup for the generated registration type
@@ -271,5 +285,5 @@ The generated `ProvideChatService` / `GetClientCallbacks` extension methods buil
 factory and registry above: `ProvideChatService(impl)` calls `peer.Provide(...)` with the
 generated dispatcher, and `GetClientCallbacks()` returns the generated proxy over the peer.
 If you only have `Type` values at runtime, call
-`DotBoxDGenerated.CreateProxy(serviceType, peer)` and `peer.Provide(DotBoxDGenerated.CreateDispatcher(serviceType, impl))`
+`GeneratedServiceRegistry.CreateProxy(serviceType, peer)` and `peer.Provide(GeneratedServiceRegistry.CreateDispatcher(serviceType, impl))`
 instead. Both sides can use the same pattern over one duplex connection.

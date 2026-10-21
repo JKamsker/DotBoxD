@@ -11,6 +11,7 @@ public sealed class UiSession : IAsyncDisposable
     private readonly UiStateStore _state;
     private readonly UiBindings _bindings;
     private readonly UiKernelRunner _kernels;
+    private readonly UiInteractionState _interaction;
     private readonly Dictionary<int, UiEvent> _events;
     private readonly Dictionary<(int Node, UiPropertyId Property), int> _inputs;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -30,6 +31,8 @@ public sealed class UiSession : IAsyncDisposable
         _state = state;
         _bindings = bindings;
         _kernels = kernels;
+        _interaction = new UiInteractionState(package);
+        _interaction.Commit(bindings.Current);
         _events = package.Events.ToDictionary(e => e.Id);
         _inputs = package.Nodes.SelectMany(n => n.Properties.Where(p => p.TwoWay)
             .Select(p => ((n.Id, p.Id), p.StateSlotId))).ToDictionary(p => p.Item1, p => p.StateSlotId);
@@ -62,6 +65,8 @@ public sealed class UiSession : IAsyncDisposable
         }, token);
 
     public Guid Id { get; } = Guid.NewGuid();
+    /// <summary>Trusted presentation adapter; null once teardown releases it.</summary>
+    public IUiRenderer? Renderer => _renderer.Renderer;
     public bool IsDisconnected => Volatile.Read(ref _closed) != 0;
 
     public ValueTask<UiSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
@@ -89,6 +94,7 @@ public sealed class UiSession : IAsyncDisposable
         {
             throw new UiValidationException("Input must address a declared two-way property.");
         }
+        _interaction.Validate(nodeId);
         return CommitAsync([new UiStateValue(slot, value)], token);
     }
 
@@ -107,6 +113,7 @@ public sealed class UiSession : IAsyncDisposable
 
             if (route.Target == UiEventTarget.LocalKernel)
             {
+                _interaction.Validate(route.NodeId);
                 using var local = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
                 var result = await _kernels.ExecuteAsync(route.KernelId, _state.Values, local.Token).ConfigureAwait(false);
                 var snapshot = await CommitAsync([new UiStateValue(route.OutputSlotId, result)], local.Token).ConfigureAwait(false);
@@ -117,6 +124,7 @@ public sealed class UiSession : IAsyncDisposable
             {
                 throw new UiValidationException("UI remote event concurrency limit exceeded.");
             }
+            _interaction.Validate(route.NodeId);
 
             var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
             linked.CancelAfter(_policy.RemoteEventTimeout);
@@ -186,6 +194,7 @@ public sealed class UiSession : IAsyncDisposable
         var changes = _bindings.Changes(values);
         _state.Commit(next);
         _bindings.Commit(values);
+        _interaction.Commit(values);
         if (!changes.IsEmpty)
         {
             await _renderer.UpdateAsync(changes, linked.Token).ConfigureAwait(false);
@@ -251,6 +260,7 @@ public sealed class UiSession : IAsyncDisposable
             _inputs.Clear();
             _state.Clear();
             _bindings.Clear();
+            _interaction.Clear();
             _kernels.Clear();
             await _renderer.DisposeAsync().ConfigureAwait(false);
         }

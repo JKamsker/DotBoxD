@@ -10,6 +10,23 @@ internal static class PluginServerWorldExtensionSuffixResolver
         INamedTypeSymbol worldType,
         CancellationToken cancellationToken)
     {
+        var extensions = PluginServerExtensionTypeResolver.Resolve(worldType);
+        var rpcPeerType = compilation.GetTypeByMetadataName("DotBoxD.Services.Peer.RpcPeer");
+        if (extensions is not null && rpcPeerType is not null)
+        {
+            foreach (var method in extensions.GetMembers().OfType<IMethodSymbol>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (method is { IsStatic: true, IsGenericMethod: false, Parameters.Length: 1 } &&
+                    method.Name.StartsWith("Get", StringComparison.Ordinal) &&
+                    SymbolEqualityComparer.Default.Equals(method.ReturnType, worldType) &&
+                    SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, rpcPeerType))
+                {
+                    return method.Name.Substring(3);
+                }
+            }
+        }
+
         var services = CollectServices(compilation, cancellationToken);
         var targetKey = ServiceKey(
             NamespaceName(worldType.ContainingNamespace),

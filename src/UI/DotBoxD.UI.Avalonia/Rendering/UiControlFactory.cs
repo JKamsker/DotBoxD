@@ -8,6 +8,7 @@ internal static class UiControlFactory
     private static readonly FrozenDictionary<UiPrimitive, Func<Control>> Factories =
         new Dictionary<UiPrimitive, Func<Control>>
         {
+            [UiPrimitive.Image] = static () => new Image(),
             [UiPrimitive.Stack] = static () => new StackPanel(),
             [UiPrimitive.Grid] = static () => new Grid(),
             [UiPrimitive.Border] = static () => new Border(),

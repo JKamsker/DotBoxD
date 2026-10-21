@@ -12,6 +12,7 @@ internal static class ArchTestSupport
     public static readonly string[] ShippingAssemblyNames =
     [
         "DotBoxD.UI.Avalonia",
+        "DotBoxD.UI.Blazor",
         "DotBoxD.UI",
         "DotBoxD.UI.Runtime",
         "DotBoxD.Kernels",

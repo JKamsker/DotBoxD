@@ -7,6 +7,12 @@ public sealed record UiPolicy
 {
     public ImmutableArray<UiPrimitive> AllowedPrimitives { get; init; } = [.. Enum.GetValues<UiPrimitive>()];
     public int MaxPackageBytes { get; init; } = 2 * 1024 * 1024;
+    public ImmutableArray<string> AllowedExtensionSchemas { get; init; } = [];
+    public int MaxExtensionBytes { get; init; } = 16 * 1024;
+    public int MaxResources { get; init; } = 16;
+    public int MaxResourceBytes { get; init; } = 1024 * 1024;
+    public int MaxTotalResourceBytes { get; init; } = 4 * 1024 * 1024;
+    public int MaxImagePixels { get; init; } = 262_144;
     public int MaxNodes { get; init; } = 2_000;
     public int MaxDepth { get; init; } = 64;
     public int MaxChildren { get; init; } = 1_000;
@@ -34,7 +40,14 @@ public sealed record UiPolicy
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
         }
 
-        if (AllowedPrimitives.IsDefault || AllowedPrimitives.Any(p => !Enum.IsDefined(p)) ||
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxExtensionBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxResources);
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxResourceBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxTotalResourceBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxImagePixels);
+
+        if (AllowedExtensionSchemas.IsDefault || AllowedExtensionSchemas.Any(s => !UiResourceValidator.ValidHandle(s)) ||
+            AllowedPrimitives.IsDefault || AllowedPrimitives.Any(p => !Enum.IsDefined(p)) ||
             MaxDepth > 256 || RemoteEventTimeout <= TimeSpan.Zero ||
             RemoteEventTimeout.TotalMilliseconds > int.MaxValue)
         {

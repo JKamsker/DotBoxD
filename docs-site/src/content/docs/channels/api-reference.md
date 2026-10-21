@@ -426,7 +426,7 @@ methods. The method suffix drops the leading `I` of the interface name
 
 ```csharp
 // In namespace DotBoxD.Services.Generated
-public static class DotBoxDGeneratedExtensions
+public static class DotBoxDGeneratedExtensions_Contracts
 {
     // Provide a local implementation for the other peer to call (before the peer starts).
     public static RpcPeer ProvideFooService(this RpcPeer peer, IFooService implementation);
@@ -436,16 +436,18 @@ public static class DotBoxDGeneratedExtensions
 }
 ```
 
-The generator also emits a public factory class and registers factories with the runtime registry.
+The generator emits an internal assembly-local factory and a public extension class with an
+assembly-specific name. Use extension method syntax on the peer and the public runtime registry
+for factories and registration across contract assemblies.
 The proxy factories take an `IRpcInvoker` (an `RpcPeer` implements it), so pass the peer directly:
 
 ```csharp
 // In namespace DotBoxD.Services.Generated
-public static class DotBoxDGenerated
+public static class GeneratedServiceRegistry
 {
-    public static IReadOnlyList<GeneratedService> Services { get; }
-    public static void RegisterServices(IRpcServiceRegistrationSink sink);
-    public static void RegisterGeneratedServices(IRpcGeneratedServiceRegistrationSink sink);
+    public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly);
+    public static void RegisterServices(IEnumerable<Assembly> assemblies, IRpcServiceRegistrationSink sink);
+    public static void RegisterGeneratedServices(IEnumerable<Assembly> assemblies, IRpcGeneratedServiceRegistrationSink sink);
     public static TService CreateProxy<TService>(IRpcInvoker invoker) where TService : class;
     public static object CreateProxy(Type serviceInterface, IRpcInvoker invoker);
     public static IServiceDispatcher CreateDispatcher<TService>(TService implementation) where TService : class;
@@ -457,7 +459,7 @@ public static class DotBoxDGenerated
 `peer.Provide(dispatcher)`; `CreateProxy<TService>(invoker)` produces a proxy bound to the peer
 (equivalent to `peer.Get<TService>()` and the generated `Get...` extension).
 
-`DotBoxDGenerated.Services` is backed by a generated static array of `GeneratedService`
+`GeneratedServiceRegistry.GetServices(assembly)` is backed by a generated static array of `GeneratedService`
 records. Each descriptor includes `ServiceType`, `ProxyType`, `DispatcherType`, and
 `ServiceName`, so hosts can build a service map without scanning assembly types.
 

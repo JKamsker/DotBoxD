@@ -5,16 +5,38 @@
 public async ValueTask<UiSession> InstallAsync( UiPackage package, IUiRenderer renderer, IUiRemoteTransport? remote = null, CancellationToken cancellationToken = default)
 public async ValueTask<UiSnapshot> DispatchAsync(int eventId, CancellationToken cancellationToken = default)
 public bool IsDisconnected => Volatile.Read(ref _closed) != 0
+public byte[] ToPng() => UiPngEncoder.Encode(this)
 public Guid Id { get; } = Guid.NewGuid()
+public ImmutableArray<byte> Rgba { get; }
+public ImmutableDictionary<int, UiResolvedExtension<T>> Resolve(UiPackage package, UiPolicy policy)
+public ImmutableHashSet<string> ExtensionSchemas { get; init; } = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+public ImmutableHashSet<string> Schemas => _schemas.Keys.ToImmutableHashSet(StringComparer.Ordinal)
+public int Height { get; }
+public int Width { get; }
+public interface IUiExtensionSchema
 public interface IUiInputSource
 public interface IUiRemoteTransport
 public interface IUiRenderer : IAsyncDisposable
+public IUiRenderer? Renderer => _renderer.Renderer
+public sealed class UiExtensionRegistry<T> where T : IUiExtensionSchema
 public sealed class UiHost
+public sealed class UiImageResource
+public sealed class UiResourceCatalog
 public sealed class UiSession : IAsyncDisposable
 public sealed record UiInput(int EventId = 0, int NodeId = 0, UiPropertyId PropertyId = default, UiValue? Value = null)
+public sealed record UiRendererCapabilities( ImmutableHashSet<UiPrimitive> Primitives, ImmutableHashSet<UiFeature> Features)
+public sealed record UiResolvedExtension<T>(T Schema, JsonElement Payload) where T : IUiExtensionSchema
+public static UiImageResource FromRgba(int width, int height, ReadOnlySpan<byte> rgba)
+public static UiRendererCapabilities Core { get; } = new( [.. Enum.GetValues<UiPrimitive>()], [.. Enum.GetValues<UiFeature>()])
+public static UiResourceCatalog Empty { get; } = new([])
 public string? LastInputError => Volatile.Read(ref _lastInputError)
+public UiExtensionRegistry(IEnumerable<T> schemas)
 public UiHost(SandboxHost kernels, SandboxPolicy kernelPolicy, UiPolicy? policy = null, SandboxExecutionOptions? execution = null)
+public UiImageResource GetImage(string handle) => _images.TryGetValue(handle, out var image)
+public UiResourceCatalog(IEnumerable<KeyValuePair<string, UiImageResource>> images)
 public ValueTask DisposeAsync()
 public ValueTask<UiSnapshot> ApplyPatchAsync(UiStatePatch patch, CancellationToken cancellationToken = default)
 public ValueTask<UiSnapshot> SetInputAsync( int nodeId, UiPropertyId propertyId, UiValue value, CancellationToken cancellationToken = default)
 public ValueTask<UiSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
+public void Validate(UiPackage package, UiPolicy policy)
+public void Validate(UiPackage package)

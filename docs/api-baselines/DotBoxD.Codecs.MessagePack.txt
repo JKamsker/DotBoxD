@@ -9,6 +9,7 @@ public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
 public sealed class MessagePackRpcSerializer : ISerializer
 public static MessagePackRpcSerializer CreateUnityCompatible()
 public static MessagePackRpcSerializer CreateWithResolver(IFormatterResolver resolver) =>
+public static MessagePackSerializerOptions CreateCollectibleOptions(params IFormatterResolver[] resolvers)
 public static MessagePackSerializerOptions CreateOptions(params IFormatterResolver[] resolvers)
 public T Deserialize<T>(ReadOnlyMemory<byte> data)
 public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)

@@ -264,9 +264,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             }
         });
 
-        context.RegisterSourceOutput(allServiceMetadata.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
+        context.RegisterSourceOutput(allServiceMetadata, static (spc, services) =>
         {
-            var services = pair.Left;
             if (services.IsEmpty)
             {
                 return;
@@ -274,7 +273,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
             try
             {
-                var factorySource = GeneratedFactoryGenerator.Generate(services, pair.Right, spc.CancellationToken);
+                var factorySource = GeneratedFactoryGenerator.Generate(services, spc.CancellationToken);
                 spc.AddSource(
                     "DotBoxDGenerated.g.cs",
                     SourceText.From(factorySource, Encoding.UTF8));

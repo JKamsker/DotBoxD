@@ -203,7 +203,9 @@ public sealed class GamePluginControlServiceServerExtensionRegressionTests
         RpcPeer peer,
         object implementation)
     {
-        var extensions = generatedAssembly.GetType("DotBoxD.Services.Generated.DotBoxDGeneratedExtensions", throwOnError: true)!;
+        var extensions = generatedAssembly.GetExportedTypes().Single(type =>
+            type.Namespace == "DotBoxD.Services.Generated" &&
+            type.Name.StartsWith("DotBoxDGeneratedExtensions_", StringComparison.Ordinal));
         var method = extensions.GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Single(candidate =>
             {

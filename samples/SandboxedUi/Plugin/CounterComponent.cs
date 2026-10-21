@@ -4,27 +4,13 @@ using Examples.SandboxedUi.Contracts;
 
 namespace Examples.SandboxedUi.Plugin;
 
+[UiRazorComponent("Counter.ui.razor")]
 internal sealed partial class CounterComponent : IUiComponent
 {
     public static UiPackage Package()
     {
         var builder = new UiBuilder();
         return builder.Build(new CounterComponent().Render(builder));
-    }
-
-    public UiElement Render(UiBuilder builder)
-    {
-        var count = builder.State(0);
-        var query = builder.State("");
-        var results = builder.State("");
-        var score = builder.State(0);
-        var increment = builder.Kernel(IncrementUiKernel(), count);
-        var label = builder.Kernel(LabelUiKernel(), count);
-        var readScore = builder.Kernel(ReadScoreUiKernel());
-        return builder.Border(builder.Stack(
-            builder.Text(label), builder.Button("Increment", increment, count),
-            new SearchComponent(query, results).Render(builder),
-            builder.Button("Read game score", readScore, score)));
     }
 
     [UiLocalHandler]

@@ -45,12 +45,14 @@
   </Folder>
 
   <Folder Name="/src/CodeGeneration/">
+    <Project Path="src/CodeGeneration/DotBoxD.UI.Razor/DotBoxD.UI.Razor.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Services.SourceGenerator/DotBoxD.Services.SourceGenerator.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
   <Folder Name="/src/UI/">
     <Project Path="src/UI/DotBoxD.UI.Avalonia/DotBoxD.UI.Avalonia.csproj" />
+    <Project Path="src/UI/DotBoxD.UI.Blazor/DotBoxD.UI.Blazor.csproj" />
     <Project Path="src/UI/DotBoxD.UI.Runtime/DotBoxD.UI.Runtime.csproj" />
     <Project Path="src/UI/DotBoxD.UI/DotBoxD.UI.csproj" />
   </Folder>
