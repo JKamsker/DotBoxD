@@ -40,17 +40,8 @@ public sealed class GeneratedAssemblyCatalogLifetimeTests
     }
 
     [Fact]
-    public void Explicit_global_registrations_keep_their_service_factories_alive()
-    {
-        var reference = RegisterGlobally();
-        Collect();
-        var service = Assert.IsAssignableFrom<Type>(reference.Target);
-        var metadata = GeneratedServiceRegistry.GetService(service);
-        var proxy = GeneratedServiceRegistry.CreateProxy(service, new RecordingInvoker());
-
-        Assert.Equal(metadata.ProxyType, proxy.GetType());
-        Assert.True(service.IsInstanceOfType(proxy));
-    }
+    public async Task Explicit_registrations_release_unused_collectible_service_factories()
+        => await AssertCollected(RegisterGlobally());
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference ProbeMissing(string operation)

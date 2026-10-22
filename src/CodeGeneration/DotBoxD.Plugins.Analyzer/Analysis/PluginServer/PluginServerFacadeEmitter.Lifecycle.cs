@@ -27,7 +27,7 @@ internal static partial class PluginServerFacadeEmitter
         if (model.EventCallbackType is not null)
         {
             // Provide the reverse event-callback sink during the connect before services start.
-            builder.AppendLine("                    session = await _connectionFactory(peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Provide" + model.EventCallbackProvideSuffix + "(peer, new RemoteLocalEventSink(_localHandlers)), cancellationToken).ConfigureAwait(false);");
+            builder.AppendLine("                    session = await _connectionFactory(peer => " + model.EventCallbackExtensionsType + ".Provide" + model.EventCallbackProvideSuffix + "(peer, new RemoteLocalEventSink(_localHandlers)), cancellationToken).ConfigureAwait(false);");
         }
         else
         {
@@ -37,7 +37,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                    cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("                    ThrowIfDisposed();");
         builder.AppendLine("                    var control = session.Get<" + model.ControlServiceType + ">();");
-        builder.AppendLine("                    var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(session.Peer);");
+        builder.AppendLine("                    var world = " + model.WorldExtensionsType + ".Get" + model.WorldExtensionSuffix + "(session.Peer);");
         builder.AppendLine("                    Initialize(control, world);");
         builder.AppendLine("                    _session = session;");
         builder.AppendLine("                    ThrowIfDisposed();");

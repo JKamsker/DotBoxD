@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
 using DotBoxD.Services.Peer;
 
 namespace DotBoxD.Kernels.Game.Plugin.Tests;
@@ -33,9 +34,7 @@ public sealed class RemoteRunLocalFacadeIpcTests
         // provided — the facade's world proxy getters are lazy and this test never calls a world method.
         await using var ipcHost = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
         {
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGamePluginControlService(
-                peer,
-                control);
+            peer.ProvideGamePluginControlService(control);
             serverPeerReady.TrySetResult(peer);
         });
         await ipcHost.StartAsync();
@@ -63,7 +62,7 @@ public sealed class RemoteRunLocalFacadeIpcTests
         // generated sink.
         var serverPeer = await serverPeerReady.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var pushProxy =
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
+            serverPeer.GetPluginEventCallback();
         await pushProxy.OnEventAsync(subscriptionId, KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.String("monster-7")));
 
         // The native RunLocal delegate ran in the plugin process with the decoded projection — reachable only

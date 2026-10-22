@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
 
 namespace DotBoxD.Kernels.Game.Plugin.Tests.Regression;
 
@@ -13,9 +14,7 @@ public sealed class GamePluginControlServiceIpcRegressionTests
         var control = new EchoControlService();
         await using var host = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
         {
-            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGamePluginControlService(
-                peer,
-                control);
+            peer.ProvideGamePluginControlService(control);
         });
         await host.StartAsync();
         await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);

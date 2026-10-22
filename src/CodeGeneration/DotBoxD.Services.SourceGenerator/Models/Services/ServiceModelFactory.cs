@@ -1,3 +1,4 @@
+using DotBoxD.CodeGeneration.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -125,7 +126,8 @@ internal static partial class ServiceModelFactory
                 RawServiceName: serviceName,
                 ObsoleteAttribute: obsoleteAttribute.Source,
                 TypeAttributePrefix: typeAttributePrefix,
-                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
+                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId,
+                GeneratedExtensionsType: GeneratedServiceTypeNames.Extensions(interfaceSymbol.ContainingAssembly.Name)),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),

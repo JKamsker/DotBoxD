@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\Services\*.cs" Link="Shared\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Shared\Defaults\*.cs" Link="Shared\Defaults\%(Filename)%(Extension)" />
   </ItemGroup>
 

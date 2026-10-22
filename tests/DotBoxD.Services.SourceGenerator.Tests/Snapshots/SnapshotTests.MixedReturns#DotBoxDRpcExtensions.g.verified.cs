@@ -7,7 +7,7 @@ namespace DotBoxD.Services.Generated
     /// <summary>
     /// Extension methods for registering generated DotBoxD services.
     /// </summary>
-    public static class DotBoxDGeneratedExtensions
+    public static class DotBoxDGeneratedExtensions_Snapshots
     {
 
         /// <summary>
