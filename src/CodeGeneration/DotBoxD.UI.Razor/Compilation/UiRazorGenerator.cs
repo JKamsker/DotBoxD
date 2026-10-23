@@ -74,8 +74,8 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         { return new Output(hint, component.SourcePath, "", null, null); }
         if (!component.Valid)
         { return new Output(hint, component.SourcePath, "", null, "Use a top-level, non-generic partial class, or hand-write Render(UiBuilder)."); }
-        var matches = files.Where(f => string.Equals(f.Path.Replace('\\', '/'), component.Path.Replace('\\', '/'), StringComparison.Ordinal) ||
-            f.Path.Replace('\\', '/').EndsWith("/" + component.Path.Replace('\\', '/'), StringComparison.Ordinal)).ToArray();
+        var matches = files.Where(f => string.Equals(f.Path.Replace('\\', '/'), component.Path.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase) ||
+            f.Path.Replace('\\', '/').EndsWith("/" + component.Path.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase)).ToArray();
         if (matches.Length != 1)
         { return new Output(hint, component.SourcePath, "", null, "Register exactly one matching .ui.razor file as AdditionalFiles: " + component.Path); }
         var file = matches[0];
