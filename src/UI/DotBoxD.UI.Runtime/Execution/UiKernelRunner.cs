@@ -60,6 +60,11 @@ internal sealed class UiKernelRunner(SandboxHost host, SandboxExecutionOptions o
             cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
+            if (result.Error?.Code == SandboxErrorCode.Cancelled && cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
             throw new UiValidationException($"UI kernel failed: {result.Error?.Code}.");
         }
 

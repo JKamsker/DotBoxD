@@ -115,9 +115,16 @@ public sealed class UiSession : IAsyncDisposable
             {
                 _interaction.Validate(route.NodeId);
                 using var local = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-                var result = await _kernels.ExecuteAsync(route.KernelId, _state.Values, local.Token).ConfigureAwait(false);
-                var snapshot = await CommitAsync([new UiStateValue(route.OutputSlotId, result)], local.Token).ConfigureAwait(false);
-                return new Dispatch(snapshot, null, null, null);
+                try
+                {
+                    var result = await _kernels.ExecuteAsync(route.KernelId, _state.Values, local.Token).ConfigureAwait(false);
+                    var snapshot = await CommitAsync([new UiStateValue(route.OutputSlotId, result)], local.Token).ConfigureAwait(false);
+                    return new Dispatch(snapshot, null, null, null);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
             }
 
             if (Volatile.Read(ref _inFlight) >= _policy.MaxInFlightRemoteEvents)
