@@ -12,8 +12,8 @@ public sealed class UiRazorAuthoringTests
     {
         var result = Generate(Component, Markup, "/authoring/COUNTER.UI.RAZOR");
 
-        Assert.Contains(result.Result.GeneratedTrees,
-            tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.Single(result.Result.GeneratedTrees.Where(
+            tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal)));
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
         Assert.Empty(result.Output.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning));
