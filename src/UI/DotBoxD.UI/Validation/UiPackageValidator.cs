@@ -89,6 +89,27 @@ public static class UiPackageValidator
         {
             throw new UiValidationException("Invalid UI kernel or unknown input state slot.");
         }
+
+        RequireWellFormedEntrypoint(kernel.Entrypoint);
+    }
+
+    private static void RequireWellFormedEntrypoint(string entrypoint)
+    {
+        for (var i = 0; i < entrypoint.Length; i++)
+        {
+            var character = entrypoint[i];
+            if (char.IsHighSurrogate(character))
+            {
+                if (++i >= entrypoint.Length || !char.IsLowSurrogate(entrypoint[i]))
+                {
+                    throw new UiValidationException("UI kernel entrypoint must contain well-formed UTF-16.");
+                }
+            }
+            else if (char.IsLowSurrogate(character))
+            {
+                throw new UiValidationException("UI kernel entrypoint must contain well-formed UTF-16.");
+            }
+        }
     }
 
     private static void ValidateEvents(UiPackage package, Dictionary<int, UiEvent> events,
