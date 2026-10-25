@@ -64,6 +64,11 @@ internal static class SubscriptionDelivery
         }
         catch (Exception ex)
         {
+            if (rawContext.CancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
             return;
         }
@@ -119,6 +124,11 @@ internal static class SubscriptionDelivery
         }
         catch (Exception ex)
         {
+            if (rawContext.CancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
             return false;
         }
@@ -155,6 +165,11 @@ internal static class SubscriptionDelivery
             }
             catch (Exception ex)
             {
+                if (rawContext.CancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
             }
         }
