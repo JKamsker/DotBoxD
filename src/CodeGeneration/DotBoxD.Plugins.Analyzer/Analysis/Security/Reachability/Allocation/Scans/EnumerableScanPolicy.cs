@@ -25,7 +25,7 @@ internal static class EnumerableScanPolicy
     }
 
     private static bool IsScanMethod(IMethodSymbol method)
-        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault" or "SingleOrDefault" ||
+        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault" or "SingleOrDefault" or "Single" ||
            method.Name == "Last" && method.Parameters.Length == 2;
 
     private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
@@ -88,6 +88,8 @@ internal static class EnumerableScanPolicy
         => method.Name switch
         {
             "Any" or "Count" when method.Parameters.Length == 1 =>
+                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
+            "Single" when method.Parameters.Length == 1 =>
                 HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
