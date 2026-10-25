@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
@@ -108,8 +109,15 @@ internal static class ForbiddenApiNamePolicy
     public static bool IsForbiddenNamespace(string name)
         => NamespacePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal));
 
-    public static bool TryGetForbiddenExactMemberDisplayName(string name, out string displayName)
+    public static bool TryGetForbiddenExactMemberDisplayName(IMethodSymbol method, out string displayName)
     {
+        var name = MethodContainingTypeName(method.ContainingType) + "." + method.Name;
+        if (IsPredicateEnumerableLast(method, name))
+        {
+            displayName = name;
+            return true;
+        }
+
         if (Array.IndexOf(ExactMemberNames, name) < 0)
         {
             displayName = null!;
@@ -123,4 +131,14 @@ internal static class ForbiddenApiNamePolicy
 
         return true;
     }
+
+    private static bool IsPredicateEnumerableLast(IMethodSymbol method, string name)
+        => name == "System.Linq.Enumerable.Last" &&
+           method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
+           method.Parameters.Length == 2;
+
+    private static string MethodContainingTypeName(INamedTypeSymbol containingType)
+        => containingType.SpecialType == SpecialType.System_String
+            ? "System.String"
+            : containingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 }

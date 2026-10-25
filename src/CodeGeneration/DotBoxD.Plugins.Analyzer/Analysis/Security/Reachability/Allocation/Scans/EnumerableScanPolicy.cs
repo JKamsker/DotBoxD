@@ -9,7 +9,7 @@ internal static class EnumerableScanPolicy
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
-            method.Name is not ("Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault") ||
+            !IsScanMethod(method) ||
             typeName != "System.Linq.Enumerable")
         {
             return false;
@@ -23,6 +23,11 @@ internal static class EnumerableScanPolicy
 
         return !IsBoundedCollectionCall(method, source);
     }
+
+    private static bool IsScanMethod(IMethodSymbol method)
+        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or
+               "FirstOrDefault" or "LastOrDefault" ||
+           method.Name == "Last" && method.Parameters.Length == 2;
 
     private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
     {
@@ -87,6 +92,8 @@ internal static class EnumerableScanPolicy
                 HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
+            "Last" when method.Parameters.Length == 1 =>
+                name == "System.Collections.Generic.List<T>",
             _ => false
         };
 
