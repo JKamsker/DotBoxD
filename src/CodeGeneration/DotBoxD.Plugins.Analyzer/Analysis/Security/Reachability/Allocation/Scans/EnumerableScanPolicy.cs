@@ -21,11 +21,16 @@ internal static class EnumerableScanPolicy
             source = conversion.Operand;
         }
 
+        if (method.Name == "First")
+        {
+            return method.Parameters.Length == 2;
+        }
+
         return !IsBoundedCollectionCall(method, source);
     }
 
     private static bool IsScanMethod(IMethodSymbol method)
-        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault" or "SingleOrDefault" or "Single" or "Aggregate" ||
+        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault" or "SingleOrDefault" or "Single" or "Aggregate" or "First" ||
            method.Name == "Last" && method.Parameters.Length == 2;
 
     private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
