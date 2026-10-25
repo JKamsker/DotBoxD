@@ -5,19 +5,40 @@ namespace DotBoxD.UI;
 /// <summary>Checks evaluated properties before controls are created or a state batch is committed.</summary>
 public static class UiMaterializationValidator
 {
+    private static readonly IReadOnlyDictionary<UiPropertyId, UiValueKind> PropertyKinds =
+        new Dictionary<UiPropertyId, UiValueKind>
+        {
+            [UiPropertyId.Enabled] = UiValueKind.Boolean,
+            [UiPropertyId.Visible] = UiValueKind.Boolean,
+            [UiPropertyId.Checked] = UiValueKind.Boolean,
+            [UiPropertyId.Horizontal] = UiValueKind.Boolean,
+            [UiPropertyId.Text] = UiValueKind.String,
+            [UiPropertyId.Value] = UiValueKind.Number,
+            [UiPropertyId.Maximum] = UiValueKind.Number,
+            [UiPropertyId.Spacing] = UiValueKind.Number,
+            [UiPropertyId.Padding] = UiValueKind.Number,
+            [UiPropertyId.Resource] = UiValueKind.Int32,
+            [UiPropertyId.Columns] = UiValueKind.Int32,
+            [UiPropertyId.Row] = UiValueKind.Int32,
+            [UiPropertyId.Column] = UiValueKind.Int32,
+            [UiPropertyId.Items] = UiValueKind.Items,
+        };
+
     public static void Validate(int staticNodeCount, ImmutableArray<UiPropertyValue> values, UiPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentOutOfRangeException.ThrowIfNegative(staticNodeCount);
         if (values.IsDefault)
         { throw new UiValidationException("UI materialization property values must be explicitly initialized."); }
-        ValidateUniqueProperties(values);
+        var properties = new HashSet<(int NodeId, UiPropertyId PropertyId)>();
 
         long count = staticNodeCount;
         foreach (var property in values)
         {
             if (property is null)
             { throw new UiValidationException("UI materialization contains a null property entry."); }
+            if (!properties.Add((property.NodeId, property.PropertyId)))
+            { throw new UiValidationException("UI materialization contains duplicate node properties."); }
             if (property.NodeId <= 0)
             { throw new UiValidationException($"UI property references invalid node ID {property.NodeId}."); }
 
@@ -37,27 +58,10 @@ public static class UiMaterializationValidator
         { throw new UiValidationException("UI materialization exceeds the host node limit."); }
     }
 
-    private static void ValidateUniqueProperties(ImmutableArray<UiPropertyValue> values)
-    {
-        var properties = new HashSet<(int NodeId, UiPropertyId PropertyId)>();
-        foreach (var property in values)
-        {
-            if (!properties.Add((property.NodeId, property.PropertyId)))
-            { throw new UiValidationException("UI materialization contains duplicate node properties."); }
-        }
-    }
-
     private static void RequirePropertyKind(UiPropertyValue property)
     {
-        var expected = property.PropertyId switch
-        {
-            UiPropertyId.Enabled or UiPropertyId.Visible or UiPropertyId.Checked or UiPropertyId.Horizontal => UiValueKind.Boolean,
-            UiPropertyId.Text => UiValueKind.String,
-            UiPropertyId.Value or UiPropertyId.Maximum or UiPropertyId.Spacing or UiPropertyId.Padding => UiValueKind.Number,
-            UiPropertyId.Resource or UiPropertyId.Columns or UiPropertyId.Row or UiPropertyId.Column => UiValueKind.Int32,
-            UiPropertyId.Items => UiValueKind.Items,
-            _ => throw new UiValidationException("Unsupported UI property.")
-        };
+        if (!PropertyKinds.TryGetValue(property.PropertyId, out var expected))
+        { throw new UiValidationException("Unsupported UI property."); }
         if (property.Value.Kind != expected)
         { throw new UiValidationException("UI materialization property type mismatch."); }
     }

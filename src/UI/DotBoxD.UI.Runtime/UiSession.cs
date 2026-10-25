@@ -149,7 +149,7 @@ public sealed class UiSession : IAsyncDisposable
         try
         {
             var request = dispatch.Remote!;
-            var patch = await CallRemoteAsync(dispatch.Transport!, request, pending.Token, cancellationToken).ConfigureAwait(false);
+            var patch = await UiRemoteDispatch.DispatchAsync(dispatch.Transport!, request, pending.Token, cancellationToken, this).ConfigureAwait(false);
             if (patch is null || patch.SessionId != request.Snapshot.SessionId ||
                 patch.ExpectedVersion != request.Snapshot.Version)
             {
@@ -173,32 +173,6 @@ public sealed class UiSession : IAsyncDisposable
         finally
         {
             Interlocked.Decrement(ref _inFlight);
-        }
-    }
-
-    private async ValueTask<UiStatePatch> CallRemoteAsync(
-        IUiRemoteTransport transport, UiRemoteEvent message, CancellationToken token, CancellationToken caller)
-    {
-        try
-        {
-            return await transport.DispatchAsync(message, token).AsTask().WaitAsync(token).ConfigureAwait(false);
-        }
-        catch when (caller.IsCancellationRequested)
-        {
-            caller.ThrowIfCancellationRequested();
-            throw;
-        }
-        catch
-        {
-            try
-            {
-                await DisposeAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-                // Best-effort teardown must not replace the remote transport failure.
-            }
-            throw;
         }
     }
 

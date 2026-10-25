@@ -8,7 +8,7 @@ public async ValueTask MaterializeAsync(UiPackage package, ImmutableArray<UiProp
 public async ValueTask UpdateAsync(ImmutableArray<UiPropertyValue> changes, CancellationToken cancellationToken)
 public async ValueTask<RenderTargetBitmap> CaptureAsync(PixelSize pixels, Vector dpi, CancellationToken cancellationToken = default)
 public AvaloniaUiRenderer(int inputCapacity = 128, UiResourceCatalog? resources = null, IEnumerable<IUiAvaloniaExtension>? extensions = null)
-public bool IsDisposed => Volatile.Read(ref _disposed)
+public bool IsDisposed => Volatile.Read(ref _disposeStarted) != 0
 public Control? Root { get { Dispatcher.UIThread.VerifyAccess(); return _root; } }
 public int Materializations { get; private set; }
 public int Updates { get; private set; }

@@ -1,6 +1,6 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.MergeableIr;
 

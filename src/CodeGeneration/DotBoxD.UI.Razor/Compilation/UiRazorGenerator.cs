@@ -50,8 +50,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var generationDisabled = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false);
         var skip = generationDisabled || render == RenderKind.Handwritten;
         var hasRenderProperty = type.GetMembers("Render").OfType<IPropertySymbol>().Any();
-        var valid = type.TypeKind == TypeKind.Class && !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
-            type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is TypeDeclarationSyntax declaration && declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
+        var valid = IsSupportedContainer(type);
         return new Component(type.ToDisplayString(), syntax.Identifier.Text,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             string.Join(" ", syntax.Modifiers.Select(m => m.Text)), type.IsRecord ? "record class" : "class",
@@ -60,6 +59,10 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
                 ? "Render(UiBuilder) must be an instance method returning UiElement, or set GenerateRender = false."
                 : null);
     }
+
+    private static bool IsSupportedContainer(INamedTypeSymbol type)
+        => type.TypeKind == TypeKind.Class && !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
+            type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is TypeDeclarationSyntax declaration && declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
 
     private static RenderKind GetRenderKind(INamedTypeSymbol type, Compilation compilation)
     {

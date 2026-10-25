@@ -5,6 +5,13 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class EnumerableScanPolicy
 {
+    private static readonly HashSet<string> ScanMethodNames = new(StringComparer.Ordinal)
+    {
+        "Contains", "Any", "Count", "SequenceEqual", "All", "LongCount", "FirstOrDefault", "LastOrDefault",
+        "SingleOrDefault", "Single", "Aggregate", "First", "Max", "Min", "Sum", "Average", "MaxBy",
+        "ElementAt", "ElementAtOrDefault", "Skip"
+    };
+
     public static bool IsScan(IInvocationOperation invocation, string typeName)
     {
         var method = invocation.TargetMethod;
@@ -30,7 +37,7 @@ internal static class EnumerableScanPolicy
     }
 
     private static bool IsScanMethod(IMethodSymbol method)
-        => method.Name is "Contains" or "Any" or "Count" or "SequenceEqual" or "All" or "LongCount" or "FirstOrDefault" or "LastOrDefault" or "SingleOrDefault" or "Single" or "Aggregate" or "First" or "Max" or "Min" or "Sum" or "Average" or "MaxBy" or "ElementAt" or "ElementAtOrDefault" or "Skip" ||
+        => ScanMethodNames.Contains(method.Name) ||
            method.Name == "Last" && method.Parameters.Length == 2;
 
     private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
@@ -40,8 +47,7 @@ internal static class EnumerableScanPolicy
             return false;
         }
 
-        if (method.Name is "Any" or "Count" && method.Parameters.Length == 1 &&
-            (source?.Type is IArrayTypeSymbol || IsSortedListView(source)))
+        if (IsBoundedCountCall(method, source))
         {
             return true;
         }
@@ -64,6 +70,10 @@ internal static class EnumerableScanPolicy
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return IsBoundedFrameworkCall(method, source, name);
     }
+
+    private static bool IsBoundedCountCall(IMethodSymbol method, IOperation? source)
+        => method.Name is "Any" or "Count" && method.Parameters.Length == 1 &&
+           (source?.Type is IArrayTypeSymbol || IsSortedListView(source));
 
     private static bool HasCompatibleCollectionElementType(IMethodSymbol method, IOperation? source)
         => source?.Type is INamedTypeSymbol type &&
@@ -90,16 +100,18 @@ internal static class EnumerableScanPolicy
                SymbolDisplayFormat.CSharpErrorMessageFormat) == "System.Collections.Generic.SortedList<TKey, TValue>";
 
     private static bool IsBoundedFrameworkCall(IMethodSymbol method, IOperation? source, string name)
+        => IsCountMethod(method) && HasBoundedCount(name) && HasCompatibleCountFastPath(method, source) ||
+           IsBoundedIndexedOrContainsCall(method, source, name);
+
+    private static bool IsCountMethod(IMethodSymbol method)
+        => method.Name is "Any" or "Count" or "Single" && method.Parameters.Length == 1;
+
+    private static bool IsBoundedIndexedOrContainsCall(IMethodSymbol method, IOperation? source, string name)
         => method.Name switch
         {
-            "Any" or "Count" when method.Parameters.Length == 1 =>
-                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
-            "Single" when method.Parameters.Length == 1 =>
-                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
-            "Last" when method.Parameters.Length == 1 =>
-                name == "System.Collections.Generic.List<T>",
+            "Last" when method.Parameters.Length == 1 => name == "System.Collections.Generic.List<T>",
             _ => false
         };
 
