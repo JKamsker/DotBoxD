@@ -195,6 +195,23 @@ public sealed class UiAuthoringTests
         Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
+    [Fact]
+    public void Keyword_escaped_namespace_generates_a_clean_local_facet()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            namespace Keyword.@event;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+            }
+            """);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "CS8785");
+        Assert.Single(result.Result.GeneratedTrees);
+        Assert.Contains("IncrementUiKernel", string.Join("", result.Result.GeneratedTrees), StringComparison.Ordinal);
+        Assert.Empty(result.Output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
     [Theory]
     [InlineData("public static class Manual")]
     [InlineData("public static class Manual<T>")]

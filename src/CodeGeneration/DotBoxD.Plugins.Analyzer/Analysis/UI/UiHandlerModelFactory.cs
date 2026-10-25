@@ -12,7 +12,7 @@ internal static class UiHandlerModelFactory
         var method = (IMethodSymbol)context.TargetSymbol;
         var syntax = (MethodDeclarationSyntax)context.TargetNode;
         var location = syntax.Identifier.GetLocation();
-        var hint = method.ContainingType.ToDisplayString() + "." + method.Name + ".Ui.g.cs";
+        var hint = method.ContainingType.ToDisplayString().Replace("@", string.Empty) + "." + method.Name + ".Ui.g.cs";
         try
         {
             var attribute = context.Attributes[0];
