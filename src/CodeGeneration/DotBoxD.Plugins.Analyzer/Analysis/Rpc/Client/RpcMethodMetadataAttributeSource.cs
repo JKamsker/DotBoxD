@@ -55,6 +55,14 @@ internal static class RpcMethodMetadataAttributeSource
                         "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute");
                     break;
 
+                case "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
+                    break;
+
                 case "System.Runtime.Versioning.SupportedOSPlatformAttribute":
                     AppendAttribute(
                         builder,
