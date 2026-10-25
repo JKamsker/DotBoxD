@@ -25,6 +25,23 @@ public sealed class ServerExtensionClientTypePreviewFeatureAttributeSurpriseTest
         Assert.DoesNotContain(portableClient.GetAttributes(), IsPreviewFeatureAttribute);
     }
 
+    [Theory]
+    [InlineData("", 0)]
+    [InlineData("(Url = \"https://example.invalid/preview\")", 0)]
+    [InlineData("(null, Url = \"https://example.invalid/preview\")", 1)]
+    public void Service_client_preserves_preview_constructor_and_named_arguments(string arguments, int constructorCount)
+    {
+        var source = ServiceBackedSource.Replace(
+            "(\"Preview service\", Url = \"https://example.invalid/preview\")", arguments, StringComparison.Ordinal);
+        var result = RpcMemberMetadataGeneratorHarness.RunGenerator(source);
+        Assert.DoesNotContain(result.GeneratorDiagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        var original = Assert.Single(result.OutputCompilation.GetTypeByMetadataName("Sample.IPreviewService")!.GetAttributes(), IsPreviewFeatureAttribute);
+        var client = result.OutputCompilation.GetSymbolsWithName("PreviewKernelServerExtensionClient").OfType<INamedTypeSymbol>().Single();
+        var generated = Assert.Single(client.GetAttributes(), IsPreviewFeatureAttribute);
+        Assert.Equal(constructorCount, generated.ConstructorArguments.Length);
+        Assert.Equal(original.ToString(), generated.ToString());
+    }
+
     private static bool IsPreviewFeatureAttribute(AttributeData attribute)
         => attribute.AttributeClass?.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
 

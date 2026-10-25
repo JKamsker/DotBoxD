@@ -7,6 +7,7 @@ internal static class UiRemoteDispatch
     {
         try
         {
+            using var callback = session.EnterCallbackScope();
             return await transport.DispatchAsync(message, token).AsTask().WaitAsync(token).ConfigureAwait(false);
         }
         catch when (caller.IsCancellationRequested)

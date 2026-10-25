@@ -11,11 +11,17 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 /// </remarks>
 internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
 {
+    private Timer? _deadline;
+
     public void CancelIgnoringCallbackExceptions()
     {
         try
         {
             Cancel(throwOnFirstException: false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // A timer callback may already be queued when its context is disposed.
         }
         catch (AggregateException)
         {
@@ -25,13 +31,29 @@ internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
 
     public void ArmDeadline(TimeSpan remaining)
     {
-        // CancelAfter reuses the source's internal timer after the first call,
-        // so re-arming the shared instance does not allocate per binding call.
-        // A source that has already fired (run is aborting) ignores this.
         if (!IsCancellationRequested)
         {
-            CancelAfter(remaining);
+            _deadline ??= CreateDeadlineTimer();
+            _deadline.Change(remaining, Timeout.InfiniteTimeSpan);
         }
     }
 
+    private Timer CreateDeadlineTimer()
+    {
+        if (ExecutionContext.IsFlowSuppressed())
+        { return CreateTimer(); }
+        using var flow = ExecutionContext.SuppressFlow();
+        return CreateTimer();
+    }
+
+    private Timer CreateTimer()
+        => new(static state => ((SharedWallTimeTokenSource)state!).CancelIgnoringCallbackExceptions(),
+            this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        { _deadline?.Dispose(); }
+        base.Dispose(disposing);
+    }
 }

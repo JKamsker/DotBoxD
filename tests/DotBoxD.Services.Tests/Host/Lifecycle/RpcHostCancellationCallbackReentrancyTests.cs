@@ -27,6 +27,60 @@ public sealed class RpcHostCancellationCallbackReentrancyTests
         await host.DisposeAsync();
     }
 
+    [Fact]
+    public async Task StopAsync_WhenLastRegisteredCallbackJoinsStop_StopsListenerBeforeJoiningAccept()
+    {
+        var transport = new ReverseRegistrationServerTransport();
+        var host = RpcHost.Listen(transport, new MessagePackRpcSerializer());
+        transport.Host = host;
+        await host.StartAsync();
+        await transport.AcceptEntered.Task.WaitAsync(Timeout);
+
+        var stop = Task.Run(() => host.StopAsync());
+        try
+        {
+            await stop.WaitAsync(Timeout);
+            Assert.Equal(1, transport.StopCalls);
+        }
+        finally
+        {
+            transport.ReleaseAccept();
+            await IgnoreFailureAsync(stop);
+            await IgnoreFailureAsync(host.DisposeAsync().AsTask());
+        }
+    }
+
+    private static async Task IgnoreFailureAsync(Task task)
+    {
+        try
+        { await task.WaitAsync(Timeout); }
+        catch { }
+    }
+
+    private sealed class ReverseRegistrationServerTransport : IServerTransport
+    {
+        private readonly TaskCompletionSource<IRpcChannel> _accept = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public RpcHost? Host { get; set; }
+        public TaskCompletionSource AcceptEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int StopCalls { get; private set; }
+        public Task StartAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
+        {
+            ct.Register(() => _accept.TrySetCanceled(ct));
+            ct.Register(() => Host!.StopAsync().GetAwaiter().GetResult());
+            AcceptEntered.TrySetResult();
+            return _accept.Task;
+        }
+        public void ReleaseAccept() => _accept.TrySetCanceled();
+        public Task StopAsync(CancellationToken ct = default)
+        {
+            StopCalls++;
+            ReleaseAccept();
+            return Task.CompletedTask;
+        }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class ReentrantCancellationCallbackServerTransport : IServerTransport
     {
         private int _stopCalls;

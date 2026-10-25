@@ -6,6 +6,7 @@ internal static class UiInputLoop
 {
     public static async Task RunAsync(UiSession session, IUiInputSource source, UiPolicy policy, IReadOnlySet<int> remoteEvents, CancellationToken token)
     {
+        using var callback = session.EnterCallbackScope();
         var window = Stopwatch.GetTimestamp();
         var count = 0;
         var pending = new UiInputConcurrency(policy.MaxInFlightRemoteEvents);

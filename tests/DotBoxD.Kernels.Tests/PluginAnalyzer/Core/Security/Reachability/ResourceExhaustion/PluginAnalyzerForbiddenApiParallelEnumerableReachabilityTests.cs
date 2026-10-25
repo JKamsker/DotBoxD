@@ -34,14 +34,24 @@ public sealed class PluginAnalyzerForbiddenApiParallelEnumerableReachabilityTest
     }
 
     [Fact]
-    public async Task Allows_sequential_linq_control_from_event_kernel()
+    public async Task Allows_bounded_sequential_linq_control_from_event_kernel()
     {
         var source = Source(
-            "return System.Linq.Enumerable.Range(0, 3).Count() > 0;");
+            "return System.Array.Empty<int>().Count() > 0;");
 
         var diagnostics = await AnalyzeAsync(source);
 
         Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
+    }
+
+    [Fact]
+    public async Task Reports_iterator_count_without_a_proven_collection_fast_path()
+    {
+        var diagnostics = await AnalyzeAsync(Source(
+            "return System.Linq.Enumerable.Range(0, 3).Count() > 0;"));
+
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.Count", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     private static string Source(string shouldHandleBody)

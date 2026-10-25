@@ -27,7 +27,7 @@ internal static class ForbiddenCollectionScanPolicy
 
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (EnumerableScanPolicy.IsScan(invocation, typeName))
+        if (EnumerableScanPolicy.IsScan(invocation, typeName, compilation))
         {
             forbidden = $"System.Linq.Enumerable.{method.Name}";
             return true;

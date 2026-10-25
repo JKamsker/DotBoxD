@@ -130,4 +130,75 @@ public sealed partial class MergeableIrStepGeneratorTests
             GeneratedSource(result),
             StringComparison.Ordinal);
     }
+    [Theory]
+    [InlineData("(Url = \"https://example.test/preview\")", 0)]
+    [InlineData("(null, Url = \"https://example.test/preview\")", 1)]
+    public void Generated_ir_members_preserve_preview_constructor_shapes_and_url(string arguments, int constructorCount)
+    {
+        RunGenerator($$"""
+            using System;
+            using System.Runtime.Versioning;
+            using DotBoxD.Abstractions;
+            namespace Sample;
+            [RequiresPreviewFeatures{{arguments}}]
+            public sealed record PreviewEvent(int Value);
+            public sealed class StepPipeline<T>
+            {
+                public StepPipeline<T> Where(Func<T, bool> predicate,
+                    [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null) => this;
+            }
+            public static class Usage
+            {
+                public static StepPipeline<PreviewEvent> Configure(StepPipeline<PreviewEvent> pipeline)
+                    => pipeline.Where(item => item.Value >= 4);
+            }
+            """, out var output, out var diagnostics);
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        var methods = output.GetSymbolsWithName(name => name == "CreateIRFunc" || name.StartsWith("Intercept_", StringComparison.Ordinal))
+            .OfType<IMethodSymbol>().ToArray();
+        Assert.Equal(2, methods.Length);
+        foreach (var method in methods)
+        {
+            var attribute = Assert.Single(method.GetAttributes(), a =>
+                a.AttributeClass?.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
+            Assert.Equal(constructorCount, attribute.ConstructorArguments.Length);
+            Assert.Equal("https://example.test/preview", Assert.Single(attribute.NamedArguments).Value.Value);
+        }
+    }
+
+    [Fact]
+    public void Aliased_preview_lookalike_does_not_add_a_framework_requirement_to_generated_ir()
+    {
+        var foreign = PluginServerGenerationTestDriver.CompileReference("""
+            namespace System.Runtime.Versioning;
+            [System.AttributeUsage(System.AttributeTargets.Class)]
+            public sealed class RequiresPreviewFeaturesAttribute : System.Attribute { }
+            """, "ForeignPreviewMetadata").WithProperties(MetadataReferenceProperties.Assembly.WithAliases(["ForeignPreview"]));
+        RunGenerator("""
+            extern alias ForeignPreview;
+            using System;
+            using DotBoxD.Abstractions;
+            namespace Sample;
+            [ForeignPreview::System.Runtime.Versioning.RequiresPreviewFeatures]
+            public sealed record PreviewEvent(int Value);
+            public sealed class StepPipeline<T>
+            {
+                public StepPipeline<T> Where(Func<T, bool> predicate,
+                    [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null) => this;
+            }
+            public static class Usage
+            {
+                public static StepPipeline<PreviewEvent> Configure(StepPipeline<PreviewEvent> pipeline)
+                    => pipeline.Where(item => item.Value >= 4);
+            }
+            """, [foreign], out var output, out var diagnostics);
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        var payload = output.GetTypeByMetadataName("Sample.PreviewEvent")!;
+        Assert.Equal("ForeignPreviewMetadata", Assert.Single(payload.GetAttributes()).AttributeClass!.ContainingAssembly.Name);
+        var methods = output.GetSymbolsWithName(name => name == "CreateIRFunc" || name.StartsWith("Intercept_", StringComparison.Ordinal)).OfType<IMethodSymbol>().ToArray();
+        Assert.Equal(2, methods.Length);
+        Assert.All(methods, method => Assert.DoesNotContain(method.GetAttributes(), a =>
+            a.AttributeClass?.ToDisplayString() == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute"));
+    }
+
 }

@@ -23,6 +23,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
     private readonly Dictionary<(int Node, UiPropertyId Property), UiInput> _latest = [];
     private BlazorUiSnapshot? _snapshot;
     private Func<Task>? _changed;
+    private readonly AsyncLocal<bool> _disposalCallback = new();
     private Task? _disposeTask;
     private bool _disposed;
     private bool _installed;
@@ -164,6 +165,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         bool authorized;
         try
         {
+            using var callback = session.EnterCallbackScope();
             authorized = await authorizer.AuthorizeAsync(user, session, input, token).AsTask().WaitAsync(token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
         }
@@ -207,6 +209,8 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
 
     public ValueTask DisposeAsync()
     {
+        if ((_disposalCallback.Value && _disposeTask is not { IsCompleted: true }) || BlazorDisposal.IsCancelling(_lifetime))
+        { return ValueTask.CompletedTask; }
         lock (_sync)
         {
             _disposeTask ??= DisposeCoreAsync();
@@ -229,10 +233,17 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
             while (_inputs.Reader.TryRead(out _))
             { }
         }
-        await _lifetime.CancelAsync().ConfigureAwait(false);
-        _lifetime.Dispose();
-        if (changed is not null)
+        await BlazorDisposal.RunAsync(_lifetime, () => NotifyDisposalAsync(changed)).ConfigureAwait(false);
+    }
+
+    private async Task NotifyDisposalAsync(Func<Task>? changed)
+    {
+        if (changed is null)
+        { return; }
+        _disposalCallback.Value = true;
+        try
         { await changed().ConfigureAwait(false); }
+        finally { _disposalCallback.Value = false; }
     }
 
     private static BlazorUiImage Image(UiImageResource image) => new(image.Width, image.Height,

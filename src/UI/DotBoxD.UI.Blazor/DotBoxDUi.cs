@@ -123,6 +123,8 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
+        if (BlazorDisposal.IsCancelling(_lifetime))
+        { return ValueTask.CompletedTask; }
         lock (_disposeLock)
         {
             _disposeTask ??= DisposeCoreAsync();
@@ -138,12 +140,7 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
         var session = _session;
         _session = null;
         _renderer = null;
-        try
-        {
-            await _lifetime.CancelAsync();
-            if (_disposeAttachedSessionOnDetach && session is not null)
-            { await session.DisposeAsync(); }
-        }
-        finally { _lifetime.Dispose(); }
+        await BlazorDisposal.RunAsync(_lifetime,
+            _disposeAttachedSessionOnDetach && session is not null ? () => session.DisposeAsync().AsTask() : null);
     }
 }

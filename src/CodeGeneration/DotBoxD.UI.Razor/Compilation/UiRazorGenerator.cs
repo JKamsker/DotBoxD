@@ -49,7 +49,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var render = GetRenderKind(type, context.SemanticModel.Compilation);
         var generationDisabled = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false);
         var skip = generationDisabled || render == RenderKind.Handwritten;
-        var hasRenderProperty = type.GetMembers("Render").OfType<IPropertySymbol>().Any();
+        var hasRenderProperty = HasRenderNameCollision(type, context.SemanticModel.Compilation);
         var valid = IsSupportedContainer(type);
         return new Component(type.ToDisplayString(), syntax.Identifier.Text,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
@@ -60,6 +60,17 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
                 : null);
     }
 
+    private static bool HasRenderNameCollision(INamedTypeSymbol type, Compilation compilation)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (current.GetMembers("Render").Any(member => member is not IMethodSymbol &&
+                compilation.IsSymbolAccessibleWithin(member, type)))
+            { return true; }
+        }
+        return false;
+    }
+
     private static bool IsSupportedContainer(INamedTypeSymbol type)
         => type.TypeKind == TypeKind.Class && !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
             type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is TypeDeclarationSyntax declaration && declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
@@ -67,22 +78,31 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
     private static RenderKind GetRenderKind(INamedTypeSymbol type, Compilation compilation)
     {
         var componentInterface = compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.IUiComponent");
+        if (HasComponentImplementation(type, componentInterface))
+        { return RenderKind.Handwritten; }
         for (var current = type; current is not null; current = current.BaseType)
         {
-            foreach (var method in current.GetMembers().OfType<IMethodSymbol>().Where(m =>
-                m.Name == "Render" || IsExplicitComponentRender(m, componentInterface)))
-            {
-                if (!IsRenderSignature(method) ||
-                    !compilation.IsSymbolAccessibleWithin(method, type) && !IsExplicitComponentRender(method, componentInterface))
-                { continue; }
-                if (!method.IsStatic && method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement")
-                { return RenderKind.Handwritten; }
-                if (SymbolEqualityComparer.Default.Equals(current, type))
-                { return RenderKind.Incompatible; }
-            }
+            var methods = current.GetMembers().OfType<IMethodSymbol>().Where(method =>
+                IsAccessibleRender(method, type, componentInterface, compilation)).ToArray();
+            if (methods.Any(method => !method.IsStatic &&
+                method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement"))
+            { return RenderKind.Handwritten; }
+            if (methods.Length > 0)
+            { return RenderKind.Incompatible; }
         }
         return RenderKind.None;
     }
+
+    private static bool HasComponentImplementation(INamedTypeSymbol type, INamedTypeSymbol? componentInterface)
+        => componentInterface?.GetMembers("Render").OfType<IMethodSymbol>().Any(contract =>
+            type.FindImplementationForInterfaceMember(contract) is IMethodSymbol { IsStatic: false } implementation &&
+            implementation.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement") == true;
+
+    private static bool IsAccessibleRender(IMethodSymbol method, INamedTypeSymbol type,
+        INamedTypeSymbol? componentInterface, Compilation compilation)
+        => (method.Name == "Render" || IsExplicitComponentRender(method, componentInterface)) &&
+            IsRenderSignature(method) && (compilation.IsSymbolAccessibleWithin(method, type) ||
+                IsExplicitComponentRender(method, componentInterface));
 
     private static bool IsRenderSignature(IMethodSymbol method) => method.Arity == 0 && method.Parameters.Length == 1 &&
         method.Parameters[0].RefKind == RefKind.None && method.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder";
@@ -101,7 +121,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         if (component.HasRenderProperty)
         {
             return new Output(hint, component.SourcePath, "", null,
-                "A component property named Render conflicts with generated Render(UiBuilder). Rename the property or hand-write Render(UiBuilder).");
+                "A component member named Render conflicts with generated Render(UiBuilder). Rename the member or hand-write Render(UiBuilder).");
         }
         if (!component.Valid)
         { return new Output(hint, component.SourcePath, "", null, "Use a top-level, non-generic partial class, or hand-write Render(UiBuilder)."); }

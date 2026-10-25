@@ -63,6 +63,15 @@ capture the host's session object; no browser-supplied session ID is used to dis
 
 ## Shared presentation contract
 
+Trusted adapters that invoke application callbacks can use `using var scope = session.EnterCallbackScope()`
+around the invocation. This lets cancellation registrations and asynchronous work captured by that callback
+join an already pending session disposal without waiting on their own completion. Dispose the scope in
+the same logical execution context; it restores the caller's context while registrations keep the marker
+they captured. Calls from outside callback scopes still wait for all teardown and see its terminal failure;
+captured callbacks also see that failure after teardown completes. The runtime enters this scope for owned
+renderer, input, and remote transport callbacks, and Blazor uses it for interaction authorization. Custom
+adapters can use the same public primitive without depending on Blazor or generated code.
+
 `IUiRenderer` materializes once after validation and initial kernel evaluation. Updates are atomic
 batches of changed semantic property values, including authoritative corrections for rejected input.
 Neither interface exposes Blazor or Avalonia types. `UiRendererCapabilities` advertises supported

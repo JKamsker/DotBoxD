@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
@@ -14,6 +15,36 @@ public sealed class BindingWallTimeCallbackCancellationSurpriseTests
     [InlineData(ExecutionMode.Compiled)]
     public async Task Caller_cancellation_does_not_leak_binding_wall_time_callback_failures(
         ExecutionMode mode)
+        => await RunCancellationAsync(mode, deadline: false);
+
+    [Fact]
+    public async Task Wall_deadline_does_not_allow_a_throwing_binding_callback_to_terminate_the_process()
+    {
+        const string childVariable = "DOTBOXD_WALL_CALLBACK_CHILD";
+        if (Environment.GetEnvironmentVariable(childVariable) == "1")
+        {
+            await RunCancellationAsync(ExecutionMode.Interpreted, deadline: true);
+            await RunCancellationAsync(ExecutionMode.Compiled, deadline: true);
+            return;
+        }
+
+        var start = new ProcessStartInfo("dotnet")
+        { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add("vstest");
+        start.ArgumentList.Add(typeof(BindingWallTimeCallbackCancellationSurpriseTests).Assembly.Location);
+        start.ArgumentList.Add("--TestCaseFilter:FullyQualifiedName~Wall_deadline_does_not_allow_a_throwing_binding_callback");
+        start.Environment[childVariable] = "1";
+        using var child = Process.Start(start)!;
+        var output = child.StandardOutput.ReadToEndAsync();
+        var error = child.StandardError.ReadToEndAsync();
+        try
+        { await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45)); }
+        finally
+        { if (!child.HasExited) { child.Kill(entireProcessTree: true); } }
+        Assert.True(child.ExitCode == 0, await output + await error);
+    }
+
+    private static async Task RunCancellationAsync(ExecutionMode mode, bool deadline)
     {
         var binding = new ThrowingWallTimeCallbackBinding();
         using var host = SandboxHost.Create(builder =>
@@ -26,7 +57,7 @@ public sealed class BindingWallTimeCallbackCancellationSurpriseTests
         var policy = SandboxPolicyBuilder.Create()
             .AllowRuntimeAsync()
             .WithFuel(1_000)
-            .WithWallTime(TimeSpan.FromSeconds(30))
+            .WithWallTime(deadline ? TimeSpan.FromMilliseconds(500) : TimeSpan.FromSeconds(30))
             .WithMaxHostCalls(2)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
@@ -42,11 +73,12 @@ public sealed class BindingWallTimeCallbackCancellationSurpriseTests
         {
             await binding.Invoked.WaitAsync(TimeSpan.FromSeconds(5));
 
-            runCancellation.Cancel();
+            if (!deadline)
+            { runCancellation.Cancel(); }
 
             var result = await execution.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.False(result.Succeeded);
-            Assert.Equal(SandboxErrorCode.Cancelled, result.Error!.Code);
+            Assert.Equal(deadline ? SandboxErrorCode.Timeout : SandboxErrorCode.Cancelled, result.Error!.Code);
             Assert.Equal(mode, result.ActualMode);
             Assert.Equal(1, binding.CallbackCount);
         }

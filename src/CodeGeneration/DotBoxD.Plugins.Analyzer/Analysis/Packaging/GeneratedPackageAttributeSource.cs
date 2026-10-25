@@ -112,14 +112,14 @@ internal static class GeneratedPackageAttributeSource
         }
 
         if (attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string message)
+            attribute.ConstructorArguments[0].Value is not (null or string))
         {
             return null;
         }
 
         var builder = new StringBuilder();
         builder.Append("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute(")
-            .Append(LiteralReader.StringLiteral(message));
+            .Append(LiteralReader.ObjectLiteral(attribute.ConstructorArguments[0].Value));
         AppendUrl(builder, attribute);
         builder.Append(")]");
         return builder.ToString();

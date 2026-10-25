@@ -150,7 +150,6 @@ public sealed partial class RpcHost
 
         throw new InvalidOperationException("Host start was stopped before it completed.");
     }
-
     public Task StopAsync(CancellationToken ct = default)
     {
         lock (_lifecycleLock)
@@ -176,15 +175,16 @@ public sealed partial class RpcHost
             }
             cancellation = RpcHostCancellation.TryCancelAsync(cts);
             await RpcHostCancellation.WaitForCancellationRequestAsync(cts, cancellation).ConfigureAwait(false);
+            if (!stopListenerBeforeCancel)
+            {
+                // Unblock Accept before joining it; cancellation callbacks can synchronously join Stop.
+                await StopListenerOnceAsync(ct).ConfigureAwait(false);
+            }
             if (acceptTask is not null)
             {
                 await ObserveAcceptShutdownAsync(acceptTask).ConfigureAwait(false);
             }
             await _acceptLoop.DrainInFlightAsync().ConfigureAwait(false);
-            if (!stopListenerBeforeCancel)
-            {
-                await StopListenerOnceAsync(ct).ConfigureAwait(false);
-            }
             await _peers.CloseAllAsync().ConfigureAwait(false);
             await _peers.AwaitCleanupAsync().ConfigureAwait(false);
             completed = true;

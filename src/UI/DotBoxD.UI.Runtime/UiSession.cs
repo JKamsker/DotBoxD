@@ -17,10 +17,11 @@ public sealed class UiSession : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _disposeLock = new();
-    private readonly TaskCompletionSource _resourcesReleased = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly UiSessionCallbackContext _callbacks = new();
     private Task? _disposeTask;
     private int _closed;
     private int _inFlight;
+    private string? _lastInputError;
 
     internal UiSession(
         UiPackage package, UiPolicy policy, UiRendererOwner renderer, IUiRemoteTransport? remote,
@@ -43,7 +44,6 @@ public sealed class UiSession : IAsyncDisposable
         => _ = UiInputLoop.RunAsync(this, source, _policy,
             _events.Values.Where(e => e.Target == UiEventTarget.Remote).Select(e => e.Id).ToHashSet(), _lifetime.Token);
 
-    private string? _lastInputError;
     public string? LastInputError => Volatile.Read(ref _lastInputError);
     internal void RecordInputError(string message) => Volatile.Write(ref _lastInputError, message);
 
@@ -68,6 +68,9 @@ public sealed class UiSession : IAsyncDisposable
     public Guid Id { get; } = Guid.NewGuid();
     /// <summary>Trusted presentation adapter; null once teardown releases it.</summary>
     public IUiRenderer? Renderer => _renderer.Renderer;
+    /// <summary>Marks trusted adapter callbacks so they can join pending teardown without waiting on themselves.</summary>
+    /// <remarks>Captured execution contexts retain the marker. Completed disposal still exposes its terminal outcome.</remarks>
+    public IDisposable EnterCallbackScope() => _callbacks.Enter();
     public bool IsDisconnected => Volatile.Read(ref _closed) != 0;
 
     public ValueTask<UiSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
@@ -206,6 +209,7 @@ public sealed class UiSession : IAsyncDisposable
         try
         {
             await _gate.WaitAsync(token).ConfigureAwait(false);
+            using var callback = EnterCallbackScope();
             try
             {
                 ThrowIfDisconnected();
@@ -229,27 +233,29 @@ public sealed class UiSession : IAsyncDisposable
     {
         lock (_disposeLock)
         {
-            var starting = _disposeTask is null;
+            if (UiSessionCancellation.IsCancelling(_lifetime) ||
+                _callbacks.IsActive && _disposeTask is { IsCompleted: false })
+            { return ValueTask.CompletedTask; }
             if (_disposeTask is null)
             {
                 // Publish the disposal state before cancellation can invoke a re-entrant callback.
                 _disposeTask = Task.CompletedTask;
                 _disposeTask = DisposeCoreAsync();
             }
-            return new ValueTask(starting || !_lifetime.IsCancellationRequested ? _disposeTask : _resourcesReleased.Task);
+            return new ValueTask(_disposeTask);
         }
     }
 
     private async Task DisposeCoreAsync()
     {
         Interlocked.Exchange(ref _closed, 1);
-        var cancellation = _lifetime.CancelAsync();
+        var cancellation = UiSessionCancellation.CancelAsync(_lifetime);
+        var resourcesReleased = false;
         try
         {
             await ReleaseResourcesAsync().ConfigureAwait(false);
-            _resourcesReleased.TrySetResult();
+            resourcesReleased = true;
         }
-        catch (Exception error) { _resourcesReleased.TrySetException(error); throw; }
         finally
         {
             try
@@ -257,7 +263,7 @@ public sealed class UiSession : IAsyncDisposable
                 await cancellation.ConfigureAwait(false);
             }
             // Preserve the original release failure when both the callback and teardown fault.
-            catch when (!_resourcesReleased.Task.IsCompletedSuccessfully) { }
+            catch when (!resourcesReleased) { }
             finally
             {
                 _lifetime.Dispose();
@@ -277,6 +283,7 @@ public sealed class UiSession : IAsyncDisposable
             _bindings.Clear();
             _interaction.Clear();
             _kernels.Clear();
+            using var callback = EnterCallbackScope();
             await _renderer.DisposeAsync().ConfigureAwait(false);
         }
         finally

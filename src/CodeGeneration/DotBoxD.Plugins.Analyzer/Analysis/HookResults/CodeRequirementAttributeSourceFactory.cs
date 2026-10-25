@@ -25,10 +25,9 @@ internal static class CodeRequirementAttributeSourceFactory
         }
 
         var arguments = new List<string>();
-        if (attribute.ConstructorArguments.Length == 1 &&
-            attribute.ConstructorArguments[0].Value is string message)
+        if (HasMessageArgument(attribute))
         {
-            arguments.Add(LiteralReader.StringLiteral(message));
+            arguments.Add(LiteralReader.ObjectLiteral(attribute.ConstructorArguments[0].Value));
         }
         else if (attribute.ConstructorArguments.Length != 0 ||
                  !AllowsParameterlessConstructor(attributeName))
@@ -59,6 +58,9 @@ internal static class CodeRequirementAttributeSourceFactory
             attributes.Add(attribute, "global::" + metadataName);
         }
     }
+
+    private static bool HasMessageArgument(AttributeData attribute)
+        => attribute.ConstructorArguments.Length == 1 && attribute.ConstructorArguments[0].Value is null or string;
 
     private static bool AllowsParameterlessConstructor(string attributeName)
         => attributeName is "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute"

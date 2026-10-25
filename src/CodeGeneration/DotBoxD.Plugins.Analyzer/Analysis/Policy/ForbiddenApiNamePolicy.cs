@@ -112,11 +112,6 @@ internal static class ForbiddenApiNamePolicy
     public static bool TryGetForbiddenExactMemberDisplayName(IMethodSymbol method, out string displayName)
     {
         var name = MethodContainingTypeName(method.ContainingType) + "." + method.Name;
-        if (IsPredicateEnumerableLast(method, name))
-        {
-            displayName = name;
-            return true;
-        }
 
         if (Array.IndexOf(ExactMemberNames, name) < 0)
         {
@@ -131,11 +126,6 @@ internal static class ForbiddenApiNamePolicy
 
         return true;
     }
-
-    private static bool IsPredicateEnumerableLast(IMethodSymbol method, string name)
-        => name == "System.Linq.Enumerable.Last" &&
-           method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
-           method.Parameters.Length == 2;
 
     private static string MethodContainingTypeName(INamedTypeSymbol containingType)
         => containingType.SpecialType == SpecialType.System_String

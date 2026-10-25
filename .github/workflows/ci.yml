@@ -864,6 +864,123 @@ jobs:
               Remote_RegisterLocal_tamper_rejects = 4
             }
 
+      - name: Required library surprise regressions
+        shell: pwsh
+        run: |
+          $groups = @{
+            BindingWallTimeCallbackCancellationSurpriseTests = 3
+            EnumerableBoundedCollectionTests = 63
+            EnumerableMethodGroupPolicySurpriseTests = 6
+            EnumerableRuntimeIdentitySurpriseTests = 32
+            HookFireAsyncPreviewFeatureAttributeSurpriseTests = 3
+            MergeableIrStepGeneratorTests = 54
+            PluginAnalyzerForbiddenApiEnumerableAggregateReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableAllReachabilityTests = 4
+            PluginAnalyzerForbiddenApiEnumerableAverageReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableCountReachabilityTests = 3
+            PluginAnalyzerForbiddenApiEnumerableElementAtOrDefaultReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableElementAtReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableFirstOrDefaultReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableFirstReachabilityTests = 4
+            PluginAnalyzerForbiddenApiEnumerableLastOrDefaultReachabilityTests = 1
+            PluginAnalyzerForbiddenApiEnumerableLastReachabilityTests = 7
+            PluginAnalyzerForbiddenApiEnumerableLongCountReachabilityTests = 3
+            PluginAnalyzerForbiddenApiEnumerableMaxByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableMaxReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableMinReachabilityTests = 3
+            PluginAnalyzerForbiddenApiEnumerableOrderByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableReverseReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableSequenceEqualReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableSingleOrDefaultReachabilityTests = 1
+            PluginAnalyzerForbiddenApiEnumerableSingleReachabilityTests = 1
+            PluginAnalyzerForbiddenApiEnumerableSkipLastReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableSkipReachabilityTests = 1
+            PluginAnalyzerForbiddenApiEnumerableSumReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableTakeLastReachabilityTests = 2
+            PluginAnalyzerForbiddenApiParallelEnumerableReachabilityTests = 4
+            PluginPackagePreviewFeatureAttributeSurpriseTests = 2
+            PluginServerPlatformCompatibilityAttributeSurpriseTests = 5
+            PluginServerPreviewFeatureAttributeSurpriseTests = 4
+            PluginServerSurpriseRegressionTests = 30
+            RemoteLocalHandlerRegistryCancellationTests = 9
+            ResultHookSlotCancellationPrecedenceSurpriseTests = 2
+            ServerExtensionClientPlatformGuardAttributeSurpriseTests = 3
+            ServerExtensionClientPreviewFeatureAttributeSurpriseTests = 3
+            ServerExtensionClientTypePreviewFeatureAttributeSurpriseTests = 4
+            SubscriptionDeliveryFaultCancellationPrecedenceSurpriseTests = 2
+            UiAuthoringTests = 25
+            UiExplicitInterfaceHandlerTests = 2
+            UiHostInstallCancellationCleanupTests = 1
+            UiInheritedRenderCollisionSurpriseTests = 15
+            UiLocalKernelCancellationTests = 1
+            UiMalformedRemoteInputTests = 1
+            UiMaterializationValidatorArgumentValidationTests = 2
+            UiMaterializationValidatorDefaultValuesTests = 1
+            UiMaterializationValidatorDuplicatePropertyTests = 2
+            UiMaterializationValidatorNodeIdTests = 3
+            UiMaterializationValidatorPropertyKindTests = 4
+            UiMaterializationValidatorValidationTests = 2
+            UiPackageJsonTests = 14
+            UiPartialMethodAuthoringTests = 1
+            UiRazorAuthoringTests = 42
+            UiRecordStructHandlerSurpriseTests = 2
+            UiRemoteTransportCancellationPrecedenceSurpriseTests = 2
+            UiSessionAsyncCleanupReentrancySurpriseTests = 3
+            UiSessionCallbackScopeTests = 3
+            UiSessionInputCancellationDisposalTests = 4
+            UiSessionTransportFailureCleanupTests = 2
+          }
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj `
+            -Configuration Release -NoBuild `
+            -RequiredFullyQualifiedNameContains @($groups.Keys) `
+            -MinimumExecutedTestsByGroup $groups
+          $groups = @{
+            GeneratedProxyFaultedTaskCancellationTests = 4
+            PlatformGuardAttributeMetadataTests = 2
+            RequiresPreviewFeaturesMemberMetadataTests = 1
+            RequiresPreviewFeaturesTypeMetadataTests = 1
+          }
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj `
+            -Configuration Release -NoBuild `
+            -RequiredFullyQualifiedNameContains @($groups.Keys) `
+            -MinimumExecutedTestsByGroup $groups
+          $groups = @{
+            GeneratedDispatcherReceiverFaultCancellationRegressionTests = 2
+            PayloadCoverageTests = 5
+            PooledBufferWriterCoverageTests = 18
+            RpcDispatchResponseBuilderDispatcherFaultCancellationRegressionTests = 2
+            RpcHostCancellationCallbackReentrancyTests = 2
+            RpcHostListenerDisposalReentrancyTests = 2
+            RpcPeerDisposeOutboundStreamCallbackDeadlockTests = 1
+          }
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj `
+            -Configuration Release -NoBuild `
+            -RequiredFullyQualifiedNameContains @($groups.Keys) `
+            -MinimumExecutedTestsByGroup $groups
+          $groups = @{
+            AvaloniaExtensionTests = 2
+            AvaloniaRendererTests = 7
+          }
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.UI.Avalonia.Tests/DotBoxD.UI.Avalonia.Tests.csproj `
+            -Configuration Release -NoBuild `
+            -RequiredFullyQualifiedNameContains @($groups.Keys) `
+            -MinimumExecutedTestsByGroup $groups
+          $groups = @{
+            BlazorAuthorizerCancellationPrecedenceSurpriseTests = 3
+            BlazorRendererDisposalTerminalSurpriseTests = 9
+            BlazorReplacementOwnershipSurpriseTests = 2
+            DotBoxDUiDisposalTerminalSurpriseTests = 2
+          }
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj `
+            -Configuration Release -NoBuild `
+            -RequiredFullyQualifiedNameContains @($groups.Keys) `
+            -MinimumExecutedTestsByGroup $groups
+
       - name: Setup Node.js for documentation validation
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

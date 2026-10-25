@@ -152,30 +152,22 @@ internal static class ExperimentalAttributeSource
 
     private static void CollectPreviewFeatureAttribute(AttributeData attribute, ISet<string> attributes)
     {
-        if (attribute.AttributeClass?.ToDisplayString() != RequiresPreviewFeaturesAttributeName)
+        if (attribute.AttributeClass is not { } attributeClass ||
+            attributeClass.ToDisplayString() != RequiresPreviewFeaturesAttributeName ||
+            !FrameworkCollectionIdentity.IsFrameworkType(attributeClass))
         {
             return;
         }
 
-        if (attribute.ConstructorArguments.Length == 0)
-        {
-            attributes.Add("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]\n");
-            return;
-        }
-
-        if (attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string message)
-        {
-            return;
-        }
-
-        var url = attribute.NamedArguments.FirstOrDefault(pair => pair.Key == "Url").Value.Value as string;
-        var urlAssignment = url is null
-            ? string.Empty
-            : ", Url = " + LiteralReader.StringLiteral(url);
-        attributes.Add(
-            "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute(" +
-            LiteralReader.StringLiteral(message) + urlAssignment + ")]\n");
+        if (attribute.ConstructorArguments.Length > 1 ||
+            attribute.ConstructorArguments.Any(argument => argument.Value is not (null or string)))
+        { return; }
+        var arguments = attribute.ConstructorArguments
+            .Select(argument => LiteralReader.ObjectLiteral(argument.Value)).ToList();
+        arguments.AddRange(attribute.NamedArguments.Where(argument => argument.Key == "Url")
+            .Select(argument => "Url = " + LiteralReader.ObjectLiteral(argument.Value.Value)));
+        attributes.Add("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" +
+            (arguments.Count == 0 ? "" : "(" + string.Join(", ", arguments) + ")") + "]\n");
     }
 
     private static void CollectCodeRequirementAttribute(

@@ -37,6 +37,45 @@ public sealed class DotBoxDUiDisposalTerminalSurpriseTests
         Assert.Empty(browser.Errors);
     }
 
+    [Fact]
+    public async Task Throwing_cancellation_callback_does_not_skip_owned_session_teardown()
+    {
+        using var sandbox = UiFixture.Sandbox();
+        var renderer = new BlazorUiRenderer();
+        var session = await UiFixture.Host(sandbox).InstallAsync(UiFixture.TextPackage(), renderer);
+        var browser = new TestBlazorRenderer();
+        var authorizer = new ThrowingAuthorizer();
+        await browser.MountAsync(session, authorizer);
+        var interaction = browser.SendAsync("oninput", new ChangeEventArgs { Value = "pending" });
+        await authorizer.Registered.Task;
+        try
+        {
+            var error = await Assert.ThrowsAsync<AggregateException>(() => browser.DisposeComponentAsync().AsTask());
+            Assert.Contains(error.Flatten().InnerExceptions, e => e.Message == "component cancellation sentinel");
+            Assert.True(session.IsDisconnected);
+            await interaction;
+        }
+        finally
+        {
+            try
+            { await browser.DisposeAsync(); }
+            catch (AggregateException) { }
+            await session.DisposeAsync();
+        }
+    }
+
+    private sealed class ThrowingAuthorizer : IUiInteractionAuthorizer
+    {
+        public TaskCompletionSource Registered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ValueTask<bool> AuthorizeAsync(ClaimsPrincipal user, UiSession session, UiInput input, CancellationToken cancellationToken)
+        {
+            cancellationToken.Register(static () => throw new InvalidOperationException("component cancellation sentinel"));
+            Registered.TrySetResult();
+            return new ValueTask<bool>(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ContinueWith(
+                static _ => false, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default));
+        }
+    }
+
     private sealed class CancellationBlockingAuthorizer : IUiInteractionAuthorizer
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -89,6 +89,32 @@ public sealed class PluginPackagePreviewFeatureAttributeSurpriseTests
             outputCompilation.GetTypeByMetadataName("Sample.PortableDamagePluginPackage"));
     }
 
+    [Fact]
+    public void Generated_package_preserves_null_preview_message_and_url()
+    {
+        var compilation = CreateCompilation("""
+            using System.Runtime.Versioning;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            namespace Sample;
+            public sealed record NullEvent(string TargetId);
+            [RequiresPreviewFeatures(null, Url = "https://example.test/null-preview")]
+            [Plugin("sample.null-preview")]
+            public sealed partial class NullPreviewKernel : IEventKernel<NullEvent>
+            {
+                public bool ShouldHandle(NullEvent e, HookContext context) => true;
+                public void Handle(NullEvent e, HookContext context) => context.Messages.Send(e.TargetId, "preview");
+            }
+            """);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create([new PluginPackageGenerator().AsSourceGenerator()], parseOptions: ParseOptions);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        var attribute = Assert.Single(output.GetTypeByMetadataName("Sample.NullPreviewPluginPackage")!.GetAttributes(),
+            a => a.AttributeClass?.ToDisplayString() == RequiresPreviewFeaturesAttribute);
+        Assert.Null(Assert.Single(attribute.ConstructorArguments).Value);
+        Assert.Equal("https://example.test/null-preview", Assert.Single(attribute.NamedArguments).Value.Value);
+    }
+
     private static void AssertPreviewFeatureAttribute(INamedTypeSymbol? packageType, string message, string url)
     {
         Assert.NotNull(packageType);

@@ -9,10 +9,10 @@ internal static class EnumerableScanPolicy
     {
         "Contains", "Any", "Count", "SequenceEqual", "All", "LongCount", "FirstOrDefault", "LastOrDefault",
         "SingleOrDefault", "Single", "Aggregate", "First", "Max", "Min", "Sum", "Average", "MaxBy",
-        "ElementAt", "ElementAtOrDefault", "Skip"
+        "ElementAt", "ElementAtOrDefault", "Skip", "Last"
     };
 
-    public static bool IsScan(IInvocationOperation invocation, string typeName)
+    public static bool IsScan(IInvocationOperation invocation, string typeName, Compilation compilation)
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
@@ -23,24 +23,21 @@ internal static class EnumerableScanPolicy
         }
 
         var source = invocation.Arguments.FirstOrDefault(argument => argument.Parameter?.Ordinal == 0)?.Value;
-        while (source is IConversionOperation { IsImplicit: true } conversion)
+        while (source is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion)
         {
             source = conversion.Operand;
         }
 
-        if (method.Name == "First")
-        {
-            return method.Parameters.Length == 2;
-        }
-
-        return !IsBoundedCollectionCall(method, source);
+        return !IsBoundedCollectionCall(method, source, compilation);
     }
 
-    private static bool IsScanMethod(IMethodSymbol method)
-        => ScanMethodNames.Contains(method.Name) ||
-           method.Name == "Last" && method.Parameters.Length == 2;
+    public static bool IsUnboundedMethodReference(IMethodSymbol method, string typeName)
+        => typeName == "System.Linq.Enumerable" && method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
+           IsScanMethod(method);
 
-    private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
+    private static bool IsScanMethod(IMethodSymbol method) => ScanMethodNames.Contains(method.Name);
+
+    private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source, Compilation compilation)
     {
         if (method.Name == "Contains" && !HasCompatibleCollectionElementType(method, source))
         {
@@ -68,7 +65,7 @@ internal static class EnumerableScanPolicy
         }
 
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        return IsBoundedFrameworkCall(method, source, name);
+        return IsBoundedFrameworkCall(method, source, name) && FrameworkCollectionOrigin.IsExact(source, compilation);
     }
 
     private static bool IsBoundedCountCall(IMethodSymbol method, IOperation? source)
@@ -104,16 +101,19 @@ internal static class EnumerableScanPolicy
            IsBoundedIndexedOrContainsCall(method, source, name);
 
     private static bool IsCountMethod(IMethodSymbol method)
-        => method.Name is "Any" or "Count" or "Single" && method.Parameters.Length == 1;
+        => method.Name is "Any" or "Count" && method.Parameters.Length == 1;
 
     private static bool IsBoundedIndexedOrContainsCall(IMethodSymbol method, IOperation? source, string name)
         => method.Name switch
         {
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
             "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
-            "Last" when method.Parameters.Length == 1 => name == "System.Collections.Generic.List<T>",
+            _ when IsParameterlessIndexedMethod(method) => HasCompatibleIndexedFastPath(method, source),
             _ => false
         };
+
+    private static bool IsParameterlessIndexedMethod(IMethodSymbol method)
+        => method.Name is "First" or "Last" or "Single" && method.Parameters.Length == 1;
 
     private static bool HasNoPredicate(IMethodSymbol method)
         => method.Parameters.All(static parameter => parameter.Type.TypeKind != TypeKind.Delegate);

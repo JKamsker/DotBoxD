@@ -17,7 +17,7 @@ internal static class PluginServerPlatformCompatibilityAttributeFormatter
     }
 
     private static string? GetAttributeType(AttributeData attribute)
-        => attribute.AttributeClass?.ToDisplayString() switch
+        => PluginServerFrameworkAttributeIdentity.GetName(attribute) switch
         {
             "System.Runtime.Versioning.SupportedOSPlatformAttribute" =>
                 "global::System.Runtime.Versioning.SupportedOSPlatformAttribute",

@@ -6,6 +6,19 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
+    private static void ReportAndRecordUnboundedCollectionReference(
+        OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph, IMethodSymbol method)
+    {
+        method = method.ReducedFrom ?? method;
+        if (!FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType))
+        { return; }
+        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (CollectionMaterializationPolicy.TryGetDisplayName(method, typeName, out var forbidden))
+        { ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden); }
+        else if (EnumerableScanPolicy.IsUnboundedMethodReference(method, typeName))
+        { ReportAndRecordCollectionCapacityOperation(context, helperGraph, "System.Linq.Enumerable." + method.Name); }
+    }
+
     private static void ReportAndRecordCollectionCapacityCreation(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,

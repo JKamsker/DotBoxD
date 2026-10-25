@@ -41,6 +41,22 @@ public sealed class HookFireAsyncPreviewFeatureAttributeSurpriseTests
             StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("(Url = \"https://example.test/preview\")", 0)]
+    [InlineData("(null, Url = \"https://example.test/preview\")", 1)]
+    public void Fire_async_preserves_preview_constructor_shapes_and_url(string arguments, int constructorCount)
+    {
+        var source = Source.Replace("(\"Preview combat contract.\", Url = \"https://example.test/preview-combat\")", arguments, StringComparison.Ordinal);
+        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(source);
+        var method = assembly.GetTypes().SelectMany(t => t.GetMethods())
+            .Single(m => m.Name == "FireAsync" && m.ReturnType.ToString().Contains("PreviewDamageResult", StringComparison.Ordinal) &&
+                !m.ReturnType.ToString().Contains("DefaultPreview", StringComparison.Ordinal));
+        var attribute = Assert.Single(method.GetCustomAttributesData(), a =>
+            a.AttributeType.FullName == "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute");
+        Assert.Equal(constructorCount, attribute.ConstructorArguments.Count);
+        Assert.Equal("https://example.test/preview", Assert.Single(attribute.NamedArguments).TypedValue.Value);
+    }
+
     private const string Source = """
         using System.Runtime.Versioning;
         using DotBoxD.Abstractions;

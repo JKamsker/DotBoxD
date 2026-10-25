@@ -53,6 +53,30 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableLastReachabilityTests
         Assert.Contains("System.Linq.Enumerable.Last", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("LinkedList<int>")]
+    [InlineData("HashSet<int>")]
+    [InlineData("Queue<int>")]
+    public async Task Reports_parameterless_last_on_retained_nonindexed_collection(string collection)
+    {
+        var source = Source("return Retained.Last() > 0;")
+            .Replace("List<int>", collection, StringComparison.Ordinal)
+            .Replace("Retained.Add(e.Length);", "", StringComparison.Ordinal);
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "UnboundedLast");
+
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains("System.Linq.Enumerable.Last", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Does_not_report_parameterless_last_on_array()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("return Retained.Last() > 0;").Replace("List<int> Retained = new()", "int[] Retained = []", StringComparison.Ordinal)
+                .Replace("Retained.Add(e.Length);", "", StringComparison.Ordinal), "BoundedArrayLast");
+        Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
+    }
+
     private static string Source(string body)
         => $$"""
             #nullable enable
