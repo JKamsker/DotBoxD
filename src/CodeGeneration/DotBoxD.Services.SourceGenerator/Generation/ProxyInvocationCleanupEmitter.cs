@@ -104,6 +104,7 @@ internal static class ProxyInvocationCleanupEmitter
             var exceptionName = locals.Reserve("__dotboxd_ex", ct);
             sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalException} {exceptionName})");
             EmitReservationReleases(sb, returnedName, reservations, ct, indent);
+            ProxyFaultedReturnEmitter.AppendCallerCancellationFaultReturn(sb, method, ct, indent + "    ");
             sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.Build(method, exceptionName!)};");
             sb.AppendLine($"{indent}}}");
         }

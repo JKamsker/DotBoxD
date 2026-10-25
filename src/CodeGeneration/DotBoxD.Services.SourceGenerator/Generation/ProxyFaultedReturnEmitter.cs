@@ -1,3 +1,4 @@
+using System.Text;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
@@ -79,6 +80,24 @@ internal static class ProxyFaultedReturnEmitter
         return callerToken == "default"
             ? $"{exceptionName}.CancellationToken"
             : $"{exceptionName}.CancellationToken.IsCancellationRequested ? {exceptionName}.CancellationToken : {callerToken}";
+    }
+
+    public static void AppendCallerCancellationFaultReturn(
+        StringBuilder sb,
+        MethodModel method,
+        CancellationToken ct,
+        string indent)
+    {
+        var callerToken = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
+        if (callerToken == "default")
+        {
+            return;
+        }
+
+        sb.AppendLine($"{indent}if ({callerToken}.IsCancellationRequested)");
+        sb.AppendLine($"{indent}{{");
+        sb.AppendLine($"{indent}    return {BuildCanceled(method, callerToken)};");
+        sb.AppendLine($"{indent}}}");
     }
 
     private static bool IsFaultableTask(MethodReturnKind returnKind) =>

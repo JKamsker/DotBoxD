@@ -232,17 +232,26 @@ internal static class ProxyCallerCancellationHelperEmitter
         sb.AppendLine();
         sb.AppendLine($"        private static async {type} {core}{typeParameter}({type} task, {cancellationToken} ct)");
         sb.AppendLine("        {");
+        sb.AppendLine("            try");
+        sb.AppendLine("            {");
         if (generic)
         {
-            sb.AppendLine("            var result = await task.ConfigureAwait(false);");
-            sb.AppendLine("            ct.ThrowIfCancellationRequested();");
-            sb.AppendLine("            return result;");
+            sb.AppendLine("                var result = await task.ConfigureAwait(false);");
+            sb.AppendLine("                ct.ThrowIfCancellationRequested();");
+            sb.AppendLine("                return result;");
         }
         else
         {
-            sb.AppendLine("            await task.ConfigureAwait(false);");
-            sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+            sb.AppendLine("                await task.ConfigureAwait(false);");
+            sb.AppendLine("                ct.ThrowIfCancellationRequested();");
         }
+
+        sb.AppendLine("            }");
+        sb.AppendLine("            catch");
+        sb.AppendLine("            {");
+        sb.AppendLine("                ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("                throw;");
+        sb.AppendLine("            }");
 
         sb.AppendLine("        }");
     }
