@@ -11,6 +11,18 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 /// </remarks>
 internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
 {
+    public void CancelIgnoringCallbackExceptions()
+    {
+        try
+        {
+            Cancel(throwOnFirstException: false);
+        }
+        catch (AggregateException)
+        {
+            // Binding-owned callbacks must not make cancellation of the caller's run token fail.
+        }
+    }
+
     public void ArmDeadline(TimeSpan remaining)
     {
         // CancelAfter reuses the source's internal timer after the first call,
