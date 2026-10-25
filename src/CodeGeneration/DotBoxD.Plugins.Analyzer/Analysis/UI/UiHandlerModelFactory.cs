@@ -19,12 +19,13 @@ internal static class UiHandlerModelFactory
             var facet = remote ? "GenerateEndpoint" : "GenerateKernel";
             if (attribute.NamedArguments.Any(a => a.Key == facet && a.Value.Value is false))
             { return Model(null, null); }
-            var name = method.Name + (remote ? "UiEndpoint" : "UiKernel");
+            var handlerName = HandlerName(method);
+            var name = handlerName + (remote ? "UiEndpoint" : "UiKernel");
             if (HasHandwrittenFacet(method, name, remote, context.SemanticModel.Compilation))
             { return Model(null, null); }
             RequireSourceContainer(syntax);
             RequireContainer(method);
-            if (method.ContainingType.GetMembers(method.Name).OfType<IMethodSymbol>().Count() != 1)
+            if (method.ContainingType.GetMembers().OfType<IMethodSymbol>().Count(candidate => HandlerName(candidate) == handlerName) != 1)
             { throw new NotSupportedException("UI handler names must be unique; overloads require distinct route names"); }
             var member = remote ? RemoteMember(method, attribute, name) : LocalMember(method, syntax, context.SemanticModel, token, name);
             var ns = method.ContainingNamespace.IsGlobalNamespace ? "" : "namespace " + method.ContainingNamespace.ToDisplayString() + ";";
@@ -85,6 +86,9 @@ internal static class UiHandlerModelFactory
         return input is not null && SymbolEqualityComparer.Default.Equals(facet.ReturnType,
             definition.Construct(input, handler.ReturnType));
     }
+
+    private static string HandlerName(IMethodSymbol method)
+        => method.ExplicitInterfaceImplementations.FirstOrDefault()?.Name ?? method.Name;
 
     private static void RequireSourceContainer(MethodDeclarationSyntax syntax)
     {
