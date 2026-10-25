@@ -118,6 +118,89 @@ public sealed class EnumerableBoundedCollectionTests
     }
 
     [Theory]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values)", false)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, -1)", false)]
+    [InlineData("int[]", "[]", "Enumerable.LastOrDefault(Values)", false)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, static _ => true)", true)]
+    [InlineData("List<int>", "new()", "Enumerable.LastOrDefault(Values, static _ => true, -1)", true)]
+    public async Task Last_or_default_preserves_indexed_fast_paths(
+        string collectionType,
+        string initializer,
+        string expression,
+        bool reportsScan)
+    {
+        var source = $$"""
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("bounded-last-or-default")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly {{collectionType}} Values = {{initializer}};
+                public bool ShouldHandle(string e, HookContext context) => {{expression}} >= 0;
+                public void Handle(string e, HookContext context) { }
+            }
+            """;
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "BoundedLastOrDefault");
+        Assert.Equal(reportsScan ? 1 : 0, diagnostics.Count(diagnostic => diagnostic.Id == "DBXK001"));
+    }
+
+    [Fact]
+    public async Task Last_or_default_reports_scan_for_custom_i_list()
+    {
+        var source = """
+            using System;
+            using System.Collections;
+            using System.Collections.Generic;
+            using System.Linq;
+            using DotBoxD.Abstractions;
+
+            [Plugin("custom-i-list-last-or-default")]
+            public sealed class Kernel : IEventKernel<string>
+            {
+                private readonly IList<int> Values = new ScanningList();
+                public bool ShouldHandle(string e, HookContext context) => Enumerable.LastOrDefault(Values) >= 0;
+                public void Handle(string e, HookContext context) { }
+            }
+
+            public sealed class ScanningList : IList<int>
+            {
+                private readonly List<int> Items = [];
+                public int this[int index]
+                {
+                    get
+                    {
+                        foreach (var item in Items)
+                        {
+                            if (index-- == 0) return item;
+                        }
+
+                        throw new ArgumentOutOfRangeException(nameof(index));
+                    }
+                    set => Items[index] = value;
+                }
+
+                public int Count => Items.Count;
+                public bool IsReadOnly => false;
+                public void Add(int item) => Items.Add(item);
+                public void Clear() => Items.Clear();
+                public bool Contains(int item) => Items.Contains(item);
+                public void CopyTo(int[] array, int arrayIndex) => Items.CopyTo(array, arrayIndex);
+                public IEnumerator<int> GetEnumerator() => Items.GetEnumerator();
+                public int IndexOf(int item) => Items.IndexOf(item);
+                public void Insert(int index, int item) => Items.Insert(index, item);
+                public bool Remove(int item) => Items.Remove(item);
+                public void RemoveAt(int index) => Items.RemoveAt(index);
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            """;
+
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(source, "CustomIListLastOrDefault");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Theory]
     [InlineData("Dictionary<int, int>", "Map.Keys.Any()", false)]
     [InlineData("Dictionary<int, int>", "Enumerable.Any(Map.Keys)", false)]
     [InlineData("Dictionary<int, int>", "Map.Values.Any()", false)]
