@@ -49,11 +49,12 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var render = GetRenderKind(type, context.SemanticModel.Compilation);
         var generationDisabled = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false);
         var skip = generationDisabled || render == RenderKind.Handwritten;
+        var hasRenderProperty = type.GetMembers("Render").OfType<IPropertySymbol>().Any();
         var valid = !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
             type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is ClassDeclarationSyntax c && c.Modifiers.Any(SyntaxKind.PartialKeyword));
         return new Component(type.ToDisplayString(), syntax.Identifier.Text,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
-            string.Join(" ", syntax.Modifiers.Select(m => m.Text)), path, syntax.SyntaxTree.FilePath, skip, valid,
+            string.Join(" ", syntax.Modifiers.Select(m => m.Text)), path, syntax.SyntaxTree.FilePath, skip, hasRenderProperty, valid,
             render == RenderKind.Incompatible && !generationDisabled
                 ? "Render(UiBuilder) must be an instance method returning UiElement, or set GenerateRender = false."
                 : null);
@@ -86,6 +87,11 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         { return new Output(hint, component.SourcePath, "", null, renderError); }
         if (component.Skip)
         { return new Output(hint, component.SourcePath, "", null, null); }
+        if (component.HasRenderProperty)
+        {
+            return new Output(hint, component.SourcePath, "", null,
+                "A component property named Render conflicts with generated Render(UiBuilder). Rename the property or hand-write Render(UiBuilder).");
+        }
         if (!component.Valid)
         { return new Output(hint, component.SourcePath, "", null, "Use a top-level, non-generic partial class, or hand-write Render(UiBuilder)."); }
         var matches = files.Where(f => string.Equals(f.Path.Replace('\\', '/'), component.Path.Replace('\\', '/'), StringComparison.Ordinal) ||
@@ -107,7 +113,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
 
     private sealed record RazorFile(string Path, string Text);
     private sealed record Component(string FullName, string Name, string Namespace, string Modifiers,
-        string Path, string SourcePath, bool Skip, bool Valid, string? RenderError);
+        string Path, string SourcePath, bool Skip, bool HasRenderProperty, bool Valid, string? RenderError);
     private sealed record Output(string Hint, string Path, string FileText, string? Source, string? Error);
     private enum RenderKind { None, Handwritten, Incompatible }
 }
