@@ -37,6 +37,36 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generated_plugin_server_preserves_platform_guard_attributes_on_synchronous_facade_and_wrapper_members()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(ServerSource);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+
+        var normalized = generated.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "    public bool IsWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "    public bool IsNotWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "        public bool IsWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "        public bool IsNotWindows()",
+            normalized,
+            StringComparison.Ordinal);
+    }
+
     private const string ServerSource = """
         #nullable enable
         using System.Runtime.Versioning;
@@ -54,6 +84,12 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
                 [SupportedOSPlatform("windows")]
                 ValueTask<int> WindowsPingAsync();
 
+                [SupportedOSPlatformGuard("windows")]
+                bool IsWindows();
+
+                [UnsupportedOSPlatformGuard("windows")]
+                bool IsNotWindows();
+
                 ValueTask<int> CrossPlatformPingAsync();
 
                 IMonsterControl Monsters { get; }
@@ -64,6 +100,12 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
             {
                 [SupportedOSPlatform("windows")]
                 ValueTask<int> WindowsRenameAsync(string value);
+
+                [SupportedOSPlatformGuard("windows")]
+                bool IsWindows();
+
+                [UnsupportedOSPlatformGuard("windows")]
+                bool IsNotWindows();
             }
         }
 

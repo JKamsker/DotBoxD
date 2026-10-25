@@ -6,21 +6,34 @@ internal static class PluginServerPlatformCompatibilityAttributeFormatter
 {
     public static string? Format(AttributeData attribute)
     {
-        var attributeType = attribute.AttributeClass?.ToDisplayString() switch
-        {
-            "System.Runtime.Versioning.SupportedOSPlatformAttribute" =>
-                "global::System.Runtime.Versioning.SupportedOSPlatformAttribute",
-            "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" =>
-                "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute",
-            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" =>
-                "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute",
-            _ => null,
-        };
+        var attributeType = GetAttributeType(attribute);
         if (attributeType is null)
         {
             return null;
         }
 
+        var arguments = FormatArguments(attribute);
+        return arguments is null ? null : "[" + attributeType + "(" + string.Join(", ", arguments) + ")]";
+    }
+
+    private static string? GetAttributeType(AttributeData attribute)
+        => attribute.AttributeClass?.ToDisplayString() switch
+        {
+            "System.Runtime.Versioning.SupportedOSPlatformAttribute" =>
+                "global::System.Runtime.Versioning.SupportedOSPlatformAttribute",
+            "System.Runtime.Versioning.SupportedOSPlatformGuardAttribute" =>
+                "global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute",
+            "System.Runtime.Versioning.UnsupportedOSPlatformAttribute" =>
+                "global::System.Runtime.Versioning.UnsupportedOSPlatformAttribute",
+            "System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute" =>
+                "global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute",
+            "System.Runtime.Versioning.ObsoletedOSPlatformAttribute" =>
+                "global::System.Runtime.Versioning.ObsoletedOSPlatformAttribute",
+            _ => null,
+        };
+
+    private static List<string>? FormatArguments(AttributeData attribute)
+    {
         var arguments = new List<string>();
         foreach (var argument in attribute.ConstructorArguments)
         {
@@ -42,6 +55,6 @@ internal static class PluginServerPlatformCompatibilityAttributeFormatter
             arguments.Add(argument.Key + " = " + LiteralReader.StringLiteral(value));
         }
 
-        return "[" + attributeType + "(" + string.Join(", ", arguments) + ")]";
+        return arguments;
     }
 }
