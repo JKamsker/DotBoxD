@@ -123,10 +123,11 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
-        if (BlazorDisposal.IsCancelling(_lifetime))
-        { return ValueTask.CompletedTask; }
         lock (_disposeLock)
         {
+            if (BlazorDisposal.IsCancelling(_lifetime) ||
+                (_disposeTask is { IsCompleted: false } && BlazorDisposal.IsCancellationCallback))
+            { return ValueTask.CompletedTask; }
             _disposeTask ??= DisposeCoreAsync();
             return new ValueTask(_disposeTask);
         }
