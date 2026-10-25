@@ -15,6 +15,8 @@ public static class UiMaterializationValidator
         {
             if (property is null)
             { throw new UiValidationException("UI materialization contains a null property entry."); }
+            if (property.NodeId <= 0)
+            { throw new UiValidationException($"UI property references invalid node ID {property.NodeId}."); }
 
             UiValueValidator.Validate(property.Value, policy);
             if (property.PropertyId == UiPropertyId.Items)
