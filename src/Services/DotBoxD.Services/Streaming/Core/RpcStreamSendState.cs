@@ -114,6 +114,10 @@ internal sealed class RpcStreamSendState : IDisposable
         _cts.Dispose();
     }
 
+    // Peer teardown must not let a caller's cancellation callback block its own completion.
+    public void DisposeInBackground() =>
+        _ = Task.Factory.StartNew(Dispose, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
     public void DisposeAfterCompletion()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
