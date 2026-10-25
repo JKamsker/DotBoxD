@@ -7,6 +7,7 @@ public static class UiMaterializationValidator
 {
     public static void Validate(int staticNodeCount, ImmutableArray<UiPropertyValue> values, UiPolicy policy)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(staticNodeCount);
         long count = staticNodeCount;
         foreach (var property in values)
         {
