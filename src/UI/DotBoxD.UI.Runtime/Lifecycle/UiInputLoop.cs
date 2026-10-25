@@ -6,6 +6,7 @@ internal static class UiInputLoop
 {
     public static async Task RunAsync(UiSession session, IUiInputSource source, UiPolicy policy, IReadOnlySet<int> remoteEvents, CancellationToken token)
     {
+        using var callback = session.EnterCallbackScope();
         var window = Stopwatch.GetTimestamp();
         var count = 0;
         var pending = new UiInputConcurrency(policy.MaxInFlightRemoteEvents);
@@ -21,7 +22,7 @@ internal static class UiInputLoop
                 if (remoteEvents.Contains(input.EventId))
                 {
                     if (pending.TryBegin())
-                    { _ = ObserveRemoteAsync(session, ApplyAsync(session, input, token), pending, token); }
+                    { _ = ObserveRemoteAsync(session, input, pending, token); }
                     else
                     { session.RecordInputError("UI remote input concurrency limit exceeded."); }
                 }
@@ -51,10 +52,10 @@ internal static class UiInputLoop
         }
     }
 
-    private static async Task ObserveRemoteAsync(UiSession session, ValueTask<UiSnapshot> operation, UiInputConcurrency pending, CancellationToken token)
+    private static async Task ObserveRemoteAsync(UiSession session, UiInput input, UiInputConcurrency pending, CancellationToken token)
     {
         try
-        { await operation.ConfigureAwait(false); }
+        { await ApplyAsync(session, input, token).ConfigureAwait(false); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (UiValidationException error) { session.RecordInputError(error.Message); }
         catch { await session.DisposeAsync().ConfigureAwait(false); }

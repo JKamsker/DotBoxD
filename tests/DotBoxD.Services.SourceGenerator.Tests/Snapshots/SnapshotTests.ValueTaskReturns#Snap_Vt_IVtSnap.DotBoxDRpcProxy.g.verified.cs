@@ -70,6 +70,10 @@ namespace Snap.Vt
             }
             catch (global::System.Exception __dotboxd_ex)
             {
+                if (ct.IsCancellationRequested)
+                {
+                    return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromCanceled<int>(ct));
+                }
                 return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromException<int>(__dotboxd_ex));
             }
         }
@@ -86,6 +90,10 @@ namespace Snap.Vt
             }
             catch (global::System.Exception __dotboxd_ex)
             {
+                if (ct.IsCancellationRequested)
+                {
+                    return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromCanceled(ct));
+                }
                 return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromException(__dotboxd_ex));
             }
         }
@@ -97,8 +105,16 @@ namespace Snap.Vt
 
         private static async global::System.Threading.Tasks.Task __dotboxd_observeCallerCancellationCoreAsync(global::System.Threading.Tasks.Task task, global::System.Threading.CancellationToken ct)
         {
-            await task.ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await task.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
         }
 
         private static global::System.Threading.Tasks.Task<T> __dotboxd_observeCallerCancellationAsync<T>(global::System.Threading.Tasks.Task<T> task, global::System.Threading.CancellationToken ct)
@@ -108,9 +124,17 @@ namespace Snap.Vt
 
         private static async global::System.Threading.Tasks.Task<T> __dotboxd_observeCallerCancellationCoreAsync<T>(global::System.Threading.Tasks.Task<T> task, global::System.Threading.CancellationToken ct)
         {
-            var result = await task.ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
-            return result;
+            try
+            {
+                var result = await task.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                return result;
+            }
+            catch
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
         }
 
         private static global::System.Threading.Tasks.ValueTask __dotboxd_observeCallerCancellationAsync(global::System.Threading.Tasks.ValueTask task, global::System.Threading.CancellationToken ct)
@@ -120,8 +144,16 @@ namespace Snap.Vt
 
         private static async global::System.Threading.Tasks.ValueTask __dotboxd_observeCallerCancellationCoreAsync(global::System.Threading.Tasks.ValueTask task, global::System.Threading.CancellationToken ct)
         {
-            await task.ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await task.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
         }
 
         private static global::System.Threading.Tasks.ValueTask<T> __dotboxd_observeCallerCancellationAsync<T>(global::System.Threading.Tasks.ValueTask<T> task, global::System.Threading.CancellationToken ct)
@@ -131,9 +163,17 @@ namespace Snap.Vt
 
         private static async global::System.Threading.Tasks.ValueTask<T> __dotboxd_observeCallerCancellationCoreAsync<T>(global::System.Threading.Tasks.ValueTask<T> task, global::System.Threading.CancellationToken ct)
         {
-            var result = await task.ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
-            return result;
+            try
+            {
+                var result = await task.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                return result;
+            }
+            catch
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
         }
     }
 }

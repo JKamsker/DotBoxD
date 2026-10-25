@@ -235,7 +235,10 @@ internal sealed partial class RpcStreamManager
         }
     }
 
-    internal void RemoveOutbound(RpcStreamSendState state, bool completed = false)
+    internal void RemoveOutbound(
+        RpcStreamSendState state,
+        bool completed = false,
+        bool disposeInBackground = false)
     {
         if (!state.TryClaimRemoval())
         {
@@ -254,7 +257,14 @@ internal sealed partial class RpcStreamManager
         }
         else
         {
-            state.Dispose();
+            if (disposeInBackground)
+            {
+                state.DisposeInBackground();
+            }
+            else
+            {
+                state.Dispose();
+            }
         }
     }
 

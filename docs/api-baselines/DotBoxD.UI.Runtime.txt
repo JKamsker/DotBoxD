@@ -17,6 +17,7 @@ public interface IUiExtensionSchema
 public interface IUiInputSource
 public interface IUiRemoteTransport
 public interface IUiRenderer : IAsyncDisposable
+public IDisposable EnterCallbackScope() => _callbacks.Enter()
 public IUiRenderer? Renderer => _renderer.Renderer
 public sealed class UiExtensionRegistry<T> where T : IUiExtensionSchema
 public sealed class UiHost

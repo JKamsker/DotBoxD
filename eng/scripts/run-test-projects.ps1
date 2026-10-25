@@ -142,6 +142,7 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         "Serialization",
         "Strings",
         "Tooling",
+        "UI",
         "Validation",
         "Verifier",
         "Wave9Fixes",
@@ -227,6 +228,7 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
             Filter = Join-AnyTestFilter @(
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedMapReaderCompatibilityTests",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedReadonlyCollectionReaderTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.MarshallerCache",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.RpcIpc",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelLiveSetting",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelRuntime")
@@ -341,6 +343,8 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerLiveSetting",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerNullable",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerPluginId",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerHookAttributeIdentitySurpriseTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerPluginAttributeIdentitySurpriseTests",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginPackage",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.EventPropertyCapability",
                 "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.GeneratedPackagePluginId",

@@ -59,9 +59,16 @@ public sealed class UiHost
             { session.StartInput(inputs); }
             return session;
         }
-        catch
+        catch (Exception error)
         {
-            await owner.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await owner.DisposeAsync().ConfigureAwait(false);
+            }
+            catch when (error is OperationCanceledException)
+            {
+            }
+
             throw;
         }
     }

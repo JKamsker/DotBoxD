@@ -138,6 +138,7 @@ internal static class MergeableIrStepModelFactory
             outputTag,
             irFuncType,
             generatedAttributeSource,
+            MergeableIrClsCompliance.IsEnabled(model.Compilation),
             $"new {DotBoxDGenerationNames.TypeNames.GlobalParameter}({LiteralReader.StringLiteral(CurrentValueName)}, {inputTypeSource})",
             value.Source,
             EquatableArray<string>.FromOwned([.. capabilities]),

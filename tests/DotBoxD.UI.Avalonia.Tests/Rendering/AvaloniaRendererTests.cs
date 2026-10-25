@@ -38,6 +38,20 @@ public sealed class AvaloniaRendererTests
     }
 
     [AvaloniaFact]
+    public async Task Pre_canceled_capture_takes_precedence_over_invalid_dimensions()
+    {
+        var renderer = new AvaloniaUiRenderer();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            renderer.CaptureAsync(new PixelSize(0, 1), new Vector(96, 96), cancellation.Token).AsTask());
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, renderer.Materializations);
+    }
+
+    [AvaloniaFact]
     public async Task Keyboard_focus_mouse_boolean_and_numeric_input_update_authoritative_state()
     {
         var b = new UiBuilder();

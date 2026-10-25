@@ -183,6 +183,53 @@ public sealed class RemoteLocalHandlerRegistryCancellationTests
     }
 
     [Fact]
+    public async Task DispatchAsync_prefers_caller_cancellation_over_fault_after_raw_decoder_handler_cancels()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        using var cancellation = new CancellationTokenSource();
+        var canceledHandlerInvocations = 0;
+        registry.Register(
+            "sub-caller-cancel-fault",
+            (string _, HookContext _) =>
+            {
+                canceledHandlerInvocations++;
+                cancellation.Cancel();
+                return ValueTask.FromException(new InvalidOperationException("handler fault"));
+            },
+            static (ReadOnlyMemory<byte> _) => "payload");
+
+        var cancellationException = await Record.ExceptionAsync(
+            async () => await registry.DispatchAsync(
+                "sub-caller-cancel-fault",
+                EncodeProjected("payload"),
+                new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None),
+                cancellation.Token));
+
+        var canceled = cancellationException as OperationCanceledException;
+        Assert.Equal(
+            (typeof(OperationCanceledException), cancellation.Token, 1),
+            (cancellationException?.GetType(), canceled?.CancellationToken, canceledHandlerInvocations));
+
+        var liveTokenHandlerInvocations = 0;
+        registry.Register(
+            "sub-live-token-fault",
+            (string _, HookContext _) =>
+            {
+                liveTokenHandlerInvocations++;
+                return ValueTask.FromException(new InvalidOperationException("handler fault"));
+            },
+            static (ReadOnlyMemory<byte> _) => "payload");
+
+        var faultException = await Record.ExceptionAsync(
+            async () => await registry.DispatchAsync(
+                "sub-live-token-fault",
+                EncodeProjected("payload"),
+                new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None)));
+
+        Assert.Equal((typeof(InvalidOperationException), 1), (faultException?.GetType(), liveTokenHandlerInvocations));
+    }
+
+    [Fact]
     public async Task DispatchAsync_does_not_invoke_handler_after_raw_decoder_cancels_context()
     {
         var registry = new RemoteLocalHandlerRegistry();

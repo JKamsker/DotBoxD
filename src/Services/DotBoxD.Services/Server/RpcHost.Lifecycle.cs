@@ -150,7 +150,6 @@ public sealed partial class RpcHost
 
         throw new InvalidOperationException("Host start was stopped before it completed.");
     }
-
     public Task StopAsync(CancellationToken ct = default)
     {
         lock (_lifecycleLock)
@@ -165,7 +164,7 @@ public sealed partial class RpcHost
     private async Task StopCoreAsync(CancellationTokenSource cts, Task? acceptTask, CancellationToken ct)
     {
         var completed = false;
-        var cancellationStarted = false;
+        Task? cancellation = null;
         var stopListenerBeforeCancel = acceptTask is not null && ct.IsCancellationRequested;
         try
         {
@@ -174,26 +173,27 @@ public sealed partial class RpcHost
                 await Task.Yield();
                 await StopListenerOnceAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            RpcHostCancellation.TryCancel(cts);
-            cancellationStarted = true;
+            cancellation = RpcHostCancellation.TryCancelAsync(cts);
+            await RpcHostCancellation.WaitForCancellationRequestAsync(cts, cancellation).ConfigureAwait(false);
+            if (!stopListenerBeforeCancel)
+            {
+                // Unblock Accept before joining it; cancellation callbacks can synchronously join Stop.
+                await StopListenerOnceAsync(ct).ConfigureAwait(false);
+            }
             if (acceptTask is not null)
             {
                 await ObserveAcceptShutdownAsync(acceptTask).ConfigureAwait(false);
             }
             await _acceptLoop.DrainInFlightAsync().ConfigureAwait(false);
-            if (!stopListenerBeforeCancel)
-            {
-                await StopListenerOnceAsync(ct).ConfigureAwait(false);
-            }
             await _peers.CloseAllAsync().ConfigureAwait(false);
             await _peers.AwaitCleanupAsync().ConfigureAwait(false);
             completed = true;
         }
         finally
         {
-            if (cancellationStarted)
+            if (cancellation is not null)
             {
-                RpcHostCancellation.Dispose(cts);
+                RpcHostCancellation.DisposeAfterCancellation(cts, cancellation);
             }
             CompleteStop(cts, completed);
         }
@@ -245,22 +245,46 @@ public sealed partial class RpcHost
             }
         }
     }
-
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         Task disposeTask;
+        TaskCompletionSource<bool>? disposalCompletion = null;
         lock (_lifecycleLock)
         {
             if (_disposeTask is null)
             {
                 Volatile.Write(ref _disposed, 1);
-                _disposeTask = DisposeCoreAsync();
+                disposalCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposeTask = disposalCompletion.Task;
             }
 
             disposeTask = _disposeTask;
         }
 
-        await disposeTask.ConfigureAwait(false);
+        if (_disposalContext.IsDisposingListener && !disposeTask.IsCompleted)
+        {
+            return default;
+        }
+
+        if (disposalCompletion is not null)
+        {
+            _ = CompleteDisposeAsync(disposalCompletion);
+        }
+
+        return new ValueTask(disposeTask);
+    }
+
+    private async Task CompleteDisposeAsync(TaskCompletionSource<bool> disposalCompletion)
+    {
+        try
+        {
+            await DisposeCoreAsync().ConfigureAwait(false);
+            disposalCompletion.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            disposalCompletion.TrySetException(ex);
+        }
     }
 
     private async Task DisposeCoreAsync()
@@ -269,7 +293,7 @@ public sealed partial class RpcHost
             () => StopAsync(),
             _peers.CloseAllAsync,
             _peers.AwaitCleanupAsync,
-            () => _listener.DisposeAsync().AsTask()).ConfigureAwait(false);
+            () => _disposalContext.DisposeListenerAsync(_listener)).ConfigureAwait(false);
     }
 
     private readonly record struct StartRecovery(CancellationTokenSource Cts, bool DisposeCts, Exception? Failure);

@@ -31,6 +31,8 @@ internal static class PluginServerCodeRequirementAttributeFormatter
                 "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute",
             "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute" =>
                 "global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute",
+            "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" =>
+                "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute",
             _ => null,
         };
 
@@ -45,9 +47,9 @@ internal static class PluginServerCodeRequirementAttributeFormatter
             return false;
         }
 
-        if (message is not null)
+        if (attribute.ConstructorArguments.Length == 1)
         {
-            arguments.Add(LiteralReader.StringLiteral(message));
+            arguments.Add(LiteralReader.ObjectLiteral(message));
         }
         foreach (var argument in attribute.NamedArguments)
         {
@@ -67,7 +69,8 @@ internal static class PluginServerCodeRequirementAttributeFormatter
         message = null;
         if (attribute.ConstructorArguments.Length == 0)
         {
-            return attributeType == "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute";
+            return attributeType is "global::System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute"
+                or "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
         }
 
         if (attribute.ConstructorArguments.Length != 1)
@@ -76,7 +79,7 @@ internal static class PluginServerCodeRequirementAttributeFormatter
         }
 
         message = attribute.ConstructorArguments[0].Value as string;
-        return message is not null;
+        return attribute.ConstructorArguments[0].Value is null or string;
     }
 
     private static bool TryFormatNamedArgument(

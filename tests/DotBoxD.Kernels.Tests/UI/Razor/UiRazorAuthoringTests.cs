@@ -8,6 +8,18 @@ namespace DotBoxD.Kernels.Tests.UI.Razor;
 public sealed class UiRazorAuthoringTests
 {
     [Fact]
+    public void Additional_file_matching_is_case_insensitive_after_discovery()
+    {
+        var result = Generate(Component, Markup, "/authoring/COUNTER.UI.RAZOR");
+
+        Assert.Single(result.Result.GeneratedTrees.Where(
+            tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal)));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
+        Assert.Empty(result.Output.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning));
+    }
+
+    [Fact]
     public async Task Safe_Razor_and_handwritten_public_builder_have_identical_hash_and_semantics()
     {
         var generated = Package();
@@ -122,6 +134,51 @@ public sealed class UiRazorAuthoringTests
         var result = Generate(source, "<escape />");
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
         Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Incompatible_static_Render_reports_a_focused_diagnostic_instead_of_suppressing_generation()
+    {
+        var source = Component.Replace("[UiLocalHandler] public static int Increment",
+            "public static void Render(UiBuilder builder) { } [UiLocalHandler] public static int Increment", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Render_property_reports_a_focused_diagnostic_instead_of_colliding_with_generated_Render()
+    {
+        var source = Component.Replace("[UiLocalHandler] public static int Increment",
+            "public string Render { get; } = \"manual\"; [UiLocalHandler] public static int Increment", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Explicit_IUiComponent_Render_is_the_handwritten_opt_out()
+    {
+        const string markup = "<UiText Text=\"generated\" />";
+        var source = Component.Replace("public partial class Counter", "public partial class Counter : IUiComponent", StringComparison.Ordinal)
+            .Replace("[UiLocalHandler] public static int Increment",
+                "UiElement IUiComponent.Render(UiBuilder builder) => builder.Text(\"manual\"); [UiLocalHandler] public static int Increment", StringComparison.Ordinal)
+            .Replace("new Counter().Render(builder)", "((IUiComponent)new Counter()).Render(builder)", StringComparison.Ordinal);
+        var result = Generate(source, markup);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.Equal("manual", Assert.Single(Package(source, markup).Nodes).Properties[0].Literal!.Text);
+    }
+
+    [Fact]
+    public void Record_components_are_generated_instead_of_silently_ignored()
+    {
+        var source = Component.Replace("public partial class Counter", "public partial record class Counter", StringComparison.Ordinal);
+        var result = Generate(source, Markup);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXR001");
+        Assert.Contains(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Output.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
     }
 
     [Theory]

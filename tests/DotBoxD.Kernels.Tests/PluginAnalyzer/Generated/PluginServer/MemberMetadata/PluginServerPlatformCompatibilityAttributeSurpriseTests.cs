@@ -1,3 +1,7 @@
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
@@ -37,6 +41,64 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generated_plugin_server_preserves_platform_guard_attributes_on_synchronous_facade_and_wrapper_members()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(ServerSource);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+
+        var normalized = generated.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "    public bool IsWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "    public bool IsNotWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.SupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "        public bool IsWindows()",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Runtime.Versioning.UnsupportedOSPlatformGuardAttribute(\"windows\")]\n" +
+            "        public bool IsNotWindows()",
+            normalized,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("SupportedOSPlatformGuard")]
+    [InlineData("UnsupportedOSPlatformGuard")]
+    public void Aliased_foreign_guards_do_not_become_framework_guards_on_facades_and_wrappers(string name)
+    {
+        var references = (((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?.Split(Path.PathSeparator) ?? [])
+            .Select(path => MetadataReference.CreateFromFile(path));
+        var foreign = CSharpCompilation.Create("ForeignGuard", [CSharpSyntaxTree.ParseText($$"""
+            namespace System.Runtime.Versioning;
+            public sealed class {{name}}Attribute(string platform) : System.Attribute;
+            """)], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emit = foreign.Emit(stream);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var reference = MetadataReference.CreateFromImage(stream.ToArray()).WithAliases(ImmutableArray.Create("ForeignGuard"));
+        var source = "extern alias ForeignGuard;\n" + ServerSource.Replace("[" + name + "(",
+            "[ForeignGuard::System.Runtime.Versioning." + name + "(", StringComparison.Ordinal);
+        var (_, output, diagnostics) = PluginServerGenerationTestDriver.RunWithDiagnostics(source, reference);
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(output);
+        var server = output.GetTypeByMetadataName("Regression.Plugin.RemotePluginServer")!;
+        var methods = new[] { server }.Concat(server.GetTypeMembers()).SelectMany(type => type.GetMembers()).OfType<IMethodSymbol>()
+            .Where(method => method.Name == (name == "SupportedOSPlatformGuard" ? "IsWindows" : "IsNotWindows")).ToArray();
+        Assert.Equal(2, methods.Length);
+        Assert.All(methods, method => Assert.DoesNotContain(method.GetAttributes(), attribute =>
+            attribute.AttributeClass?.Name == name + "Attribute"));
+    }
+
     private const string ServerSource = """
         #nullable enable
         using System.Runtime.Versioning;
@@ -54,6 +116,12 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
                 [SupportedOSPlatform("windows")]
                 ValueTask<int> WindowsPingAsync();
 
+                [SupportedOSPlatformGuard("windows")]
+                bool IsWindows();
+
+                [UnsupportedOSPlatformGuard("windows")]
+                bool IsNotWindows();
+
                 ValueTask<int> CrossPlatformPingAsync();
 
                 IMonsterControl Monsters { get; }
@@ -64,6 +132,12 @@ public sealed class PluginServerPlatformCompatibilityAttributeSurpriseTests
             {
                 [SupportedOSPlatform("windows")]
                 ValueTask<int> WindowsRenameAsync(string value);
+
+                [SupportedOSPlatformGuard("windows")]
+                bool IsWindows();
+
+                [UnsupportedOSPlatformGuard("windows")]
+                bool IsNotWindows();
             }
         }
 

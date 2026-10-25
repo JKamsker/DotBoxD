@@ -160,6 +160,58 @@ public sealed class UiAuthoringTests
         Assert.DoesNotContain("RemoteUiEndpoint", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Incompatible_handwritten_facet_names_fail_closed()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+                public static string IncrementUiKernel => "incompatible";
+                [UiRemoteHandler(7)] public static void Search() { }
+                public static string SearchUiEndpoint => "incompatible";
+            }
+            """);
+        Assert.Equal(2, result.Diagnostics.Count(d => d.Id == "DBXU001"));
+        Assert.Empty(result.Result.GeneratedTrees);
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public void Compatible_handwritten_facet_overload_wins_over_incompatible_overload()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+                public static string IncrementUiKernel(int ignored) => "incompatible";
+                public static UiKernelDefinition<int,int> IncrementUiKernel() => new("manual", "main");
+            }
+            """);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Result.GeneratedTrees);
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public void Keyword_escaped_namespace_generates_a_clean_local_facet()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            namespace Keyword.@event;
+            public static partial class Handlers
+            {
+                [UiLocalHandler] public static int Increment(int value) => value + 1;
+            }
+            """);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "CS8785");
+        Assert.Single(result.Result.GeneratedTrees);
+        Assert.Contains("IncrementUiKernel", string.Join("", result.Result.GeneratedTrees), StringComparison.Ordinal);
+        Assert.Empty(result.Output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
     [Theory]
     [InlineData("public static class Manual")]
     [InlineData("public static class Manual<T>")]

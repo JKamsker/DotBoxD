@@ -241,13 +241,21 @@ public sealed partial class MergeableIrStepGeneratorTests
         string source,
         out Compilation outputCompilation,
         out ImmutableArray<Diagnostic> diagnostics)
+        => RunGenerator(source, [], out outputCompilation, out diagnostics);
+
+    private static GeneratorDriverRunResult RunGenerator(
+        string source,
+        IEnumerable<MetadataReference> additionalReferences,
+        out Compilation outputCompilation,
+        out ImmutableArray<Diagnostic> diagnostics)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDMergeableIrStepGeneratorTest",
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],

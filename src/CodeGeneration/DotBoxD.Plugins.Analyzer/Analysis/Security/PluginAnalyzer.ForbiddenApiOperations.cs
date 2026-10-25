@@ -71,6 +71,7 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeMethodReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var reference = (IMethodReferenceOperation)context.Operation;
+        ReportAndRecordUnboundedCollectionReference(context, helperGraph, reference.Method);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, reference.Method);

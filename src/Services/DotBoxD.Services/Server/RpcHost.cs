@@ -21,6 +21,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     private readonly RpcHostPeerConfiguration _configure = new();
     private readonly RpcHostPeerAdmission _admission;
     private readonly RpcHostPeerCollection _peers = new();
+    private readonly RpcHostDisposalContext _disposalContext = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
     private Task? _stopTask;

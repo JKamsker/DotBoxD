@@ -14,8 +14,8 @@
     <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="10.0.11" />
 
     <!-- Serialization (aligned across both families) -->
-    <PackageVersion Include="MessagePack" Version="3.1.8" />
-    <PackageVersion Include="MessagePackAnalyzer" Version="3.1.8" />
+    <PackageVersion Include="MessagePack" Version="3.1.9" />
+    <PackageVersion Include="MessagePackAnalyzer" Version="3.1.9" />
 
     <!-- Roslyn. Central = 4.8.0 so the shipped generators load in the widest range of
          consumer SDKs. Test/host projects that need newer APIs use VersionOverride

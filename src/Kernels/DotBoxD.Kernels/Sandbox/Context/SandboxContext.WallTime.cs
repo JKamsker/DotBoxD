@@ -14,7 +14,7 @@ public sealed partial class SandboxContext : IDisposable
         var shared = GetOrCreateSharedWallTimeToken();
         var registration = CancellationToken.CanBeCanceled
             ? CancellationToken.UnsafeRegister(
-                static state => ((SharedWallTimeTokenSource)state!).Cancel(),
+                static state => ((SharedWallTimeTokenSource)state!).CancelIgnoringCallbackExceptions(),
                 shared)
             : default;
         return new BindingWallTimeTokenLease(shared, registration);

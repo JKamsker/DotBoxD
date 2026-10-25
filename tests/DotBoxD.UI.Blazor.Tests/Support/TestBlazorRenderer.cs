@@ -16,9 +16,12 @@ internal sealed class TestBlazorRenderer() : Renderer(new ServiceCollection().Bu
     public Task MountAsync(UiSession session, IUiInteractionAuthorizer? authorizer = null, bool dispose = true)
         => Dispatcher.InvokeAsync(async () =>
         {
-            _componentId = AssignRootComponentId(new DotBoxDUi());
+            Component = new DotBoxDUi();
+            _componentId = AssignRootComponentId(Component);
             await RenderRootComponentAsync(_componentId, Parameters(session, authorizer, dispose));
         });
+
+    public DotBoxDUi? Component { get; private set; }
 
     public Task ReplaceAsync(UiSession session, IUiInteractionAuthorizer? authorizer, bool dispose = true)
         => Dispatcher.InvokeAsync(() => RenderRootComponentAsync(_componentId, Parameters(session, authorizer, dispose)));
@@ -37,6 +40,9 @@ internal sealed class TestBlazorRenderer() : Renderer(new ServiceCollection().Bu
         var frames = GetCurrentRenderTreeFrames(_componentId);
         return frames.Array.Take(frames.Count).ToArray();
     });
+
+    public ValueTask DisposeComponentAsync()
+        => (Component ?? throw new InvalidOperationException("Mount the component before disposing it.")).DisposeAsync();
 
     public async Task<ulong> HandlerAsync(string name)
         => (await FramesAsync()).Single(f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == name).AttributeEventHandlerId;

@@ -127,6 +127,14 @@ internal sealed class RpcDispatchResponseBuilder
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
         }
+        catch (Exception ex) when (ct.IsCancellationRequested)
+        {
+            var canceled = new OperationCanceledException("RPC dispatch was cancelled.", ex, ct);
+            telemetry.MarkFailed(canceled);
+            writer?.Dispose();
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
+            throw canceled;
+        }
         catch (ServiceProtocolException ex)
         {
             telemetry.MarkFailed(ex);

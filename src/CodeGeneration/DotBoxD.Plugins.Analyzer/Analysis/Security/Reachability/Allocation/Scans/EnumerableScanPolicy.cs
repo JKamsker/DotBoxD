@@ -5,34 +5,46 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class EnumerableScanPolicy
 {
-    public static bool IsScan(IInvocationOperation invocation, string typeName)
+    private static readonly HashSet<string> ScanMethodNames = new(StringComparer.Ordinal)
+    {
+        "Contains", "Any", "Count", "SequenceEqual", "All", "LongCount", "FirstOrDefault", "LastOrDefault",
+        "SingleOrDefault", "Single", "Aggregate", "First", "Max", "Min", "Sum", "Average", "MaxBy",
+        "ElementAt", "ElementAtOrDefault", "Skip", "Last"
+    };
+
+    public static bool IsScan(IInvocationOperation invocation, string typeName, Compilation compilation)
     {
         var method = invocation.TargetMethod;
         if (method is not { IsStatic: true, MethodKind: MethodKind.Ordinary } ||
-            method.Name is not ("Contains" or "Any") ||
+            !IsScanMethod(method) ||
             typeName != "System.Linq.Enumerable")
         {
             return false;
         }
 
         var source = invocation.Arguments.FirstOrDefault(argument => argument.Parameter?.Ordinal == 0)?.Value;
-        while (source is IConversionOperation { IsImplicit: true } conversion)
+        while (source is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion)
         {
             source = conversion.Operand;
         }
 
-        return !IsBoundedCollectionCall(method, source);
+        return !IsBoundedCollectionCall(method, source, compilation);
     }
 
-    private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source)
+    public static bool IsUnboundedMethodReference(IMethodSymbol method, string typeName)
+        => typeName == "System.Linq.Enumerable" && method is { IsStatic: true, MethodKind: MethodKind.Ordinary } &&
+           IsScanMethod(method);
+
+    private static bool IsScanMethod(IMethodSymbol method) => ScanMethodNames.Contains(method.Name);
+
+    private static bool IsBoundedCollectionCall(IMethodSymbol method, IOperation? source, Compilation compilation)
     {
         if (method.Name == "Contains" && !HasCompatibleCollectionElementType(method, source))
         {
             return false;
         }
 
-        if (method.Name == "Any" && method.Parameters.Length == 1 &&
-            (source?.Type is IArrayTypeSymbol || IsSortedListView(source)))
+        if (IsBoundedCountCall(method, source))
         {
             return true;
         }
@@ -42,14 +54,23 @@ internal static class EnumerableScanPolicy
             return true;
         }
 
+        if (source?.Type is IArrayTypeSymbol)
+        {
+            return IsBoundedFrameworkCall(method, source, string.Empty);
+        }
+
         if (source?.Type is not INamedTypeSymbol type || !FrameworkCollectionIdentity.IsFrameworkType(type))
         {
             return false;
         }
 
         var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        return IsBoundedFrameworkCall(method, source, name);
+        return IsBoundedFrameworkCall(method, source, name) && FrameworkCollectionOrigin.IsExact(source, compilation);
     }
+
+    private static bool IsBoundedCountCall(IMethodSymbol method, IOperation? source)
+        => method.Name is "Any" or "Count" && method.Parameters.Length == 1 &&
+           (source?.Type is IArrayTypeSymbol || IsSortedListView(source));
 
     private static bool HasCompatibleCollectionElementType(IMethodSymbol method, IOperation? source)
         => source?.Type is INamedTypeSymbol type &&
@@ -76,13 +97,40 @@ internal static class EnumerableScanPolicy
                SymbolDisplayFormat.CSharpErrorMessageFormat) == "System.Collections.Generic.SortedList<TKey, TValue>";
 
     private static bool IsBoundedFrameworkCall(IMethodSymbol method, IOperation? source, string name)
+        => IsCountMethod(method) && HasBoundedCount(name) && HasCompatibleCountFastPath(method, source) ||
+           IsBoundedIndexedOrContainsCall(method, source, name);
+
+    private static bool IsCountMethod(IMethodSymbol method)
+        => method.Name is "Any" or "Count" && method.Parameters.Length == 1;
+
+    private static bool IsBoundedIndexedOrContainsCall(IMethodSymbol method, IOperation? source, string name)
         => method.Name switch
         {
-            "Any" when method.Parameters.Length == 1 =>
-                HasBoundedCount(name) && HasCompatibleCountFastPath(method, source),
             "Contains" when method.Parameters.Length == 2 => HasBoundedContains(name),
+            "LastOrDefault" when HasNoPredicate(method) && HasCompatibleIndexedFastPath(method, source) => true,
+            _ when IsParameterlessIndexedMethod(method) => HasCompatibleIndexedFastPath(method, source),
             _ => false
         };
+
+    private static bool IsParameterlessIndexedMethod(IMethodSymbol method)
+        => method.Name is "First" or "Last" or "Single" && method.Parameters.Length == 1;
+
+    private static bool HasNoPredicate(IMethodSymbol method)
+        => method.Parameters.All(static parameter => parameter.Type.TypeKind != TypeKind.Delegate);
+
+    private static bool HasCompatibleIndexedFastPath(IMethodSymbol method, IOperation? source)
+        => source?.Type switch
+        {
+            IArrayTypeSymbol array => SymbolEqualityComparer.Default.Equals(array.ElementType, method.TypeArguments[0]),
+            INamedTypeSymbol type => IsCompatibleFrameworkList(type, method.TypeArguments[0]),
+            _ => false,
+        };
+
+    private static bool IsCompatibleFrameworkList(INamedTypeSymbol type, ITypeSymbol elementType)
+        => FrameworkCollectionIdentity.IsFrameworkType(type) &&
+           type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ==
+               "System.Collections.Generic.List<T>" &&
+           SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], elementType);
 
     private static bool HasBoundedCount(string typeName)
         => HasBoundedCollectionCount(typeName) || HasBoundedDictionaryViewCount(typeName);

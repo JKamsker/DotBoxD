@@ -58,7 +58,7 @@ internal static class DispatcherSubServiceReturnGenerator
         sb.AppendLine($"                    var __dotboxd_task = {call};");
         sb.AppendLine("                    var __sub = __dotboxd_task.IsCompletedSuccessfully");
         sb.AppendLine("                        ? __dotboxd_task.Result");
-        sb.AppendLine("                        : await __dotboxd_task;");
+        sb.AppendLine("                        : await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);");
     }
 
     private static void GenerateRegisteredCancellationCleanup(StringBuilder sb, string serviceName)

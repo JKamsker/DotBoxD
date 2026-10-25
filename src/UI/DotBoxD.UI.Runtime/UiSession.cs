@@ -17,9 +17,11 @@ public sealed class UiSession : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _disposeLock = new();
+    private readonly UiSessionCallbackContext _callbacks = new();
     private Task? _disposeTask;
     private int _closed;
     private int _inFlight;
+    private string? _lastInputError;
 
     internal UiSession(
         UiPackage package, UiPolicy policy, UiRendererOwner renderer, IUiRemoteTransport? remote,
@@ -42,7 +44,6 @@ public sealed class UiSession : IAsyncDisposable
         => _ = UiInputLoop.RunAsync(this, source, _policy,
             _events.Values.Where(e => e.Target == UiEventTarget.Remote).Select(e => e.Id).ToHashSet(), _lifetime.Token);
 
-    private string? _lastInputError;
     public string? LastInputError => Volatile.Read(ref _lastInputError);
     internal void RecordInputError(string message) => Volatile.Write(ref _lastInputError, message);
 
@@ -67,6 +68,9 @@ public sealed class UiSession : IAsyncDisposable
     public Guid Id { get; } = Guid.NewGuid();
     /// <summary>Trusted presentation adapter; null once teardown releases it.</summary>
     public IUiRenderer? Renderer => _renderer.Renderer;
+    /// <summary>Marks trusted adapter callbacks so they can join pending teardown without waiting on themselves.</summary>
+    /// <remarks>Captured execution contexts retain the marker. Completed disposal still exposes its terminal outcome.</remarks>
+    public IDisposable EnterCallbackScope() => _callbacks.Enter();
     public bool IsDisconnected => Volatile.Read(ref _closed) != 0;
 
     public ValueTask<UiSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
@@ -115,9 +119,16 @@ public sealed class UiSession : IAsyncDisposable
             {
                 _interaction.Validate(route.NodeId);
                 using var local = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-                var result = await _kernels.ExecuteAsync(route.KernelId, _state.Values, local.Token).ConfigureAwait(false);
-                var snapshot = await CommitAsync([new UiStateValue(route.OutputSlotId, result)], local.Token).ConfigureAwait(false);
-                return new Dispatch(snapshot, null, null, null);
+                try
+                {
+                    var result = await _kernels.ExecuteAsync(route.KernelId, _state.Values, local.Token).ConfigureAwait(false);
+                    var snapshot = await CommitAsync([new UiStateValue(route.OutputSlotId, result)], local.Token).ConfigureAwait(false);
+                    return new Dispatch(snapshot, null, null, null);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
             }
 
             if (Volatile.Read(ref _inFlight) >= _policy.MaxInFlightRemoteEvents)
@@ -141,7 +152,7 @@ public sealed class UiSession : IAsyncDisposable
         try
         {
             var request = dispatch.Remote!;
-            var patch = await CallRemoteAsync(dispatch.Transport!, request, pending.Token, cancellationToken).ConfigureAwait(false);
+            var patch = await UiRemoteDispatch.DispatchAsync(dispatch.Transport!, request, pending.Token, cancellationToken, this).ConfigureAwait(false);
             if (patch is null || patch.SessionId != request.Snapshot.SessionId ||
                 patch.ExpectedVersion != request.Snapshot.Version)
             {
@@ -152,30 +163,19 @@ public sealed class UiSession : IAsyncDisposable
         }
         catch when (!cancellationToken.IsCancellationRequested && pending.IsCancellationRequested)
         {
-            await DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort teardown must not replace the dispatch failure.
+            }
             throw;
         }
         finally
         {
             Interlocked.Decrement(ref _inFlight);
-        }
-    }
-
-    private async ValueTask<UiStatePatch> CallRemoteAsync(
-        IUiRemoteTransport transport, UiRemoteEvent message, CancellationToken token, CancellationToken caller)
-    {
-        try
-        {
-            return await transport.DispatchAsync(message, token).AsTask().WaitAsync(token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (caller.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            await DisposeAsync().ConfigureAwait(false);
-            throw;
         }
     }
 
@@ -209,6 +209,7 @@ public sealed class UiSession : IAsyncDisposable
         try
         {
             await _gate.WaitAsync(token).ConfigureAwait(false);
+            using var callback = EnterCallbackScope();
             try
             {
                 ThrowIfDisconnected();
@@ -232,7 +233,15 @@ public sealed class UiSession : IAsyncDisposable
     {
         lock (_disposeLock)
         {
-            _disposeTask ??= DisposeCoreAsync();
+            if (UiSessionCancellation.IsCancelling(_lifetime) ||
+                _callbacks.IsActive && _disposeTask is { IsCompleted: false })
+            { return ValueTask.CompletedTask; }
+            if (_disposeTask is null)
+            {
+                // Publish the disposal state before cancellation can invoke a re-entrant callback.
+                _disposeTask = Task.CompletedTask;
+                _disposeTask = DisposeCoreAsync();
+            }
             return new ValueTask(_disposeTask);
         }
     }
@@ -240,13 +249,25 @@ public sealed class UiSession : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         Interlocked.Exchange(ref _closed, 1);
+        var cancellation = UiSessionCancellation.CancelAsync(_lifetime);
+        var resourcesReleased = false;
         try
         {
-            await _lifetime.CancelAsync().ConfigureAwait(false);
+            await ReleaseResourcesAsync().ConfigureAwait(false);
+            resourcesReleased = true;
         }
         finally
         {
-            await ReleaseResourcesAsync().ConfigureAwait(false);
+            try
+            {
+                await cancellation.ConfigureAwait(false);
+            }
+            // Preserve the original release failure when both the callback and teardown fault.
+            catch when (!resourcesReleased) { }
+            finally
+            {
+                _lifetime.Dispose();
+            }
         }
     }
 
@@ -262,12 +283,12 @@ public sealed class UiSession : IAsyncDisposable
             _bindings.Clear();
             _interaction.Clear();
             _kernels.Clear();
+            using var callback = EnterCallbackScope();
             await _renderer.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {
             _gate.Release();
-            _lifetime.Dispose();
         }
     }
 
