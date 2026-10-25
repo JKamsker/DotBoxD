@@ -22,6 +22,11 @@ internal static class MergeableIrStepSourceEmitter
             builder.AppendLine();
         }
 
+        if (model.IsAssemblyClsCompliant)
+        {
+            builder.AppendLine("[global::System.CLSCompliant(false)]");
+        }
+
         builder.Append("public static class ").Append(model.ClassName).AppendLine();
         builder.AppendLine("{");
         builder.Append("    private static readonly ").Append(TypeNames.GlobalSourceSpan).Append(" Span = new(")

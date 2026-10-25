@@ -16,6 +16,7 @@ internal sealed record MergeableIrStepModel(
     string OutputType,
     string? IRFuncType,
     string GeneratedAttributeSource,
+    bool IsAssemblyClsCompliant,
     string ParameterSource,
     string ValueSource,
     EquatableArray<string> RequiredCapabilities,
