@@ -12,6 +12,8 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
     private BlazorUiRenderer? _renderer;
     private IDisposable? _subscription;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly object _disposeLock = new();
+    private Task? _disposeTask;
     private bool _disposed;
     private bool _disposeAttachedSessionOnDetach = true;
     private long _attachmentVersion;
@@ -119,10 +121,17 @@ public sealed class DotBoxDUi : ComponentBase, IAsyncDisposable
         { LastInteractionError = outcome; }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (_disposed)
-        { return; }
+        lock (_disposeLock)
+        {
+            _disposeTask ??= DisposeCoreAsync();
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
         _disposed = true;
         _subscription?.Dispose();
         _subscription = null;
