@@ -20,7 +20,7 @@ internal static class UiHandlerModelFactory
             if (attribute.NamedArguments.Any(a => a.Key == facet && a.Value.Value is false))
             { return Model(null, null); }
             var name = method.Name + (remote ? "UiEndpoint" : "UiKernel");
-            if (HasHandwrittenMember(method.ContainingType, name, context.SemanticModel.Compilation))
+            if (HasHandwrittenFacet(method, name, remote, context.SemanticModel.Compilation))
             { return Model(null, null); }
             RequireSourceContainer(syntax);
             RequireContainer(method);
@@ -43,14 +43,47 @@ internal static class UiHandlerModelFactory
             location.SourceTree!.FilePath, location.SourceSpan, location.GetLineSpan().Span);
     }
 
-    private static bool HasHandwrittenMember(INamedTypeSymbol type, string name, Compilation compilation)
+    private static bool HasHandwrittenFacet(IMethodSymbol handler, string name, bool remote, Compilation compilation)
     {
-        for (var current = type; current is not null; current = current.BaseType)
+        var hasIncompatibleMember = false;
+        for (var current = handler.ContainingType; current is not null; current = current.BaseType)
         {
-            if (current.GetMembers(name).Any(member => compilation.IsSymbolAccessibleWithin(member, type)))
+            var members = current.GetMembers(name)
+                .Where(member => compilation.IsSymbolAccessibleWithin(member, handler.ContainingType))
+                .ToArray();
+            if (members.Length == 0)
+            { continue; }
+            if (members.Any(member => IsCompatibleFacet(member, handler, remote, compilation)))
             { return true; }
+            hasIncompatibleMember = true;
+            if (remote || members.Any(HidesInheritedLocalFacet))
+            { break; }
+        }
+        if (hasIncompatibleMember)
+        {
+            throw new NotSupportedException("handwritten " + name + " must be " +
+            (remote ? "a const int endpoint ID" : "a static parameterless UiKernelDefinition matching the handler input and output types"));
         }
         return false;
+    }
+
+    private static bool HidesInheritedLocalFacet(ISymbol member) =>
+        member is not IMethodSymbol || member is IMethodSymbol { Arity: 0, Parameters.Length: 0 };
+
+    private static bool IsCompatibleFacet(ISymbol member, IMethodSymbol handler, bool remote, Compilation compilation)
+    {
+        if (remote)
+        { return member is IFieldSymbol { IsConst: true, Type.SpecialType: SpecialType.System_Int32 }; }
+        if (member is not IMethodSymbol { IsStatic: true, IsGenericMethod: false, Parameters.Length: 0 } facet)
+        { return false; }
+        var definition = compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.UiKernelDefinition`2");
+        if (definition is null)
+        { return false; }
+        var input = handler.Parameters.Length == 0
+            ? compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.UiUnit")
+            : handler.Parameters[0].Type;
+        return input is not null && SymbolEqualityComparer.Default.Equals(facet.ReturnType,
+            definition.Construct(input, handler.ReturnType));
     }
 
     private static void RequireSourceContainer(MethodDeclarationSyntax syntax)
