@@ -209,7 +209,7 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine($"                    var __dotboxd_task = {call};");
         sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
         sb.AppendLine("                    {");
-        sb.AppendLine("                        await __dotboxd_task;");
+        sb.AppendLine("                        await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);");
         sb.AppendLine("                    }");
         AppendCancellationCheckpoint(sb);
         sb.AppendLine("                    return;");
@@ -220,7 +220,7 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine($"                    var __dotboxd_task = {call};");
         sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
         sb.AppendLine("                    {");
-        sb.AppendLine("                        await __dotboxd_task;");
+        sb.AppendLine("                        await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);");
         sb.AppendLine("                        ct.ThrowIfCancellationRequested();");
         sb.AppendLine("                        return;");
         sb.AppendLine("                    }");
@@ -231,7 +231,10 @@ internal static class DispatcherCaseGenerator
 
     private static void GenerateSerializedAwaitedResult(StringBuilder sb, string call)
     {
-        GenerateAwaitedResult(sb, call);
+        sb.AppendLine($"                    var __dotboxd_task = {call};");
+        sb.AppendLine("                    var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully");
+        sb.AppendLine("                            ? __dotboxd_task.Result");
+        sb.AppendLine("                            : await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);");
         AppendCancellationCheckpoint(sb);
         sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, __dotboxd_result);");
         sb.AppendLine("                    return;");
@@ -247,18 +250,13 @@ internal static class DispatcherCaseGenerator
 
     private static void GenerateAwaitedStreamingReturn(StringBuilder sb, string call)
     {
-        GenerateAwaitedResult(sb, call);
+        sb.AppendLine($"                    var __dotboxd_task = {call};");
+        sb.AppendLine("                    var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully");
+        sb.AppendLine("                            ? __dotboxd_task.Result");
+        sb.AppendLine("                            : await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);");
         AppendCancellationCheckpoint(sb);
         sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(__dotboxd_result);");
         sb.AppendLine("                    return;");
-    }
-
-    private static void GenerateAwaitedResult(StringBuilder sb, string call)
-    {
-        sb.AppendLine($"                    var __dotboxd_task = {call};");
-        sb.AppendLine("                    var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully");
-        sb.AppendLine("                        ? __dotboxd_task.Result");
-        sb.AppendLine("                        : await __dotboxd_task;");
     }
 
     private static void AppendCancellationCheckpoint(StringBuilder sb)

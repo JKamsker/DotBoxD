@@ -94,8 +94,8 @@ namespace Snap.Mixed
                     ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.GetNameAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
-                        ? __dotboxd_task.Result
-                        : await __dotboxd_task;
+                            ? __dotboxd_task.Result
+                            : await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);
                     ct.ThrowIfCancellationRequested();
                     serializer.Serialize(output, __dotboxd_result);
                     return;
@@ -107,7 +107,7 @@ namespace Snap.Mixed
                     var __dotboxd_task = receiver.SaveAsync(arg);
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
-                        await __dotboxd_task;
+                        await __dotboxd_awaitWithCancellationPrecedenceAsync(__dotboxd_task, ct);
                     }
                     ct.ThrowIfCancellationRequested();
                     return;
@@ -134,6 +134,58 @@ namespace Snap.Mixed
                 }
                 default:
                     throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Method '" + method + "' not found on service 'IMix'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Method);
+            }
+        }
+
+        private static async global::System.Threading.Tasks.Task __dotboxd_awaitWithCancellationPrecedenceAsync(global::System.Threading.Tasks.Task task, global::System.Threading.CancellationToken ct)
+        {
+            try
+            {
+                await task;
+            }
+            catch (global::System.Exception) when (ct.IsCancellationRequested)
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask __dotboxd_awaitWithCancellationPrecedenceAsync(global::System.Threading.Tasks.ValueTask task, global::System.Threading.CancellationToken ct)
+        {
+            try
+            {
+                await task;
+            }
+            catch (global::System.Exception) when (ct.IsCancellationRequested)
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
+        }
+
+        private static async global::System.Threading.Tasks.Task<T> __dotboxd_awaitWithCancellationPrecedenceAsync<T>(global::System.Threading.Tasks.Task<T> task, global::System.Threading.CancellationToken ct)
+        {
+            try
+            {
+                return await task;
+            }
+            catch (global::System.Exception) when (ct.IsCancellationRequested)
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
+            }
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask<T> __dotboxd_awaitWithCancellationPrecedenceAsync<T>(global::System.Threading.Tasks.ValueTask<T> task, global::System.Threading.CancellationToken ct)
+        {
+            try
+            {
+                return await task;
+            }
+            catch (global::System.Exception) when (ct.IsCancellationRequested)
+            {
+                ct.ThrowIfCancellationRequested();
+                throw;
             }
         }
     }
