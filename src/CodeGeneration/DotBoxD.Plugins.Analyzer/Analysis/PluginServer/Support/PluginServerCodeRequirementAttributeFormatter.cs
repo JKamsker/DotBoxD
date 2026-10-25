@@ -31,6 +31,8 @@ internal static class PluginServerCodeRequirementAttributeFormatter
                 "global::System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute",
             "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute" =>
                 "global::System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute",
+            "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" =>
+                "global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute",
             _ => null,
         };
 
