@@ -26,4 +26,11 @@ public sealed class UiMaterializationValidatorValidationTests
             .ToImmutableArray();
         return [new UiPropertyValue(1, UiPropertyId.Items, UiValue.FromItems(rows))];
     }
+
+    [Fact]
+    public void Null_property_entries_fail_closed_at_the_materialization_boundary()
+    {
+        Assert.Throws<UiValidationException>(() =>
+            UiMaterializationValidator.Validate(0, ImmutableArray.CreateRange<UiPropertyValue>([null!]), new UiPolicy()));
+    }
 }
