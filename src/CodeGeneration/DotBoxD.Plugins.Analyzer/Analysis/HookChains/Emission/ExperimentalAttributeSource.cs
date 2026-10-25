@@ -9,6 +9,8 @@ internal static class ExperimentalAttributeSource
         "System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute";
     private const string RequiresUnreferencedCodeAttributeName =
         "System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute";
+    private const string RequiresPreviewFeaturesAttributeName =
+        "System.Runtime.Versioning.RequiresPreviewFeaturesAttribute";
     private static readonly HashSet<string> PlatformCompatibilityAttributeNames =
     [
         "System.Runtime.Versioning.SupportedOSPlatformAttribute",
@@ -20,32 +22,47 @@ internal static class ExperimentalAttributeSource
     {
         var diagnosticIds = new SortedSet<string>(StringComparer.Ordinal);
         var codeRequirementAttributes = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var previewFeatureAttributes = new SortedSet<string>(StringComparer.Ordinal);
         var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var type in types)
         {
-            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: true);
+            Collect(
+                type,
+                diagnosticIds,
+                codeRequirementAttributes,
+                previewFeatureAttributes,
+                platformAttributes,
+                includeAvailabilityPlatforms: true);
         }
 
-        return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
+        return BuildSource(diagnosticIds, codeRequirementAttributes, previewFeatureAttributes, platformAttributes);
     }
 
     public static string FromTypesWithSharedSupportedPlatform(params ITypeSymbol?[] types)
     {
         var diagnosticIds = new SortedSet<string>(StringComparer.Ordinal);
         var codeRequirementAttributes = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var previewFeatureAttributes = new SortedSet<string>(StringComparer.Ordinal);
         var platformAttributes = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var type in types)
         {
-            Collect(type, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms: false);
+            Collect(
+                type,
+                diagnosticIds,
+                codeRequirementAttributes,
+                previewFeatureAttributes,
+                platformAttributes,
+                includeAvailabilityPlatforms: false);
         }
 
         platformAttributes.UnionWith(SharedPlatformAttributeSource.FromTypes(types));
-        return BuildSource(diagnosticIds, codeRequirementAttributes, platformAttributes);
+        return BuildSource(diagnosticIds, codeRequirementAttributes, previewFeatureAttributes, platformAttributes);
     }
 
     private static string BuildSource(
         SortedSet<string> diagnosticIds,
         SortedDictionary<string, string> codeRequirementAttributes,
+        SortedSet<string> previewFeatureAttributes,
         SortedSet<string> platformAttributes)
     {
         var source = string.Empty;
@@ -56,13 +73,17 @@ internal static class ExperimentalAttributeSource
                 ")]\n";
         }
 
-        return source + string.Concat(codeRequirementAttributes.Values) + string.Concat(platformAttributes);
+        return source +
+            string.Concat(codeRequirementAttributes.Values) +
+            previewFeatureAttributes.Min +
+            string.Concat(platformAttributes);
     }
 
     private static void Collect(
         ITypeSymbol? type,
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
+        ISet<string> previewFeatureAttributes,
         ISet<string> platformAttributes,
         bool includeAvailabilityPlatforms)
     {
@@ -71,10 +92,22 @@ internal static class ExperimentalAttributeSource
             case null:
                 return;
             case IArrayTypeSymbol array:
-                Collect(array.ElementType, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
+                Collect(
+                    array.ElementType,
+                    diagnosticIds,
+                    codeRequirementAttributes,
+                    previewFeatureAttributes,
+                    platformAttributes,
+                    includeAvailabilityPlatforms);
                 return;
             case INamedTypeSymbol named:
-                CollectNamed(named, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
+                CollectNamed(
+                    named,
+                    diagnosticIds,
+                    codeRequirementAttributes,
+                    previewFeatureAttributes,
+                    platformAttributes,
+                    includeAvailabilityPlatforms);
                 return;
         }
     }
@@ -83,6 +116,7 @@ internal static class ExperimentalAttributeSource
         INamedTypeSymbol named,
         ISet<string> diagnosticIds,
         IDictionary<string, string> codeRequirementAttributes,
+        ISet<string> previewFeatureAttributes,
         ISet<string> platformAttributes,
         bool includeAvailabilityPlatforms)
     {
@@ -96,6 +130,7 @@ internal static class ExperimentalAttributeSource
             }
 
             CollectCodeRequirementAttribute(attribute, codeRequirementAttributes);
+            CollectPreviewFeatureAttribute(attribute, previewFeatureAttributes);
             if (PlatformCompatibilityAttributeSource(attribute) is { } source &&
                 (includeAvailabilityPlatforms || !SharedPlatformAttributeSource.IsAvailabilityAttribute(attribute)))
             {
@@ -105,8 +140,42 @@ internal static class ExperimentalAttributeSource
 
         foreach (var argument in named.TypeArguments)
         {
-            Collect(argument, diagnosticIds, codeRequirementAttributes, platformAttributes, includeAvailabilityPlatforms);
+            Collect(
+                argument,
+                diagnosticIds,
+                codeRequirementAttributes,
+                previewFeatureAttributes,
+                platformAttributes,
+                includeAvailabilityPlatforms);
         }
+    }
+
+    private static void CollectPreviewFeatureAttribute(AttributeData attribute, ISet<string> attributes)
+    {
+        if (attribute.AttributeClass?.ToDisplayString() != RequiresPreviewFeaturesAttributeName)
+        {
+            return;
+        }
+
+        if (attribute.ConstructorArguments.Length == 0)
+        {
+            attributes.Add("[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute]\n");
+            return;
+        }
+
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string message)
+        {
+            return;
+        }
+
+        var url = attribute.NamedArguments.FirstOrDefault(pair => pair.Key == "Url").Value.Value as string;
+        var urlAssignment = url is null
+            ? string.Empty
+            : ", Url = " + LiteralReader.StringLiteral(url);
+        attributes.Add(
+            "[global::System.Runtime.Versioning.RequiresPreviewFeaturesAttribute(" +
+            LiteralReader.StringLiteral(message) + urlAssignment + ")]\n");
     }
 
     private static void CollectCodeRequirementAttribute(
