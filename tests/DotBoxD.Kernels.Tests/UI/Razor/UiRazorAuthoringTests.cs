@@ -8,6 +8,18 @@ namespace DotBoxD.Kernels.Tests.UI.Razor;
 public sealed class UiRazorAuthoringTests
 {
     [Fact]
+    public void Additional_file_matching_is_case_insensitive_after_discovery()
+    {
+        var result = Generate(Component, Markup, "/authoring/COUNTER.UI.RAZOR");
+
+        Assert.Single(result.Result.GeneratedTrees.Where(
+            tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal)));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
+        Assert.Empty(result.Output.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning));
+    }
+
+    [Fact]
     public async Task Safe_Razor_and_handwritten_public_builder_have_identical_hash_and_semantics()
     {
         var generated = Package();
