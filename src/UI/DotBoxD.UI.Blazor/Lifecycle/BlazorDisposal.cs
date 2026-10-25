@@ -6,8 +6,18 @@ internal static class BlazorDisposal
 {
     [ThreadStatic]
     private static CancellationTokenSource? _cancelling;
+    private static readonly AsyncLocal<bool> CancellationCallbackRegistration = new();
 
     public static bool IsCancelling(CancellationTokenSource source) => ReferenceEquals(_cancelling, source);
+
+    public static bool IsCancellationCallback => CancellationCallbackRegistration.Value;
+
+    public static IDisposable EnterCancellationCallbackRegistration()
+    {
+        var previous = CancellationCallbackRegistration.Value;
+        CancellationCallbackRegistration.Value = true;
+        return new RegistrationScope(previous);
+    }
 
     public static async Task RunAsync(CancellationTokenSource source, Func<Task>? cleanup)
     {
@@ -31,6 +41,14 @@ internal static class BlazorDisposal
         _cancelling = source;
         try
         { source.Cancel(); }
-        finally { _cancelling = previous; }
+        finally
+        {
+            _cancelling = previous;
+        }
+    }
+
+    private sealed class RegistrationScope(bool previous) : IDisposable
+    {
+        public void Dispose() => CancellationCallbackRegistration.Value = previous;
     }
 }
