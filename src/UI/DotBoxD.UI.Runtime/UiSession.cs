@@ -152,7 +152,14 @@ public sealed class UiSession : IAsyncDisposable
         }
         catch when (!cancellationToken.IsCancellationRequested && pending.IsCancellationRequested)
         {
-            await DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort teardown must not replace the dispatch failure.
+            }
             throw;
         }
         finally
@@ -175,7 +182,14 @@ public sealed class UiSession : IAsyncDisposable
         }
         catch
         {
-            await DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort teardown must not replace the remote transport failure.
+            }
             throw;
         }
     }
