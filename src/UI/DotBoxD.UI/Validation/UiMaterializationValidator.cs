@@ -7,6 +7,7 @@ public static class UiMaterializationValidator
 {
     public static void Validate(int staticNodeCount, ImmutableArray<UiPropertyValue> values, UiPolicy policy)
     {
+        ArgumentNullException.ThrowIfNull(policy);
         ArgumentOutOfRangeException.ThrowIfNegative(staticNodeCount);
         if (values.IsDefault)
         { throw new UiValidationException("UI materialization property values must be explicitly initialized."); }
