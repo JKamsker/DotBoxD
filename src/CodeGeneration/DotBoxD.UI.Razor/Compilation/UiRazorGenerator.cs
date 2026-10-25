@@ -62,11 +62,14 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
 
     private static RenderKind GetRenderKind(INamedTypeSymbol type, Compilation compilation)
     {
+        var componentInterface = compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.IUiComponent");
         for (var current = type; current is not null; current = current.BaseType)
         {
-            foreach (var method in current.GetMembers("Render").OfType<IMethodSymbol>())
+            foreach (var method in current.GetMembers().OfType<IMethodSymbol>().Where(m =>
+                m.Name == "Render" || IsExplicitComponentRender(m, componentInterface)))
             {
-                if (!IsRenderSignature(method) || !compilation.IsSymbolAccessibleWithin(method, type))
+                if (!IsRenderSignature(method) ||
+                    !compilation.IsSymbolAccessibleWithin(method, type) && !IsExplicitComponentRender(method, componentInterface))
                 { continue; }
                 if (!method.IsStatic && method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement")
                 { return RenderKind.Handwritten; }
@@ -79,6 +82,10 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
 
     private static bool IsRenderSignature(IMethodSymbol method) => method.Arity == 0 && method.Parameters.Length == 1 &&
         method.Parameters[0].RefKind == RefKind.None && method.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder";
+
+    private static bool IsExplicitComponentRender(IMethodSymbol method, INamedTypeSymbol? componentInterface) =>
+        componentInterface is not null && method.ExplicitInterfaceImplementations.Any(i =>
+            SymbolEqualityComparer.Default.Equals(i.ContainingType, componentInterface));
 
     private static Output Generate(Component component, EquatableArray<RazorFile> files, CancellationToken token)
     {
