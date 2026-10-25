@@ -19,6 +19,7 @@ public static class UiMaterializationValidator
             { throw new UiValidationException($"UI property references invalid node ID {property.NodeId}."); }
 
             UiValueValidator.Validate(property.Value, policy);
+            RequirePropertyKind(property);
             if (property.PropertyId == UiPropertyId.Items)
             {
                 if (property.Value.Items.Length > policy.MaxChildren)
@@ -41,6 +42,21 @@ public static class UiMaterializationValidator
             if (!properties.Add((property.NodeId, property.PropertyId)))
             { throw new UiValidationException("UI materialization contains duplicate node properties."); }
         }
+    }
+
+    private static void RequirePropertyKind(UiPropertyValue property)
+    {
+        var expected = property.PropertyId switch
+        {
+            UiPropertyId.Enabled or UiPropertyId.Visible or UiPropertyId.Checked or UiPropertyId.Horizontal => UiValueKind.Boolean,
+            UiPropertyId.Text => UiValueKind.String,
+            UiPropertyId.Value or UiPropertyId.Maximum or UiPropertyId.Spacing or UiPropertyId.Padding => UiValueKind.Number,
+            UiPropertyId.Resource or UiPropertyId.Columns or UiPropertyId.Row or UiPropertyId.Column => UiValueKind.Int32,
+            UiPropertyId.Items => UiValueKind.Items,
+            _ => throw new UiValidationException("Unsupported UI property.")
+        };
+        if (property.Value.Kind != expected)
+        { throw new UiValidationException("UI materialization property type mismatch."); }
     }
 
     private static void ValidateRanges(ImmutableArray<UiPropertyValue> values)
