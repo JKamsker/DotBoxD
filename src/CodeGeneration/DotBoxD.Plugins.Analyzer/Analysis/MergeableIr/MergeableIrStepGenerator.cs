@@ -1,10 +1,14 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.MergeableIr;
 
 internal static class MergeableIrStepGenerator
 {
+    private const string InterceptorContainerMetadataName =
+        DotBoxDGenerationNames.TypeNames.GeneratedInterceptorsNamespace + ".MergeableIrStepInterceptors";
+
     public static void Register(IncrementalGeneratorInitializationContext context)
     {
         var results = GeneratorGuard.SyntaxValues(
@@ -31,11 +35,30 @@ internal static class MergeableIrStepGenerator
             "mergeable IR step source output",
             static (sourceContext, step) => MergeableIrStepSourceEmitter.Emit(sourceContext, step));
 
+        var interceptorOutput = context.CompilationProvider
+            .Combine(steps.Select(static (step, _) => step.Interception).Collect())
+            .Select(static (pair, _) => new MergeableIrStepInterceptorOutput(
+                pair.Right,
+                pair.Left.Assembly.GetTypeByMetadataName(InterceptorContainerMetadataName) is not null));
+
         GeneratorGuard.RegisterOutput(
             context,
-            steps.Select(static (step, _) => step.Interception).Collect(),
+            interceptorOutput,
             "mergeable IR step interceptor output",
-            static (sourceContext, interceptions) => MergeableIrStepInterceptorEmitter.Emit(sourceContext, interceptions));
+            static (sourceContext, output) =>
+            {
+                if (output.HasContainerCollision && !output.Interceptions.IsDefaultOrEmpty)
+                {
+                    sourceContext.ReportDiagnostic(Diagnostic.Create(
+                        PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
+                        Location.None,
+                        "mergeable IR interceptor generation cannot use its reserved helper type " +
+                        "'DotBoxD.Plugins.Generated.MergeableIrStepInterceptors'; rename the user-declared type."));
+                    return;
+                }
+
+                MergeableIrStepInterceptorEmitter.Emit(sourceContext, output.Interceptions);
+            });
     }
 
     // Narrow syntactically before the semantic transform runs (mirrors IsHookChainTerminal): mergeable IR
@@ -51,3 +74,7 @@ internal static class MergeableIrStepGenerator
         } invocation &&
            invocation.ArgumentList.Arguments.Any(static argument => argument.Expression is LambdaExpressionSyntax);
 }
+
+internal sealed record MergeableIrStepInterceptorOutput(
+    System.Collections.Immutable.ImmutableArray<MergeableIrStepInterception> Interceptions,
+    bool HasContainerCollision);
