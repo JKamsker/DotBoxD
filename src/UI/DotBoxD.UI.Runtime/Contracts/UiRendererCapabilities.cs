@@ -17,7 +17,7 @@ public sealed record UiRendererCapabilities(
         ArgumentNullException.ThrowIfNull(package);
         if (Primitives is null || Features is null || ExtensionSchemas is null ||
             package.Extensions.Any(e => !ExtensionSchemas.Contains(e.SchemaId)) ||
-            package.Nodes.Any(n => !Primitives.Contains(n.Primitive)) ||
+            package.Nodes.Any(n => n is null || !Primitives.Contains(n.Primitive)) ||
             package.RequiredFeatures.Any(f => !Features.Contains(f)))
         { throw new UiValidationException("UI package requires unsupported renderer primitives or features."); }
     }
