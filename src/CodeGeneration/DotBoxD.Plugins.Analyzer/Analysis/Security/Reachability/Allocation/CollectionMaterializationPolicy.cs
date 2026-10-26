@@ -79,6 +79,6 @@ internal static class CollectionMaterializationPolicy
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } && FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType) &&
-           method.Name is "SkipLast" or "ToArray" or "ToList" or "ToLookup" or "TakeLast" or "Reverse" or "OrderBy" &&
+           method.Name is "SkipLast" or "ToArray" or "ToList" or "ToLookup" or "TakeLast" or "Reverse" or "OrderBy" or "Order" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 }
