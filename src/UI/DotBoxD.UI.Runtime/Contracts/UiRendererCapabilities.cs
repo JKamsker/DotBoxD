@@ -16,6 +16,7 @@ public sealed record UiRendererCapabilities(
     {
         ArgumentNullException.ThrowIfNull(package);
         if (Primitives is null || Features is null || ExtensionSchemas is null ||
+            package.Extensions.IsDefault || package.Nodes.IsDefault || package.RequiredFeatures.IsDefault ||
             package.Extensions.Any(e => !ExtensionSchemas.Contains(e.SchemaId)) ||
             package.Nodes.Any(n => !Primitives.Contains(n.Primitive)) ||
             package.RequiredFeatures.Any(f => !Features.Contains(f)))
