@@ -16,6 +16,8 @@ public sealed class UiHandlerGenerator : IIncrementalGenerator
     {
         Register(context, "DotBoxD.UI.Authoring.UiLocalHandlerAttribute", remote: false);
         Register(context, "DotBoxD.UI.Authoring.UiRemoteHandlerAttribute", remote: true);
+        RegisterUnsupportedTargets(context, "DotBoxD.UI.Authoring.UiLocalHandlerAttribute");
+        RegisterUnsupportedTargets(context, "DotBoxD.UI.Authoring.UiRemoteHandlerAttribute");
     }
 
     private static void Register(IncrementalGeneratorInitializationContext context, string attribute, bool remote)
@@ -34,5 +36,31 @@ public sealed class UiHandlerGenerator : IIncrementalGenerator
             else if (model.Source is { } source)
             { output.AddSource(model.HintName, SourceText.From(source, Encoding.UTF8)); }
         });
+    }
+
+    private static void RegisterUnsupportedTargets(IncrementalGeneratorInitializationContext context, string attribute)
+    {
+        var diagnostics = GeneratorGuard.SyntaxValues(
+            context,
+            static (node, _) => node is AttributeSyntax,
+            "sandbox UI handler non-ordinary target",
+            (syntaxContext, token) => UnsupportedTargetDiagnostic(syntaxContext, attribute, token));
+        GeneratorGuard.RegisterOutput(
+            context,
+            diagnostics,
+            "sandbox UI handler non-ordinary target diagnostic output",
+            static (output, diagnostic) => output.ReportDiagnostic(diagnostic));
+    }
+
+    private static Diagnostic? UnsupportedTargetDiagnostic(GeneratorSyntaxContext context, string attribute, CancellationToken token)
+    {
+        if (context.Node is not AttributeSyntax { Parent.Parent: SyntaxNode target } syntax ||
+            target is MethodDeclarationSyntax ||
+            context.SemanticModel.GetSymbolInfo(syntax, token).Symbol is not IMethodSymbol constructor ||
+            constructor.ContainingType.ToDisplayString() != attribute)
+        { return null; }
+        var name = (context.SemanticModel.GetDeclaredSymbol(target, token) as IMethodSymbol)?.Name ?? target.GetType().Name;
+        return Diagnostic.Create(Unsupported, target.GetLocation(), name,
+            "UI handlers must be ordinary methods declared directly on a partial class or struct");
     }
 }
