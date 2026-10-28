@@ -96,4 +96,24 @@ public sealed class UiInheritedRenderCollisionSurpriseTests
         Assert.DoesNotContain(result.Output.GetDiagnostics(), d => d.Id == "CS0108");
     }
 
+    [Fact]
+    public void Derived_Render_property_hiding_inherited_handwritten_Render_gets_actionable_diagnostic()
+    {
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            public class BaseComponent
+            {
+                public UiElement Render(UiBuilder builder) => builder.Text("manual");
+            }
+            [UiRazorComponent("Counter.ui.razor")]
+            public partial class Counter : BaseComponent
+            {
+                public new string Render => "hidden";
+            }
+            """, Markup);
+
+        Assert.Empty(result.Compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXR001"));
+        Assert.DoesNotContain(result.Result.GeneratedTrees, t => t.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+    }
 }
