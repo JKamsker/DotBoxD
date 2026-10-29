@@ -18,7 +18,7 @@ public sealed class UiAbstractRenderSurpriseTests
             public abstract partial class Counter : BaseComponent;
             """, "<UiText Text=\"generated\" />");
 
-        Assert.Empty(result.Compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.True(
             result.Diagnostics.Any(d => d.Id == "DBXR001") ||
             result.Result.GeneratedTrees.Any(tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal)),
