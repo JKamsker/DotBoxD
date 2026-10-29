@@ -84,7 +84,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         {
             var methods = current.GetMembers().OfType<IMethodSymbol>().Where(method =>
                 IsAccessibleRender(method, type, componentInterface, compilation)).ToArray();
-            if (methods.Any(method => !method.IsStatic &&
+            if (methods.Any(method => !method.IsAbstract && !method.IsStatic &&
                 method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement"))
             { return RenderKind.Handwritten; }
             if (methods.Length > 0)
