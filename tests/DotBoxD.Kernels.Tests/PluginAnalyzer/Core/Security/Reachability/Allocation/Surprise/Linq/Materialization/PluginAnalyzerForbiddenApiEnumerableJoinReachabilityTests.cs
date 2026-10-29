@@ -6,7 +6,7 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableJoinReachabilityTests
     public async Task Reports_retained_iterator_join_materialization_in_reachable_event_handler()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("return Enumerable.Join(Enumerable.Empty<int>(), Enumerate(), static outer => outer, static inner => inner, static (outer, inner) => outer + inner).GetEnumerator().MoveNext();"),
+            Source("return Enumerable.Join(Retained, Enumerate(), static outer => outer, static inner => inner, static (outer, inner) => outer + inner).GetEnumerator().MoveNext();"),
             "DotBoxDPluginAnalyzerEnumerableJoinReachabilityTest");
 
         var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
