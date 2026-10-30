@@ -21,6 +21,18 @@ public sealed class MessagePackComputedDtoRegressionTests
     }
 
     [Fact]
+    public void Case_distinct_get_only_properties_fail_closed_with_dto_context()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var value = new CaseDistinctGetOnlyDto(5, 6);
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.SerializeToPayload(value));
+
+        Assert.Contains(nameof(CaseDistinctGetOnlyDto), exception.Message);
+    }
+
+    [Fact]
     public void Computed_get_only_dto_round_trip_preserves_serialized_value_or_fails_closed()
     {
         var serializer = new MessagePackRpcSerializer();
@@ -149,6 +161,19 @@ public sealed class MessagePackComputedDtoRegressionTests
         }
 
         public int Id { get; }
+    }
+
+    public sealed class CaseDistinctGetOnlyDto
+    {
+        public CaseDistinctGetOnlyDto(int id, int ID)
+        {
+            Id = id;
+            this.ID = ID;
+        }
+
+        public int Id { get; }
+
+        public int ID { get; }
     }
 
     public sealed class ReplayComparisonThrowingDto
