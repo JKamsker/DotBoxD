@@ -9,6 +9,11 @@ internal static class CollectionMaterializationPolicy
     private const string ImmutableDictionaryTypeName = "System.Collections.Immutable.ImmutableDictionary";
     private const string ImmutableListTypeName = "System.Collections.Immutable.ImmutableList";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private static readonly HashSet<string> EnumerableMaterializationMethodNames =
+        new(StringComparer.Ordinal)
+        {
+            "GroupJoin", "SkipLast", "ToArray", "ToList", "ToLookup", "TakeLast", "Reverse", "OrderBy"
+        };
     private static readonly IReadOnlyDictionary<string, string> ListDisplayNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -79,6 +84,6 @@ internal static class CollectionMaterializationPolicy
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } && FrameworkCollectionIdentity.IsFrameworkType(method.ContainingType) &&
-           method.Name is "SkipLast" or "ToArray" or "ToList" or "ToLookup" or "TakeLast" or "Reverse" or "OrderBy" &&
+           EnumerableMaterializationMethodNames.Contains(method.Name) &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 }
