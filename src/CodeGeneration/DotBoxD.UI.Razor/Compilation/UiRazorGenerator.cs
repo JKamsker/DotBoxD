@@ -78,12 +78,13 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
     private static RenderKind GetRenderKind(INamedTypeSymbol type, Compilation compilation)
     {
         var componentInterface = compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.IUiComponent");
+        var uiBuilder = compilation.GetTypeByMetadataName("DotBoxD.UI.Authoring.UiBuilder");
         if (HasComponentImplementation(type, componentInterface))
         { return RenderKind.Handwritten; }
         for (var current = type; current is not null; current = current.BaseType)
         {
             var methods = current.GetMembers().OfType<IMethodSymbol>().Where(method =>
-                IsAccessibleRender(method, type, componentInterface, compilation)).ToArray();
+                IsAccessibleRender(method, type, componentInterface, uiBuilder, compilation)).ToArray();
             if (methods.Any(method => !method.IsStatic &&
                 method.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement"))
             { return RenderKind.Handwritten; }
@@ -99,13 +100,14 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
             implementation.ReturnType.ToDisplayString() == "DotBoxD.UI.Authoring.UiElement") == true;
 
     private static bool IsAccessibleRender(IMethodSymbol method, INamedTypeSymbol type,
-        INamedTypeSymbol? componentInterface, Compilation compilation)
+        INamedTypeSymbol? componentInterface, INamedTypeSymbol? uiBuilder, Compilation compilation)
         => (method.Name == "Render" || IsExplicitComponentRender(method, componentInterface)) &&
-            IsRenderSignature(method) && (compilation.IsSymbolAccessibleWithin(method, type) ||
+            IsRenderSignature(method, uiBuilder) && (compilation.IsSymbolAccessibleWithin(method, type) ||
                 IsExplicitComponentRender(method, componentInterface));
 
-    private static bool IsRenderSignature(IMethodSymbol method) => method.Arity == 0 && method.Parameters.Length == 1 &&
-        method.Parameters[0].RefKind == RefKind.None && method.Parameters[0].Type.ToDisplayString() == "DotBoxD.UI.Authoring.UiBuilder";
+    private static bool IsRenderSignature(IMethodSymbol method, INamedTypeSymbol? uiBuilder)
+        => method.Arity == 0 && method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.None &&
+            SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, uiBuilder);
 
     private static bool IsExplicitComponentRender(IMethodSymbol method, INamedTypeSymbol? componentInterface) =>
         componentInterface is not null && method.ExplicitInterfaceImplementations.Any(i =>
