@@ -5,6 +5,12 @@ namespace DotBoxD.Kernels.Tests.UI.Razor;
 
 public sealed class UiRazorCompositionSurpriseTests
 {
+    private const string Component = """
+        using DotBoxD.UI.Razor;
+        [UiRazorComponent("Counter.ui.razor")]
+        public partial class Counter;
+        """;
+
     [Fact]
     public void Unknown_composition_type_reports_a_markup_diagnostic_before_generated_code_compiles()
     {
