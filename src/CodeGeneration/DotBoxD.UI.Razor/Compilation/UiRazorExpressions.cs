@@ -107,13 +107,33 @@ internal sealed class UiRazorExpressions
         return "builder.Handle(" + element + ", " + local[0] + ", " + local[1] + ")";
     }
 
-    public string Composition(string name, string arguments)
+    public string Composition(string name, string arguments, INamedTypeSymbol component)
     {
         var values = arguments.Length == 0 ? Array.Empty<string>() : arguments.Split(',').Select(v => v.Trim()).ToArray();
         if (values.Any(v => !_values.ContainsKey(v)))
         { throw new NotSupportedException("Composition arguments must name declared state, kernel or resource handles."); }
+        var type = ResolveCompositionType(name, component);
+        if (type is null)
+        { throw new NotSupportedException("Unknown composition type '" + name + "'. Use a concrete IUiComponent worker-side composition."); }
+        if (type.TypeKind != TypeKind.Class || type.IsAbstract || !type.AllInterfaces.Any(IsUiComponent))
+        { throw new NotSupportedException("Composition type '" + name + "' must be a concrete IUiComponent worker-side composition."); }
         return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(name) + "(" + string.Join(", ", values) + ")).Render(builder)";
     }
+
+    private static INamedTypeSymbol? ResolveCompositionType(string name, INamedTypeSymbol component)
+    {
+        var qualified = component.ContainingNamespace.IsGlobalNamespace ? name : component.ContainingNamespace + "." + name;
+        foreach (var assembly in component.ContainingAssembly.Modules.SelectMany(module => module.ReferencedAssemblySymbols).Prepend(component.ContainingAssembly))
+        {
+            var type = assembly.GetTypeByMetadataName(qualified) ?? assembly.GetTypeByMetadataName(name);
+            if (type is not null)
+            { return type; }
+        }
+        return null;
+    }
+
+    private static bool IsUiComponent(INamedTypeSymbol type)
+        => type.ToDisplayString() == "DotBoxD.UI.Authoring.IUiComponent";
 
     private void Add(string name, string type)
     {

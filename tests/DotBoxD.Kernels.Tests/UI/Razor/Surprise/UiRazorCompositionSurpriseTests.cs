@@ -12,7 +12,7 @@ public sealed class UiRazorCompositionSurpriseTests
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(diagnostic => diagnostic.Id == "DBXR001"));
         Assert.Contains("MissingComponent", diagnostic.GetMessage(), StringComparison.Ordinal);
-        Assert.Equal("Counter.ui.razor", Path.GetFileName(diagnostic.Location.SourceTree!.FilePath));
+        Assert.Equal("Counter.ui.razor", Path.GetFileName(diagnostic.Location.GetLineSpan().Path));
         Assert.DoesNotContain(result.Result.GeneratedTrees,
             tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Output.GetDiagnostics(),
