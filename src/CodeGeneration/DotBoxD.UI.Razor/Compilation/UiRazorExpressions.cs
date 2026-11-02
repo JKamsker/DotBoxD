@@ -141,17 +141,12 @@ internal sealed class UiRazorExpressions
         return compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol;
     }
 
-    private static bool IsConcreteUiComponent(INamedTypeSymbol type)
+    private bool IsConcreteUiComponent(INamedTypeSymbol type)
     {
         var implementsInterface = type.AllInterfaces.Any(IsUiComponent);
-        var generatedComponent = type.TypeKind == TypeKind.Class && !type.IsAbstract &&
-            !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
-            type.DeclaringSyntaxReferences.All(reference => reference.GetSyntax() is TypeDeclarationSyntax declaration &&
-                declaration.Modifiers.Any(SyntaxKind.PartialKeyword)) &&
-            type.GetAttributes().Any(attribute =>
-                attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiRazorComponentAttribute" &&
-                !attribute.NamedArguments.Any(argument => argument.Key == "GenerateRender" && argument.Value.Value is false));
-        return implementsInterface && (type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract) || generatedComponent;
+        var generatedComponent = UiRazorGenerator.GeneratesComponentImplementation(type, _compilation);
+        return !type.IsRefLikeType &&
+            (implementsInterface && (type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract) || generatedComponent);
     }
 
     private static bool IsUiComponent(INamedTypeSymbol type)

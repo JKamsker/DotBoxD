@@ -42,6 +42,26 @@ public sealed class UiRazorCompositionSurpriseTests
         Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
+    [Fact]
+    public void Attributed_components_with_handwritten_Render_are_not_treated_as_generator_backed()
+    {
+        const string source = """
+            using DotBoxD.UI.Authoring;
+            [UiRazorComponent("Counter.ui.razor")]
+            public partial class Counter;
+            [UiRazorComponent("Counter.ui.razor")]
+            public partial class Child
+            {
+                public UiElement Render(UiBuilder builder) => builder.Text("child");
+            }
+            """;
+
+        var result = Generate(source, """<UiComponent Type="Child" />""");
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
+        Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
     [Theory]
     [InlineData("Child")]
     [InlineData("Outer.Child")]

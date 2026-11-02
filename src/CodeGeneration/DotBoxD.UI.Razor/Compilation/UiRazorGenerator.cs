@@ -72,6 +72,12 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         return false;
     }
 
+    internal static bool GeneratesComponentImplementation(INamedTypeSymbol type, Compilation compilation)
+        => IsSupportedContainer(type) && !HasRenderNameCollision(type, compilation) && GetRenderKind(type, compilation) == RenderKind.None &&
+            type.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiRazorComponentAttribute" &&
+                !attribute.NamedArguments.Any(argument => argument.Key == "GenerateRender" && argument.Value.Value is false));
+
     private static bool IsSupportedContainer(INamedTypeSymbol type)
         => type.TypeKind == TypeKind.Class && !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
             type.DeclaringSyntaxReferences.All(r => r.GetSyntax() is TypeDeclarationSyntax declaration && declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
