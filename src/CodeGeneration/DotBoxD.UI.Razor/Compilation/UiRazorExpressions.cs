@@ -6,9 +6,12 @@ namespace DotBoxD.UI.Razor;
 
 internal sealed class UiRazorExpressions
 {
+    private readonly Compilation _compilation;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _resources = new(StringComparer.Ordinal);
+
+    public UiRazorExpressions(Compilation compilation) => _compilation = compilation;
 
     public string State(string declaration)
     {
@@ -115,21 +118,40 @@ internal sealed class UiRazorExpressions
         var type = ResolveCompositionType(name, component);
         if (type is null)
         { throw new NotSupportedException("Unknown composition type '" + name + "'. Use a concrete IUiComponent worker-side composition."); }
-        if (type.TypeKind != TypeKind.Class || type.IsAbstract || !type.AllInterfaces.Any(IsUiComponent))
+        if (!IsConcreteUiComponent(type))
         { throw new NotSupportedException("Composition type '" + name + "' must be a concrete IUiComponent worker-side composition."); }
-        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(name) + "(" + string.Join(", ", values) + ")).Render(builder)";
+        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(type) + "(" + string.Join(", ", values) + ")).Render(builder)";
     }
 
-    private static INamedTypeSymbol? ResolveCompositionType(string name, INamedTypeSymbol component)
+    private INamedTypeSymbol? ResolveCompositionType(string name, INamedTypeSymbol component)
     {
-        var qualified = component.ContainingNamespace.IsGlobalNamespace ? name : component.ContainingNamespace + "." + name;
-        foreach (var assembly in component.ContainingAssembly.Modules.SelectMany(module => module.ReferencedAssemblySymbols).Prepend(component.ContainingAssembly))
-        {
-            var type = assembly.GetTypeByMetadataName(qualified) ?? assembly.GetTypeByMetadataName(name);
-            if (type is not null)
-            { return type; }
-        }
-        return null;
+        var typeName = QualifiedName(name);
+        return ResolveConstructionType(typeName, component) ?? ResolveConstructionType("global::" + typeName, component);
+    }
+
+    private INamedTypeSymbol? ResolveConstructionType(string typeName, INamedTypeSymbol component)
+    {
+        var source = component.ContainingNamespace.IsGlobalNamespace
+            ? "internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); }"
+            : "namespace " + component.ContainingNamespace + " { internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); } }";
+        var parseOptions = (CSharpParseOptions)component.DeclaringSyntaxReferences[0].SyntaxTree.Options;
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions);
+        var compilation = _compilation.AddSyntaxTrees(tree);
+        var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        return compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol;
+    }
+
+    private static bool IsConcreteUiComponent(INamedTypeSymbol type)
+    {
+        var implementsInterface = type.AllInterfaces.Any(IsUiComponent);
+        var generatedComponent = type.TypeKind == TypeKind.Class && !type.IsAbstract &&
+            !type.IsFileLocal && !type.IsStatic && !type.IsGenericType && type.ContainingType is null &&
+            type.DeclaringSyntaxReferences.All(reference => reference.GetSyntax() is TypeDeclarationSyntax declaration &&
+                declaration.Modifiers.Any(SyntaxKind.PartialKeyword)) &&
+            type.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiRazorComponentAttribute" &&
+                !attribute.NamedArguments.Any(argument => argument.Key == "GenerateRender" && argument.Value.Value is false));
+        return implementsInterface && (type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract) || generatedComponent;
     }
 
     private static bool IsUiComponent(INamedTypeSymbol type)
@@ -155,6 +177,9 @@ internal sealed class UiRazorExpressions
 
     private static string QualifiedName(string name)
         => string.Join(".", name.Split('.').Select(Identifier));
+
+    private static string QualifiedName(INamedTypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
     private static IReadOnlyList<string> Call(string text, string method)
     {
