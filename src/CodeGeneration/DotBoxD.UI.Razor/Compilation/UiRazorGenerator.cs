@@ -48,13 +48,12 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var path = attribute.ConstructorArguments[0].Value as string ?? "";
         var render = GetRenderKind(type, context.SemanticModel.Compilation);
         var generationDisabled = attribute.NamedArguments.Any(a => a.Key == "GenerateRender" && a.Value.Value is false);
-        var skip = generationDisabled || render == RenderKind.Handwritten;
         var hasRenderProperty = HasRenderNameCollision(type, context.SemanticModel.Compilation);
         var valid = IsSupportedContainer(type);
         return new Component(type.ToDisplayString(), syntax.Identifier.Text,
             type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             string.Join(" ", syntax.Modifiers.Select(m => m.Text)), type.IsRecord ? "record class" : "class",
-            path, syntax.SyntaxTree.FilePath, skip, hasRenderProperty, valid,
+            path, syntax.SyntaxTree.FilePath, generationDisabled, render == RenderKind.Handwritten, hasRenderProperty, valid,
             render == RenderKind.Incompatible && !generationDisabled
                 ? "Render(UiBuilder) must be an instance method returning UiElement, or set GenerateRender = false."
                 : null);
@@ -116,13 +115,15 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var hint = component.FullName.Replace("@", "") + ".UiRazor.g.cs";
         if (component.RenderError is { } renderError)
         { return new Output(hint, component.SourcePath, "", null, renderError); }
-        if (component.Skip)
+        if (component.GenerationDisabled)
         { return new Output(hint, component.SourcePath, "", null, null); }
         if (component.HasRenderProperty)
         {
             return new Output(hint, component.SourcePath, "", null,
                 "A component member named Render conflicts with generated Render(UiBuilder). Rename the member or hand-write Render(UiBuilder).");
         }
+        if (component.Skip)
+        { return new Output(hint, component.SourcePath, "", null, null); }
         if (!component.Valid)
         { return new Output(hint, component.SourcePath, "", null, "Use a top-level, non-generic partial class, or hand-write Render(UiBuilder)."); }
         var matches = files.Where(f => string.Equals(f.Path.Replace('\\', '/'), component.Path.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase) ||
@@ -144,7 +145,7 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
 
     private sealed record RazorFile(string Path, string Text);
     private sealed record Component(string FullName, string Name, string Namespace, string Modifiers, string DeclarationKind,
-        string Path, string SourcePath, bool Skip, bool HasRenderProperty, bool Valid, string? RenderError);
+        string Path, string SourcePath, bool GenerationDisabled, bool Skip, bool HasRenderProperty, bool Valid, string? RenderError);
     private sealed record Output(string Hint, string Path, string FileText, string? Source, string? Error);
     private enum RenderKind { None, Handwritten, Incompatible }
 }
