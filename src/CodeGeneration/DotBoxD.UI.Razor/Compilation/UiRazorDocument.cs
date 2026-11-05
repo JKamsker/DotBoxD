@@ -11,13 +11,13 @@ internal static class UiRazorDocument
     private static readonly Regex KeyAttributes = new("\"[^\"]*\"|'[^']*'|(?<=\\s)@key(?=\\s*=)",
         RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
-    public static string Compile(string text, CancellationToken token)
+    public static string Compile(string text, IReadOnlyList<string> endpointConstants, CancellationToken token)
     {
         if (text.Length > 262_144)
         { throw new NotSupportedException("Safe Razor source exceeds 256 KiB. Split it into IUiComponent compositions."); }
         var statements = new StringBuilder();
         var markup = new StringBuilder();
-        var expressions = new UiRazorExpressions();
+        var expressions = new UiRazorExpressions(endpointConstants);
         var inMarkup = false;
         foreach (var line in text.Split('\n'))
         {
