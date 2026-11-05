@@ -42,9 +42,14 @@ namespace Snap.Vt
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!registry.TryAcquire("IVtSnap", instanceId, out var __obj, out var __lease) || __obj is not global::Snap.Vt.IVtSnap __inst)
+            if (!registry.TryAcquire("IVtSnap", instanceId, out var __obj, out var __lease))
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IVtSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
+            }
+
+            if (__obj is not global::Snap.Vt.IVtSnap __inst)
+            {
+                return DisposeRejectedLeaseAsync(__lease, instanceId);
             }
 
             return DispatchWithLeaseAsync(__inst, __lease, instanceId, method, payload, serializer, registry, output, streaming, ct);
@@ -75,6 +80,19 @@ namespace Snap.Vt
                     await lease.DisposeAsync().ConfigureAwait(false);
                 }
             }
+        }
+
+        private async global::System.Threading.Tasks.Task DisposeRejectedLeaseAsync(global::System.IAsyncDisposable lease, string instanceId)
+        {
+            try
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (global::System.Exception)
+            {
+            }
+
+            throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IVtSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
         }
 
 #pragma warning disable CS1998

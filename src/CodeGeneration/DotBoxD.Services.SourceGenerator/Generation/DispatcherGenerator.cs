@@ -94,9 +94,14 @@ internal static class DispatcherGenerator
             sb.AppendLine("        {");
             sb.AppendLine("            ct.ThrowIfCancellationRequested();");
             sb.AppendLine();
-            sb.AppendLine($"            if (!registry.{ServicesGeneratorMemberNames.InstanceRegistry.TryAcquire}(\"{service.ServiceName}\", instanceId, out var __obj, out var __lease) || __obj is not {qualifiedInterface} __inst)");
+            sb.AppendLine($"            if (!registry.{ServicesGeneratorMemberNames.InstanceRegistry.TryAcquire}(\"{service.ServiceName}\", instanceId, out var __obj, out var __lease))");
             sb.AppendLine("            {");
             sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Instance});");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine($"            if (__obj is not {qualifiedInterface} __inst)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                return DisposeRejectedLeaseAsync(__lease, instanceId);");
             sb.AppendLine("            }");
             sb.AppendLine();
             sb.AppendLine("            return DispatchWithLeaseAsync(__inst, __lease, instanceId, method, payload, serializer, registry, output, streaming, ct);");
@@ -127,6 +132,19 @@ internal static class DispatcherGenerator
             sb.AppendLine("                    await lease.DisposeAsync().ConfigureAwait(false);");
             sb.AppendLine("                }");
             sb.AppendLine("            }");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine($"        private async {ServicesGeneratorTypeNames.GlobalTask} DisposeRejectedLeaseAsync(global::System.IAsyncDisposable lease, string instanceId)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            try");
+            sb.AppendLine("            {");
+            sb.AppendLine("                await lease.DisposeAsync().ConfigureAwait(false);");
+            sb.AppendLine("            }");
+            sb.AppendLine("            catch (global::System.Exception)");
+            sb.AppendLine("            {");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine($"            throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Instance});");
             sb.AppendLine("        }");
             return;
         }
