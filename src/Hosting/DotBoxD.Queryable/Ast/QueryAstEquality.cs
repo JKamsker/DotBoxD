@@ -11,12 +11,7 @@ internal static class QueryAstEquality
 
         return left is not null
             && right is not null
-            && left.Kind == right.Kind
-            && left.Field == right.Field
-            && left.HasOperator == right.HasOperator
-            && left.Operator == right.Operator
-            && Equals(left.Value, right.Value)
-            && left.IgnoreCase == right.IgnoreCase
+            && FilterPropertiesEqual(left, right)
             && ListsEqual(left.Values, right.Values)
             && FiltersEqual(left.Children, right.Children);
     }
@@ -87,6 +82,14 @@ internal static class QueryAstEquality
 
         return true;
     }
+
+    private static bool FilterPropertiesEqual(QueryFilter left, QueryFilter right) =>
+        left.Kind == right.Kind
+        && left.Field == right.Field
+        && left.HasOperator == right.HasOperator
+        && left.Operator == right.Operator
+        && Equals(left.Value, right.Value)
+        && left.IgnoreCase == right.IgnoreCase;
 
     private static bool ListsEqual<T>(IReadOnlyList<T> left, IReadOnlyList<T> right)
     {
