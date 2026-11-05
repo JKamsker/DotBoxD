@@ -63,7 +63,10 @@ internal sealed class ConstructorReplayGuard
         {
             return false;
         }
-
+        if (guard._constructor is null)
+        {
+            ThrowChangingValues(runtimeType);
+        }
         if (guard._validatorCreationState == SerializedReplayState)
         {
             guard.SerializeWithReplayValidation(writer, value, options);
@@ -140,10 +143,19 @@ internal sealed class ConstructorReplayGuard
             return None;
         }
 
-        var readableProperties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+        var readablePropertyList = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(static property =>
                 property.GetMethod is { IsStatic: false } &&
                 property.GetIndexParameters().Length == 0)
+            .ToArray();
+        if (readablePropertyList
+            .GroupBy(static property => property.Name, StringComparer.OrdinalIgnoreCase)
+            .Any(static group => group.Skip(1).Any()))
+        {
+            return new ConstructorReplayGuard(null, [], [], [], useSerializedReplay: false);
+        }
+
+        var readableProperties = readablePropertyList
             .ToDictionary(static property => property.Name, StringComparer.OrdinalIgnoreCase);
         var constructor = type.GetConstructors()
             .Select(constructor => new
