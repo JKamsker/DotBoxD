@@ -43,7 +43,8 @@ internal static class UiRazorFixture
     }
 
     public static Authoring.UiGeneratorFixture.Generation Generate(
-        string source, string markup, string additionalPath = "/authoring/Counter.ui.razor")
+        string source, string markup, string additionalPath = "/authoring/Counter.ui.razor",
+        params (string Path, string Markup)[] extraFiles)
     {
         var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
         var references = paths.Append(typeof(UiPackage).Assembly.Location).Distinct(StringComparer.Ordinal)
@@ -52,7 +53,7 @@ internal static class UiRazorFixture
             [CSharpSyntaxTree.ParseText(source)], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new UiHandlerGenerator().AsSourceGenerator(), new UiRazorGenerator().AsSourceGenerator()],
-            additionalTexts: [new TextFile(additionalPath, markup)],
+            additionalTexts: [new TextFile(additionalPath, markup), .. extraFiles.Select(f => new TextFile(f.Path, f.Markup))],
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
         return new(driver.GetRunResult(), diagnostics, compilation, output, driver);

@@ -17,14 +17,18 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableOrderReachabilityTests
     public async Task Does_not_report_bounded_list_add_and_count_controls()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("return Retained.Count > 0;"),
+            Source("return Retained.Count > 0;", boundedRetention: true),
             "DotBoxDPluginAnalyzerEnumerableOrderBoundedControlTest");
 
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }
 
-    private static string Source(string returnStatement)
-        => $$"""
+    private static string Source(string returnStatement, bool boundedRetention = false)
+    {
+        var retention = boundedRetention
+            ? "if (Retained.Count == 0) { Retained.Add(e.Length); }"
+            : "Retained.Add(e.Length);";
+        return $$"""
             #nullable enable
 
             namespace Sample
@@ -41,7 +45,7 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableOrderReachabilityTests
 
                     public bool ShouldHandle(string e, HookContext context)
                     {
-                        Retained.Add(e.Length);
+                        {{retention}}
                         {{returnStatement}}
                     }
 
@@ -57,4 +61,5 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableOrderReachabilityTests
                 }
             }
             """;
+    }
 }

@@ -122,21 +122,26 @@ internal sealed class UiRazorExpressions
         var values = arguments.Length == 0 ? Array.Empty<string>() : arguments.Split(',').Select(v => v.Trim()).ToArray();
         if (values.Any(v => !_values.ContainsKey(v)))
         { throw new NotSupportedException("Composition arguments must name declared state, kernel or resource handles."); }
-        var type = ResolveCompositionType(name, component);
+        var (type, resolution) = ResolveCompositionType(name, component);
         if (type is null)
         { throw new NotSupportedException("Unknown composition type '" + name + "'. Use a concrete IUiComponent worker-side composition."); }
-        if (!IsConcreteUiComponent(type))
+        if (IsSameSourceType(type, component))
+        { throw new NotSupportedException("Composition type '" + name + "' cannot compose its own component; recursive compositions never terminate."); }
+        if (!IsConcreteUiComponent(type, resolution))
         { throw new NotSupportedException("Composition type '" + name + "' must be a concrete IUiComponent worker-side composition."); }
         return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(type) + "(" + string.Join(", ", values) + ")).Render(builder)";
     }
 
-    private INamedTypeSymbol? ResolveCompositionType(string name, INamedTypeSymbol component)
+    private (INamedTypeSymbol? Type, Compilation Resolution) ResolveCompositionType(string name, INamedTypeSymbol component)
     {
         var typeName = QualifiedName(name);
-        return ResolveConstructionType(typeName, component) ?? ResolveConstructionType("global::" + typeName, component);
+        var resolved = ResolveConstructionType(typeName, component);
+        return resolved.Type is null ? ResolveConstructionType("global::" + typeName, component) : resolved;
     }
 
-    private INamedTypeSymbol? ResolveConstructionType(string typeName, INamedTypeSymbol component)
+    // The resolved symbol belongs to the probe compilation, so every later semantic check must use that
+    // compilation rather than the generator's original one.
+    private (INamedTypeSymbol? Type, Compilation Resolution) ResolveConstructionType(string typeName, INamedTypeSymbol component)
     {
         var source = component.ContainingNamespace.IsGlobalNamespace
             ? "internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); }"
@@ -145,15 +150,19 @@ internal sealed class UiRazorExpressions
         var tree = CSharpSyntaxTree.ParseText(source, parseOptions);
         var compilation = _compilation.AddSyntaxTrees(tree);
         var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
-        return compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol;
+        return (compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol, compilation);
     }
 
-    private bool IsConcreteUiComponent(INamedTypeSymbol type)
+    private static bool IsSameSourceType(INamedTypeSymbol type, INamedTypeSymbol component)
+        => string.Equals(QualifiedName(type), QualifiedName(component), StringComparison.Ordinal) &&
+            string.Equals(type.ContainingAssembly?.Name, component.ContainingAssembly?.Name, StringComparison.Ordinal);
+
+    private static bool IsConcreteUiComponent(INamedTypeSymbol type, Compilation resolution)
     {
         var implementsInterface = type.AllInterfaces.Any(IsUiComponent);
-        var generatedComponent = UiRazorGenerator.GeneratesComponentImplementation(type, _compilation);
-        return !type.IsRefLikeType &&
-            (implementsInterface && (type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract) || generatedComponent);
+        var generatedComponent = UiRazorGenerator.GeneratesComponentImplementation(type, resolution);
+        var constructible = type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract;
+        return !type.IsRefLikeType && constructible && (implementsInterface || generatedComponent);
     }
 
     private static bool IsUiComponent(INamedTypeSymbol type)

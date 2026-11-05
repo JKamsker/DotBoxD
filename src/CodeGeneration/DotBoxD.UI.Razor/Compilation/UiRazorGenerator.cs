@@ -66,22 +66,24 @@ public sealed class UiRazorGenerator : IIncrementalGenerator
         var names = new SortedSet<string>(StringComparer.Ordinal);
         for (var current = type; current is not null; current = current.BaseType)
         {
-            foreach (var field in current.GetMembers().OfType<IFieldSymbol>())
-            {
-                if (field.IsConst && field.Type.SpecialType == SpecialType.System_Int32 &&
-                    field.ConstantValue is int value && value > 0 && compilation.IsSymbolAccessibleWithin(field, type))
-                { AddEndpointName(names, type, field.Name); }
-            }
-            foreach (var method in current.GetMembers().OfType<IMethodSymbol>())
-            {
-                var remote = method.GetAttributes().FirstOrDefault(attribute =>
-                    attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiRemoteHandlerAttribute");
-                if (remote is not null && compilation.IsSymbolAccessibleWithin(method, type) && !remote.NamedArguments.Any(argument =>
-                    argument.Key == "GenerateEndpoint" && argument.Value.Value is false))
-                { AddEndpointName(names, type, method.Name + "UiEndpoint"); }
-            }
+            foreach (var field in current.GetMembers().OfType<IFieldSymbol>().Where(field => IsEndpointConstant(field, type, compilation)))
+            { AddEndpointName(names, type, field.Name); }
+            foreach (var method in current.GetMembers().OfType<IMethodSymbol>().Where(method => GeneratesRemoteEndpoint(method, type, compilation)))
+            { AddEndpointName(names, type, method.Name + "UiEndpoint"); }
         }
         return new EquatableArray<string>(names);
+    }
+
+    private static bool IsEndpointConstant(IFieldSymbol field, INamedTypeSymbol type, Compilation compilation)
+        => field.IsConst && field.Type.SpecialType == SpecialType.System_Int32 &&
+            field.ConstantValue is int value && value > 0 && compilation.IsSymbolAccessibleWithin(field, type);
+
+    private static bool GeneratesRemoteEndpoint(IMethodSymbol method, INamedTypeSymbol type, Compilation compilation)
+    {
+        var remote = method.GetAttributes().FirstOrDefault(attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiRemoteHandlerAttribute");
+        return remote is not null && compilation.IsSymbolAccessibleWithin(method, type) && !remote.NamedArguments.Any(argument =>
+            argument.Key == "GenerateEndpoint" && argument.Value.Value is false);
     }
 
     private static void AddEndpointName(ISet<string> names, INamedTypeSymbol type, string name)

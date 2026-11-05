@@ -880,15 +880,25 @@ jobs:
             PluginAnalyzerForbiddenApiEnumerableCountReachabilityTests = 3
             PluginAnalyzerForbiddenApiEnumerableElementAtOrDefaultReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableElementAtReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableExceptByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableExceptReachabilityTests = 1
             PluginAnalyzerForbiddenApiEnumerableFirstOrDefaultReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableFirstReachabilityTests = 4
+            PluginAnalyzerForbiddenApiEnumerableGroupByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableGroupJoinReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableIntersectByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableIntersectReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableJoinReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableLastOrDefaultReachabilityTests = 1
             PluginAnalyzerForbiddenApiEnumerableLastReachabilityTests = 7
             PluginAnalyzerForbiddenApiEnumerableLongCountReachabilityTests = 3
             PluginAnalyzerForbiddenApiEnumerableMaxByReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableMaxReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableMinReachabilityTests = 3
+            PluginAnalyzerForbiddenApiEnumerableOrderByDescendingReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableOrderByReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableOrderDescendingReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableOrderReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableReverseReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableSequenceEqualReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableSingleOrDefaultReachabilityTests = 1
@@ -897,21 +907,24 @@ jobs:
             PluginAnalyzerForbiddenApiEnumerableSkipReachabilityTests = 1
             PluginAnalyzerForbiddenApiEnumerableSumReachabilityTests = 2
             PluginAnalyzerForbiddenApiEnumerableTakeLastReachabilityTests = 2
+            PluginAnalyzerForbiddenApiEnumerableToHashSetReachabilityTests = 1
             PluginAnalyzerForbiddenApiParallelEnumerableReachabilityTests = 4
             PluginPackagePreviewFeatureAttributeSurpriseTests = 2
             PluginServerPlatformCompatibilityAttributeSurpriseTests = 5
             PluginServerPreviewFeatureAttributeSurpriseTests = 4
             PluginServerSurpriseRegressionTests = 30
+            QueryAstInitializerSnapshotTests = 6
             RemoteLocalHandlerRegistryCancellationTests = 9
             ResultHookSlotCancellationPrecedenceSurpriseTests = 2
             ServerExtensionClientPlatformGuardAttributeSurpriseTests = 3
             ServerExtensionClientPreviewFeatureAttributeSurpriseTests = 3
             ServerExtensionClientTypePreviewFeatureAttributeSurpriseTests = 4
             SubscriptionDeliveryFaultCancellationPrecedenceSurpriseTests = 2
+            UiAbstractRenderSurpriseTests = 1
             UiAuthoringTests = 25
             UiExplicitInterfaceHandlerTests = 2
             UiHostInstallCancellationCleanupTests = 1
-            UiInheritedRenderCollisionSurpriseTests = 15
+            UiInheritedRenderCollisionSurpriseTests = 16
             UiLocalKernelCancellationTests = 1
             UiMalformedRemoteInputTests = 1
             UiMaterializationValidatorArgumentValidationTests = 2
@@ -920,9 +933,13 @@ jobs:
             UiMaterializationValidatorNodeIdTests = 3
             UiMaterializationValidatorPropertyKindTests = 4
             UiMaterializationValidatorValidationTests = 2
+            UiNonOrdinaryHandlerTargetTests = 4
+            UiNullableRenderSurpriseTests = 1
             UiPackageJsonTests = 14
             UiPartialMethodAuthoringTests = 1
             UiRazorAuthoringTests = 42
+            UiRazorCompositionSurpriseTests = 7
+            UiRazorRemoteEndpointSurpriseTests = 6
             UiRecordStructHandlerSurpriseTests = 2
             UiRemoteTransportCancellationPrecedenceSurpriseTests = 2
             UiSessionAsyncCleanupReentrancySurpriseTests = 3
@@ -948,8 +965,10 @@ jobs:
             -MinimumExecutedTestsByGroup $groups
           $groups = @{
             GeneratedDispatcherReceiverFaultCancellationRegressionTests = 2
+            GeneratedInstanceDispatchWrongTypeLeaseRegressionTests = 2
             PayloadCoverageTests = 5
             PooledBufferWriterCoverageTests = 18
+            RpcContractManifestSnapshotTests = 1
             RpcDispatchResponseBuilderDispatcherFaultCancellationRegressionTests = 2
             RpcHostCancellationCallbackReentrancyTests = 2
             RpcHostListenerDisposalReentrancyTests = 2
@@ -974,6 +993,10 @@ jobs:
             BlazorRendererDisposalTerminalSurpriseTests = 9
             BlazorReplacementOwnershipSurpriseTests = 2
             DotBoxDUiDisposalTerminalSurpriseTests = 2
+            DotBoxDUiForwardedCancellationSurpriseTests = 1
+            UiExtensionRegistryValidationTests = 2
+            UiRendererCapabilitiesDefaultCollectionTests = 4
+            UiRendererCapabilitiesValidationTests = 3
           }
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.UI.Blazor.Tests/DotBoxD.UI.Blazor.Tests.csproj `

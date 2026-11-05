@@ -32,11 +32,11 @@ public sealed class UiRazorCompositionSurpriseTests
             using DotBoxD.UI.Authoring;
             [UiRazorComponent("Counter.ui.razor")]
             public partial class Counter;
-            [UiRazorComponent("Counter.ui.razor")]
+            [UiRazorComponent("Child.ui.razor")]
             public partial class Child;
             """;
 
-        var result = Generate(source, """<UiComponent Type="Child" />""");
+        var result = Generate(source, """<UiComponent Type="Child" />""", extraFiles: ("/authoring/Child.ui.razor", "<UiText />"));
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
         Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
@@ -59,6 +59,36 @@ public sealed class UiRazorCompositionSurpriseTests
         var result = Generate(source, """<UiComponent Type="Child" />""");
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001");
+        Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Self_composition_reports_a_markup_diagnostic_instead_of_recursing_forever()
+    {
+        var result = Generate(Component, """<UiComponent Type="Counter" />""");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(diagnostic => diagnostic.Id == "DBXR001"));
+        Assert.Contains("Counter", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Result.GeneratedTrees,
+            tree => tree.FilePath.EndsWith("UiRazor.g.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Abstract_generator_backed_compositions_report_a_markup_diagnostic()
+    {
+        const string source = """
+            using DotBoxD.UI.Authoring;
+            [UiRazorComponent("Counter.ui.razor")]
+            public partial class Counter;
+            [UiRazorComponent("Child.ui.razor")]
+            public abstract partial class Child;
+            """;
+
+        var result = Generate(source, """<UiComponent Type="Child" />""", extraFiles: ("/authoring/Child.ui.razor", "<UiText />"));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXR001" &&
+            diagnostic.GetMessage().Contains("concrete", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
