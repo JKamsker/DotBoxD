@@ -42,9 +42,14 @@ namespace Snap.Two
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!registry.TryAcquire("ITwo", instanceId, out var __obj, out var __lease) || __obj is not global::Snap.Two.ITwo __inst)
+            if (!registry.TryAcquire("ITwo", instanceId, out var __obj, out var __lease))
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'ITwo'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
+            }
+
+            if (__obj is not global::Snap.Two.ITwo __inst)
+            {
+                return DisposeRejectedLeaseAsync(__lease, instanceId);
             }
 
             return DispatchWithLeaseAsync(__inst, __lease, instanceId, method, payload, serializer, registry, output, streaming, ct);
@@ -75,6 +80,19 @@ namespace Snap.Two
                     await lease.DisposeAsync().ConfigureAwait(false);
                 }
             }
+        }
+
+        private async global::System.Threading.Tasks.Task DisposeRejectedLeaseAsync(global::System.IAsyncDisposable lease, string instanceId)
+        {
+            try
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (global::System.Exception)
+            {
+            }
+
+            throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'ITwo'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
         }
 
 #pragma warning disable CS1998
