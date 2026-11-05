@@ -3,6 +3,7 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 public bool Boolean { get; }
+public bool Equals(EventQueryDocument? other) =>
 public bool Equals(QueryValue? other) =>
 public bool HasSubscriptions<TEvent>() => TryGetDispatcher<TEvent>() is not null
 public bool IgnoreCase { get; init; }

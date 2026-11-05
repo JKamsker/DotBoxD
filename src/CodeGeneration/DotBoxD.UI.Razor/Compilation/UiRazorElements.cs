@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Xml.Linq;
@@ -42,13 +43,13 @@ internal static class UiRazorElements
         ["Items"] = "global::System.Collections.Immutable.ImmutableArray<global::DotBoxD.UI.UiListItem>"
     };
 
-    public static string Render(XElement node, UiRazorExpressions expressions, CancellationToken token)
+    public static string Render(XElement node, UiRazorExpressions expressions, INamedTypeSymbol component, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         ValidateNode(node);
         var tag = node.Name.LocalName;
         if (tag == "UiComponent")
-        { return Composition(node, expressions); }
+        { return Composition(node, expressions, component); }
         if (!Primitives.TryGetValue(tag, out var primitive))
         { throw new NotSupportedException("Unknown tag '" + tag + "'. Use a Ui primitive or UiComponent with an IUiComponent worker-side composition."); }
         var (properties, click) = Properties(node, primitive, expressions);
@@ -56,7 +57,7 @@ internal static class UiRazorElements
         var maximum = MaximumChildren(primitive);
         if (children.Length > maximum)
         { throw new NotSupportedException("Unsupported children on " + tag + "; UiItems uses bounded keyed state, not arbitrary foreach templates."); }
-        var renderedChildren = children.Select(c => Render(c, expressions, token)).ToArray();
+        var renderedChildren = children.Select(c => Render(c, expressions, component, token)).ToArray();
         var element = primitive == "Grid" ? Grid(node, properties, renderedChildren)
             : "builder.Element(global::DotBoxD.UI.UiPrimitive." + primitive + ", [" + string.Join(", ", properties) + "]" +
                 (renderedChildren.Length == 0 ? "" : ", " + string.Join(", ", renderedChildren)) + ")";
@@ -82,11 +83,11 @@ internal static class UiRazorElements
     private static int MaximumChildren(string primitive) => primitive switch
     { "Stack" or "Grid" => 1_000, "Border" or "ScrollViewer" => 1, _ => 0 };
 
-    private static string Composition(XElement node, UiRazorExpressions expressions)
+    private static string Composition(XElement node, UiRazorExpressions expressions, INamedTypeSymbol component)
     {
         if (node.HasElements || node.Attributes().Any(a => a.Name != "Type" && a.Name != "Arguments") || node.Attribute("Type") is null)
         { throw new NotSupportedException("Use <UiComponent Type=\"WorkerComponent\" Arguments=\"state, kernel\" /> with no children."); }
-        return expressions.Composition(node.Attribute("Type")!.Value, node.Attribute("Arguments")?.Value ?? "");
+        return expressions.Composition(node.Attribute("Type")!.Value, node.Attribute("Arguments")?.Value ?? "", component);
     }
 
     private static readonly IReadOnlyDictionary<string, string[]> PropertyPrimitives = new Dictionary<string, string[]>(StringComparer.Ordinal)

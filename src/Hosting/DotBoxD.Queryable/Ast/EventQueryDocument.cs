@@ -17,7 +17,27 @@ public sealed record EventQueryDocument
     /// <summary>The projection AST describing the shape dispatched to the subscriber.</summary>
     public required QueryProjection Projection { get; init; }
 
-    /// <summary>Builds a document from its parts, defaulting a missing filter to <see cref="QueryFilter.MatchAll"/>.</summary>
+    /// <inheritdoc />
+    public bool Equals(EventQueryDocument? other) =>
+        other is not null
+        && EventName == other.EventName
+        && QueryAstEquality.FilterEquals(Filter, other.Filter)
+        && QueryAstEquality.ProjectionEquals(Projection, other.Projection);
+
+    /// <inheritdoc />
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(EventName);
+        hash.Add(QueryAstEquality.FilterHashCode(Filter));
+        hash.Add(QueryAstEquality.ProjectionHashCode(Projection));
+        return hash.ToHashCode();
+    }
+
+    /// <summary>
+    /// Builds a document from its parts, defaulting a missing filter to <see cref="QueryFilter.MatchAll"/>,
+    /// and snapshots AST collections so later caller mutations cannot alter the document.
+    /// </summary>
     public static EventQueryDocument Create(
         string eventName,
         QueryFilter? filter,
@@ -33,7 +53,11 @@ public sealed record EventQueryDocument
         };
 
         EventQueryDocumentInvariants.RequireValidShape(document);
-        return document;
+        return document with
+        {
+            Filter = QueryAstSnapshot.Filter(document.Filter),
+            Projection = QueryAstSnapshot.Projection(document.Projection),
+        };
     }
 }
 

@@ -6,9 +6,17 @@ namespace DotBoxD.UI.Razor;
 
 internal sealed class UiRazorExpressions
 {
+    private readonly Compilation _compilation;
+    private readonly IReadOnlyList<string> _endpointConstants;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _resources = new(StringComparer.Ordinal);
+
+    public UiRazorExpressions(Compilation compilation, IReadOnlyList<string> endpointConstants)
+    {
+        _compilation = compilation;
+        _endpointConstants = endpointConstants;
+    }
 
     public string State(string declaration)
     {
@@ -98,7 +106,9 @@ internal sealed class UiRazorExpressions
             var call = Call(text.Substring(1), "Remote");
             if (call.Count != 1)
             { throw new NotSupportedException("Remote routes require one positive endpoint ID or generated endpoint constant."); }
-            var endpoint = int.TryParse(call[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id > 0 ? call[0] : QualifiedName(call[0]);
+            var endpoint = int.TryParse(call[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id > 0
+                ? call[0]
+                : EndpointConstant(call[0]);
             return "builder.Remote(" + element + ", " + endpoint + ")";
         }
         var local = Call(text.Substring(1), "Handle");
@@ -107,13 +117,56 @@ internal sealed class UiRazorExpressions
         return "builder.Handle(" + element + ", " + local[0] + ", " + local[1] + ")";
     }
 
-    public string Composition(string name, string arguments)
+    public string Composition(string name, string arguments, INamedTypeSymbol component)
     {
         var values = arguments.Length == 0 ? Array.Empty<string>() : arguments.Split(',').Select(v => v.Trim()).ToArray();
         if (values.Any(v => !_values.ContainsKey(v)))
         { throw new NotSupportedException("Composition arguments must name declared state, kernel or resource handles."); }
-        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(name) + "(" + string.Join(", ", values) + ")).Render(builder)";
+        var (type, resolution) = ResolveCompositionType(name, component);
+        if (type is null)
+        { throw new NotSupportedException("Unknown composition type '" + name + "'. Use a concrete IUiComponent worker-side composition."); }
+        if (IsSameSourceType(type, component))
+        { throw new NotSupportedException("Composition type '" + name + "' cannot compose its own component; recursive compositions never terminate."); }
+        if (!IsConcreteUiComponent(type, resolution))
+        { throw new NotSupportedException("Composition type '" + name + "' must be a concrete IUiComponent worker-side composition."); }
+        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(type) + "(" + string.Join(", ", values) + ")).Render(builder)";
     }
+
+    private (INamedTypeSymbol? Type, Compilation Resolution) ResolveCompositionType(string name, INamedTypeSymbol component)
+    {
+        var typeName = QualifiedName(name);
+        var resolved = ResolveConstructionType(typeName, component);
+        return resolved.Type is null ? ResolveConstructionType("global::" + typeName, component) : resolved;
+    }
+
+    // The resolved symbol belongs to the probe compilation, so every later semantic check must use that
+    // compilation rather than the generator's original one.
+    private (INamedTypeSymbol? Type, Compilation Resolution) ResolveConstructionType(string typeName, INamedTypeSymbol component)
+    {
+        var source = component.ContainingNamespace.IsGlobalNamespace
+            ? "internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); }"
+            : "namespace " + component.ContainingNamespace + " { internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); } }";
+        var parseOptions = (CSharpParseOptions)component.DeclaringSyntaxReferences[0].SyntaxTree.Options;
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions);
+        var compilation = _compilation.AddSyntaxTrees(tree);
+        var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        return (compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol, compilation);
+    }
+
+    private static bool IsSameSourceType(INamedTypeSymbol type, INamedTypeSymbol component)
+        => string.Equals(QualifiedName(type), QualifiedName(component), StringComparison.Ordinal) &&
+            string.Equals(type.ContainingAssembly?.Name, component.ContainingAssembly?.Name, StringComparison.Ordinal);
+
+    private static bool IsConcreteUiComponent(INamedTypeSymbol type, Compilation resolution)
+    {
+        var implementsInterface = type.AllInterfaces.Any(IsUiComponent);
+        var generatedComponent = UiRazorGenerator.GeneratesComponentImplementation(type, resolution);
+        var constructible = type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract;
+        return !type.IsRefLikeType && constructible && (implementsInterface || generatedComponent);
+    }
+
+    private static bool IsUiComponent(INamedTypeSymbol type)
+        => type.ToDisplayString() == "DotBoxD.UI.Authoring.IUiComponent";
 
     private void Add(string name, string type)
     {
@@ -135,6 +188,17 @@ internal sealed class UiRazorExpressions
 
     private static string QualifiedName(string name)
         => string.Join(".", name.Split('.').Select(Identifier));
+
+    private static string QualifiedName(INamedTypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    private string EndpointConstant(string name)
+    {
+        var endpoint = QualifiedName(name);
+        if (!_endpointConstants.Contains(endpoint, StringComparer.Ordinal))
+        { throw new NotSupportedException("Remote routes require one positive endpoint ID or an available generated endpoint constant."); }
+        return endpoint;
+    }
 
     private static IReadOnlyList<string> Call(string text, string method)
     {

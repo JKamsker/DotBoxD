@@ -83,6 +83,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Collections.Generic.SortedSet<T>.RemoveWhere",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
         "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
+        "System.Linq.Enumerable.GroupBy",
         "System.Linq.Enumerable.ToDictionary",
         "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary",
         "System.Security.Cryptography.RSA.Create",

@@ -10,7 +10,18 @@ public sealed class UiExtensionRegistry<T> where T : IUiExtensionSchema
     public UiExtensionRegistry(IEnumerable<T> schemas)
     {
         ArgumentNullException.ThrowIfNull(schemas);
-        _schemas = schemas.ToImmutableDictionary(s => s.SchemaId, StringComparer.Ordinal);
+        var registered = ImmutableDictionary.CreateBuilder<string, T>(StringComparer.Ordinal);
+        foreach (var schema in schemas)
+        {
+            if (schema is null)
+            {
+                throw new ArgumentException("Schema entries cannot be null.", nameof(schemas));
+            }
+
+            registered.Add(schema.SchemaId, schema);
+        }
+
+        _schemas = registered.ToImmutable();
     }
 
     public ImmutableHashSet<string> Schemas => _schemas.Keys.ToImmutableHashSet(StringComparer.Ordinal);
