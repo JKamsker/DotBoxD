@@ -112,6 +112,24 @@ public sealed class QueryAstInitializerSnapshotTests
         Assert.Contains(right, new HashSet<EventQueryDocument> { left });
     }
 
+    [Fact]
+    public void Documents_with_different_filters_are_not_equal()
+    {
+        var left = CreateDocument();
+        var right = EventQueryDocument.Create(
+            "AttackEvent",
+            QueryFilter.Compare("AttackerId", QueryComparisonOperator.Equal, QueryValue.FromString("blocked")),
+            new QueryProjection
+            {
+                Kind = QueryProjectionKind.Construct,
+                TypeName = "Notice",
+                Fields = [QueryProjectionField.FromMember("attacker", "AttackerId")],
+            });
+
+        Assert.NotEqual(left, right);
+        Assert.Equal(2, new HashSet<EventQueryDocument> { left, right }.Count);
+    }
+
     private static void AssertDocumentIsStableAfterMutation(EventQueryDocument document, Action mutate)
     {
         var json = EventQueryJson.Serialize(document);
