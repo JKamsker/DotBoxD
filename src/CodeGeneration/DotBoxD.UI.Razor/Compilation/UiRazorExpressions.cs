@@ -6,9 +6,12 @@ namespace DotBoxD.UI.Razor;
 
 internal sealed class UiRazorExpressions
 {
+    private readonly Compilation _compilation;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _resources = new(StringComparer.Ordinal);
+
+    public UiRazorExpressions(Compilation compilation) => _compilation = compilation;
 
     public string State(string declaration)
     {
@@ -107,13 +110,47 @@ internal sealed class UiRazorExpressions
         return "builder.Handle(" + element + ", " + local[0] + ", " + local[1] + ")";
     }
 
-    public string Composition(string name, string arguments)
+    public string Composition(string name, string arguments, INamedTypeSymbol component)
     {
         var values = arguments.Length == 0 ? Array.Empty<string>() : arguments.Split(',').Select(v => v.Trim()).ToArray();
         if (values.Any(v => !_values.ContainsKey(v)))
         { throw new NotSupportedException("Composition arguments must name declared state, kernel or resource handles."); }
-        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(name) + "(" + string.Join(", ", values) + ")).Render(builder)";
+        var type = ResolveCompositionType(name, component);
+        if (type is null)
+        { throw new NotSupportedException("Unknown composition type '" + name + "'. Use a concrete IUiComponent worker-side composition."); }
+        if (!IsConcreteUiComponent(type))
+        { throw new NotSupportedException("Composition type '" + name + "' must be a concrete IUiComponent worker-side composition."); }
+        return "((global::DotBoxD.UI.Authoring.IUiComponent)new " + QualifiedName(type) + "(" + string.Join(", ", values) + ")).Render(builder)";
     }
+
+    private INamedTypeSymbol? ResolveCompositionType(string name, INamedTypeSymbol component)
+    {
+        var typeName = QualifiedName(name);
+        return ResolveConstructionType(typeName, component) ?? ResolveConstructionType("global::" + typeName, component);
+    }
+
+    private INamedTypeSymbol? ResolveConstructionType(string typeName, INamedTypeSymbol component)
+    {
+        var source = component.ContainingNamespace.IsGlobalNamespace
+            ? "internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); }"
+            : "namespace " + component.ContainingNamespace + " { internal sealed class __UiRazorCompositionResolution { private object Value = new " + typeName + "(); } }";
+        var parseOptions = (CSharpParseOptions)component.DeclaringSyntaxReferences[0].SyntaxTree.Options;
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions);
+        var compilation = _compilation.AddSyntaxTrees(tree);
+        var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        return compilation.GetSemanticModel(tree).GetTypeInfo(creation).Type as INamedTypeSymbol;
+    }
+
+    private bool IsConcreteUiComponent(INamedTypeSymbol type)
+    {
+        var implementsInterface = type.AllInterfaces.Any(IsUiComponent);
+        var generatedComponent = UiRazorGenerator.GeneratesComponentImplementation(type, _compilation);
+        return !type.IsRefLikeType &&
+            (implementsInterface && (type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class && !type.IsAbstract) || generatedComponent);
+    }
+
+    private static bool IsUiComponent(INamedTypeSymbol type)
+        => type.ToDisplayString() == "DotBoxD.UI.Authoring.IUiComponent";
 
     private void Add(string name, string type)
     {
@@ -135,6 +172,9 @@ internal sealed class UiRazorExpressions
 
     private static string QualifiedName(string name)
         => string.Join(".", name.Split('.').Select(Identifier));
+
+    private static string QualifiedName(INamedTypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
     private static IReadOnlyList<string> Call(string text, string method)
     {

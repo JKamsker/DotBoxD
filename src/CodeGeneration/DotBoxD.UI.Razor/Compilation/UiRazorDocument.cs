@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.CodeAnalysis;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -11,13 +12,13 @@ internal static class UiRazorDocument
     private static readonly Regex KeyAttributes = new("\"[^\"]*\"|'[^']*'|(?<=\\s)@key(?=\\s*=)",
         RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
-    public static string Compile(string text, CancellationToken token)
+    public static string Compile(string text, INamedTypeSymbol component, Compilation compilation, CancellationToken token)
     {
         if (text.Length > 262_144)
         { throw new NotSupportedException("Safe Razor source exceeds 256 KiB. Split it into IUiComponent compositions."); }
         var statements = new StringBuilder();
         var markup = new StringBuilder();
-        var expressions = new UiRazorExpressions();
+        var expressions = new UiRazorExpressions(compilation);
         var inMarkup = false;
         foreach (var line in text.Split('\n'))
         {
@@ -47,7 +48,7 @@ internal static class UiRazorDocument
         var nodes = root.DescendantsAndSelf().ToArray();
         if (nodes.Length > 2_000 || nodes.Any(n => n.Ancestors().Count() >= 64))
         { throw new NotSupportedException("Safe Razor exceeds the 2,000-node or 64-level authoring limit. Compose smaller bounded components."); }
-        statements.Append("return ").Append(UiRazorElements.Render(root, expressions, token)).Append(';');
+        statements.Append("return ").Append(UiRazorElements.Render(root, expressions, component, token)).Append(';');
         return statements.ToString();
     }
 }
