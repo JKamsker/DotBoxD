@@ -9,7 +9,7 @@ internal static class QueryAstSnapshot
             Kind = filter.Kind,
             Field = filter.Field,
             Value = filter.Value,
-            Values = [.. filter.Values],
+            Values = Array.AsReadOnly([.. filter.Values]),
             Children = SnapshotChildren(filter.Children),
             IgnoreCase = filter.IgnoreCase,
         };
@@ -22,7 +22,7 @@ internal static class QueryAstSnapshot
         Kind = projection.Kind,
         Path = projection.Path,
         TypeName = projection.TypeName,
-        Fields = [.. projection.Fields],
+        Fields = Array.AsReadOnly([.. projection.Fields]),
     };
 
     private static IReadOnlyList<QueryFilter> SnapshotChildren(IReadOnlyList<QueryFilter> children)
@@ -33,6 +33,6 @@ internal static class QueryAstSnapshot
             snapshot[i] = Filter(children[i]);
         }
 
-        return snapshot;
+        return Array.AsReadOnly(snapshot);
     }
 }
