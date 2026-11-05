@@ -169,7 +169,7 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
             }
         }
 
-        return services;
+        return Array.AsReadOnly(services.ToArray());
     }
 
     private static string TypeName(Type? type) => type?.FullName ?? string.Empty;
@@ -238,7 +238,7 @@ public sealed record RpcContractService(
             }
         }
 
-        return values;
+        return Array.AsReadOnly(values.ToArray());
     }
 }
 
