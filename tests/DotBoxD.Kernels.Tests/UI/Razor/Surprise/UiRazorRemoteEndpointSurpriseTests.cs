@@ -8,7 +8,13 @@ public sealed class UiRazorRemoteEndpointSurpriseTests
     [Fact]
     public void Unresolved_remote_endpoint_constant_gets_a_focused_diagnostic()
     {
-        var result = Generate(Component, """
+        var result = Generate("""
+            using DotBoxD.UI.Authoring;
+            [UiRazorComponent("Counter.ui.razor")]
+            public partial class Counter
+            {
+            }
+            """, """
             <UiButton Text="Go" OnClick="@Ui.Remote(MissingEndpoint)" />
             """);
 
