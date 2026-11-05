@@ -7,11 +7,16 @@ namespace DotBoxD.UI.Razor;
 internal sealed class UiRazorExpressions
 {
     private readonly Compilation _compilation;
+    private readonly IReadOnlyList<string> _endpointConstants;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _resources = new(StringComparer.Ordinal);
 
-    public UiRazorExpressions(Compilation compilation) => _compilation = compilation;
+    public UiRazorExpressions(Compilation compilation, IReadOnlyList<string> endpointConstants)
+    {
+        _compilation = compilation;
+        _endpointConstants = endpointConstants;
+    }
 
     public string State(string declaration)
     {
@@ -101,7 +106,9 @@ internal sealed class UiRazorExpressions
             var call = Call(text.Substring(1), "Remote");
             if (call.Count != 1)
             { throw new NotSupportedException("Remote routes require one positive endpoint ID or generated endpoint constant."); }
-            var endpoint = int.TryParse(call[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id > 0 ? call[0] : QualifiedName(call[0]);
+            var endpoint = int.TryParse(call[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id > 0
+                ? call[0]
+                : EndpointConstant(call[0]);
             return "builder.Remote(" + element + ", " + endpoint + ")";
         }
         var local = Call(text.Substring(1), "Handle");
@@ -175,6 +182,14 @@ internal sealed class UiRazorExpressions
 
     private static string QualifiedName(INamedTypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    private string EndpointConstant(string name)
+    {
+        var endpoint = QualifiedName(name);
+        if (!_endpointConstants.Contains(endpoint, StringComparer.Ordinal))
+        { throw new NotSupportedException("Remote routes require one positive endpoint ID or an available generated endpoint constant."); }
+        return endpoint;
+    }
 
     private static IReadOnlyList<string> Call(string text, string method)
     {
