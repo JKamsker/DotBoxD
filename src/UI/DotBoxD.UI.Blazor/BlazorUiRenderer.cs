@@ -166,6 +166,7 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
         try
         {
             using var callback = session.EnterCallbackScope();
+            using var cancellationCallbackRegistration = BlazorDisposal.EnterCancellationCallbackRegistration();
             authorized = await authorizer.AuthorizeAsync(user, session, input, token).AsTask().WaitAsync(token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
         }
@@ -209,7 +210,8 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
 
     public ValueTask DisposeAsync()
     {
-        if ((_disposalCallback.Value && _disposeTask is not { IsCompleted: true }) || BlazorDisposal.IsCancelling(_lifetime))
+        if (((_disposalCallback.Value || BlazorDisposal.IsCancellationCallback) &&
+             _disposeTask is not { IsCompleted: true }) || BlazorDisposal.IsCancelling(_lifetime))
         { return ValueTask.CompletedTask; }
         lock (_sync)
         {
