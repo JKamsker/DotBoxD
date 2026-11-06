@@ -131,6 +131,7 @@ internal sealed record MethodModel(
     int TypeParameterCount = 0,
     string TypeParameterList = "",
     string ConstraintClauses = "",
+    string ExplicitConstraintClauses = "",
     bool RequiresDispatcherReceiverCast = false,
     string? UnsupportedReason = null,
     SubServiceInfo? SubService = null,

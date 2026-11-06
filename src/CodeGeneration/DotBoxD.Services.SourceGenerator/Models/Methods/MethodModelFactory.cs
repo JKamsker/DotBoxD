@@ -117,6 +117,7 @@ internal static partial class MethodModelFactory
             TypeParameterCount: methodSymbol.Arity,
             TypeParameterList: typeParameterList,
             ConstraintClauses: constraintClauses,
+            ExplicitConstraintClauses: MethodSignatureFormatter.GetExplicitImplementationConstraintClauses(methodSymbol, ct),
             UnsupportedReason: unsupportedReason,
             SubService: subService,
             RawRpcName: configuredRpcName,

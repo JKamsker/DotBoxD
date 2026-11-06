@@ -60,6 +60,91 @@ internal static class MethodSignatureFormatter
         return string.Concat(clauses);
     }
 
+    /// <summary>
+    /// Explicit interface implementations inherit their constraints and may not restate them (CS0460).
+    /// The only clauses C# accepts there are <c>class</c>, <c>struct</c>, and <c>default</c>, which are
+    /// needed only so that a <c>T?</c> in the signature binds to the nullable-annotated type parameter
+    /// instead of <see cref="System.Nullable{T}"/>. Value-type parameters already bind <c>T?</c> to
+    /// <see cref="System.Nullable{T}"/>, so they never need a clause.
+    /// </summary>
+    public static string GetExplicitImplementationConstraintClauses(IMethodSymbol method, CancellationToken ct)
+    {
+        if (!method.IsGenericMethod)
+        {
+            return string.Empty;
+        }
+
+        var clauses = new List<string>();
+        foreach (var typeParameter in method.TypeParameters)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (typeParameter.IsValueType || !SignatureAnnotatesTypeParameter(method, typeParameter, ct))
+            {
+                continue;
+            }
+
+            var constraint = typeParameter.IsReferenceType ? "class" : "default";
+            clauses.Add($" where {IdentifierHelpers.EscapeIdentifier(typeParameter.Name)} : {constraint}");
+        }
+
+        return string.Concat(clauses);
+    }
+
+    private static bool SignatureAnnotatesTypeParameter(
+        IMethodSymbol method,
+        ITypeParameterSymbol typeParameter,
+        CancellationToken ct)
+    {
+        if (AnnotatesTypeParameter(method.ReturnType, typeParameter, ct))
+        {
+            return true;
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            if (AnnotatesTypeParameter(parameter.Type, typeParameter, ct))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AnnotatesTypeParameter(ITypeSymbol type, ITypeParameterSymbol typeParameter, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return type switch
+        {
+            ITypeParameterSymbol candidate =>
+                candidate.NullableAnnotation == NullableAnnotation.Annotated &&
+                SymbolEqualityComparer.Default.Equals(candidate, typeParameter),
+            IArrayTypeSymbol array => AnnotatesTypeParameter(array.ElementType, typeParameter, ct),
+            IPointerTypeSymbol pointer => AnnotatesTypeParameter(pointer.PointedAtType, typeParameter, ct),
+            IFunctionPointerTypeSymbol functionPointer =>
+                SignatureAnnotatesTypeParameter(functionPointer.Signature, typeParameter, ct),
+            INamedTypeSymbol named => NamedTypeAnnotatesTypeParameter(named, typeParameter, ct),
+            _ => false,
+        };
+    }
+
+    private static bool NamedTypeAnnotatesTypeParameter(
+        INamedTypeSymbol named,
+        ITypeParameterSymbol typeParameter,
+        CancellationToken ct)
+    {
+        foreach (var typeArgument in named.TypeArguments)
+        {
+            if (AnnotatesTypeParameter(typeArgument, typeParameter, ct))
+            {
+                return true;
+            }
+        }
+
+        return named.ContainingType is { } containing &&
+            NamedTypeAnnotatesTypeParameter(containing, typeParameter, ct);
+    }
+
     private static string GetConstraintClause(
         ITypeParameterSymbol typeParameter,
         ExternAliasTypeFormatter typeFormatter,

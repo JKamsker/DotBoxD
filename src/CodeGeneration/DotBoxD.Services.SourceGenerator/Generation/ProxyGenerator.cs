@@ -62,10 +62,12 @@ internal static partial class ProxyGenerator
         var explicitInterface = MethodRequiresExplicitImplementation(method.Name, proxyName);
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
+        // Explicit implementations inherit constraints (CS0460) except T? disambiguation clauses.
+        var constraintClauses = explicitInterface ? method.ExplicitConstraintClauses : method.ConstraintClauses;
 
         ProxyGenerationHelpers.AppendAttributes(sb, method.MemberAttributePrefix);
         ProxyGenerationHelpers.AppendAttributes(sb, method.ReturnAttributePrefix);
-        sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
+        sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){constraintClauses}");
         sb.AppendLine("        {");
 
         EmitProxyMethodBody(sb, service, method, ctArg, ct);
