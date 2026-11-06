@@ -10,9 +10,9 @@ namespace DotBoxD.Services.Client;
 // ends the wait for a send early; a response or connection failure that lands first still waits for
 // the send's own outcome, up to the deadline.
 //
-// A send still in flight when the call ends is not cancelled: cancelling a write that already started
-// closes the whole connection, which would turn one slow call into a failure of every multiplexed
-// call. The detached send keeps owning (and finally disposing) its frame, keeps the call's admission
+// A send still in flight when the call ends is not cancelled: frames are atomic, so a write that already
+// started cannot be interrupted without corrupting the shared connection for every multiplexed call.
+// The detached send keeps owning (and finally disposing) its frame, keeps the call's admission
 // slot until it finishes so MaxPendingRequests still bounds the frames queued behind a stuck send,
 // has its failure observed, and is followed by a cancel frame when a timed-out request is written late.
 internal sealed partial class RpcPeerOutboundInvoker
