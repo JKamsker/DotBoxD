@@ -29,11 +29,11 @@ public sealed class TcpPartialWriteCancellationTests
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => pair.Connection.SendValueAsync(next).AsTask().WaitAsync(Guard));
 
-        // The receiver sees only a truncated prefix of the large frame followed by the close; no later
-        // frame ever follows the partial one.
+        // The receiver sees at most the cancelled frame (usually a truncated prefix; Windows may already
+        // have buffered all of it) followed by the close; no later frame ever follows it.
         var received = await DrainUntilClosedAsync(pair);
         var attempted = completedBytes + large.Length;
-        Assert.True(received < attempted, $"Receiver observed {received} of {attempted} bytes.");
+        Assert.True(received <= attempted, $"Receiver observed {received} of {attempted} bytes.");
     }
 
     private static async Task<(Task Send, long CompletedBytes)> SendUntilWriteStallsAsync(
