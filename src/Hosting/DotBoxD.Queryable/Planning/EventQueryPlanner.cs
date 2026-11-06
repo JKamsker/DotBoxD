@@ -4,8 +4,8 @@ namespace DotBoxD.Queryable.Planning;
 
 /// <summary>
 /// Extracts an <see cref="EventQueryPlan"/> from a filter AST. The planner recognizes a conjunction (or a
-/// single leaf) of scalar comparisons. Equality and range comparisons over a <em>host-indexable</em> kind
-/// (bool/integer/number/string) become index-covered predicates; equality over <em>any</em> non-null kind —
+/// single leaf) of scalar comparisons. Equality over a <em>host-indexable</em> kind (bool/integer/number/string)
+/// and range comparisons over a numeric (integer/number) kind become index-covered predicates; equality over <em>any</em> non-null kind —
 /// including the exact kinds (Guid/Decimal/UnsignedInteger/Timestamp) the host index vocabulary cannot carry —
 /// becomes a routing key for the in-process dispatcher's own equality index. Anything not host-indexable
 /// (negations, string matches, set membership, disjunction/nesting, and the exact kinds) stays in the residual
@@ -107,7 +107,7 @@ public static class EventQueryPlanner
     }
 
     // A host-indexable predicate: a non-ignore-case comparison whose value kind the host index vocabulary
-    // accepts (bool/int/long/double/string) under an equality or range operator.
+    // accepts (bool/int/long/double/string) under equality, or a numeric (int/long/double) range.
     private static bool TryHostIndex(QueryFilter term, out IndexedPredicate predicate)
     {
         predicate = null!;
@@ -117,6 +117,14 @@ public static class EventQueryPlanner
         }
 
         if (!IsHostIndexableKind(term.Value.Kind) || !IsIndexableOperator(term.Operator))
+        {
+            return false;
+        }
+
+        // String and boolean ranges stay residual: the query comparer orders strings ordinally and never
+        // matches a boolean ordering, so a host index cannot be trusted to fully cover those terms.
+        if (term.Value.Kind is QueryValueKind.String or QueryValueKind.Boolean &&
+            term.Operator != QueryComparisonOperator.Equal)
         {
             return false;
         }

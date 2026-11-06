@@ -186,6 +186,23 @@ public sealed class EventQueryIndexAdapterTests
         Assert.Empty(matcher.HonoredPredicates);
     }
 
+    [Theory]
+    [InlineData("a", HostOperator.GreaterThan, "B", true)]
+    [InlineData("a", HostOperator.LessThan, "B", false)]
+    [InlineData("B", HostOperator.LessThanOrEqual, "a", true)]
+    [InlineData("b", HostOperator.GreaterThanOrEqual, "B", true)]
+    public void Host_matcher_orders_strings_ordinally_like_the_query_comparer(
+        string actual, HostOperator op, string bound, bool expected)
+    {
+        // Culture-sensitive ordering puts "a" before "B"; ordinal (the query comparer and the sandbox) puts
+        // it after. The index must never reject an event the verified filter would accept.
+        var matcher = EventIndexMatcher<IndexedAttack>.Create(
+            [new DotBoxD.Plugins.IndexedPredicate(nameof(IndexedAttack.AttackerId), op, bound, "string")]);
+
+        Assert.True(matcher.HasIndex);
+        Assert.Equal(expected, matcher.CouldMatch(new IndexedAttack(actual, 0, 0)));
+    }
+
     private static void AssertPublicBoundaryRejection(Action action, string expectedParamName)
     {
         var exception = Assert.Throws<ArgumentException>(action);

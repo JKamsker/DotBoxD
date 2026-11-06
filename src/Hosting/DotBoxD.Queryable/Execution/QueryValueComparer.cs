@@ -9,7 +9,8 @@ namespace DotBoxD.Queryable.Execution;
 /// <see cref="QueryValueKind.Decimal"/>, <see cref="QueryValueKind.UnsignedInteger"/>) compare via the widest
 /// EXACT common type (<see cref="decimal"/>) so no precision is lost — only a genuine <see cref="QueryValueKind.Number"/>
 /// (float/double) operand falls back to a <see cref="double"/> comparison. GUIDs compare by equality only,
-/// timestamps by their UTC instant (ordered), strings ordinally (optionally ignoring case, including ordered
+/// timestamps by UTC ticks (ordered; a <see cref="DateTimeOffset"/> by its instant, a <see cref="DateTime"/> by its
+/// clock ticks ignoring <see cref="DateTimeKind"/> as C# does), strings ordinally (optionally ignoring case, including ordered
 /// comparisons), and booleans by value. Incomparable operand pairs evaluate to <see langword="false"/> rather
 /// than throwing — and an incomparable pair is also <see langword="false"/> under
 /// <see cref="QueryComparisonOperator.NotEqual"/>, never a match.
@@ -166,8 +167,9 @@ public static partial class QueryValueComparer
         }
     }
 
-    // Normalizes DateTime/DateTimeOffset/DateOnly to a single UTC instant in ticks (same Unspecified->UTC
-    // policy as QueryValue.FromTimestamp so a captured literal and a runtime member compare consistently).
+    // Normalizes DateTime/DateTimeOffset/DateOnly to UTC ticks with the same policy as QueryValue.TryFromObject
+    // so a captured literal and a runtime member compare consistently: DateTimeOffset by its instant, DateTime
+    // by its raw clock ticks (Kind ignored, as C# DateTime ==/</Equals do), DateOnly as midnight.
     private static bool TryToInstantTicks(object? value, out long ticks)
     {
         switch (value)
@@ -176,12 +178,7 @@ public static partial class QueryValueComparer
                 ticks = dto.UtcTicks;
                 return true;
             case DateTime dt:
-                ticks = (dt.Kind switch
-                {
-                    DateTimeKind.Utc => new DateTimeOffset(dt, TimeSpan.Zero),
-                    DateTimeKind.Local => new DateTimeOffset(dt),
-                    _ => new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc), TimeSpan.Zero),
-                }).UtcTicks;
+                ticks = dt.Ticks;
                 return true;
             case DateOnly d:
                 ticks = new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).UtcTicks;

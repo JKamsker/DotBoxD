@@ -191,6 +191,14 @@ public sealed class EventIndexMatcher<TEvent>
                 return false;
             }
 
+            if (actual is string text)
+            {
+                // Ordinal, like the query comparer and the sandbox: culture ordering could reject an event
+                // the verified filter accepts (e.g. "a" > "B").
+                comparison = string.CompareOrdinal(text, (string)expected);
+                return true;
+            }
+
             if (actual is IComparable comparable)
             {
                 comparison = comparable.CompareTo(expected);
