@@ -17,10 +17,9 @@ public sealed class TcpPartialWriteCancellationTests
         var large = TcpSendTestFrames.CreateBytes(messageId: 731, bodyLength: 12 * 1024 * 1024);
         using var cancellation = new CancellationTokenSource();
 
-        // The receiver does not read, so the socket buffers fill and the write stalls mid-frame.
-        var send = pair.Connection.SendValueAsync(large, cancellation.Token).AsTask();
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
-        Assert.False(send.IsCompleted);
+        // The receiver does not read, so the socket buffers eventually fill and a write stalls mid-frame.
+        // Some platforms (Windows loopback) buffer a whole large frame, so keep sending until one stalls.
+        var (send, completedBytes) = await SendUntilWriteStallsAsync(pair, large, cancellation.Token);
 
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Guard));
@@ -33,7 +32,29 @@ public sealed class TcpPartialWriteCancellationTests
         // The receiver sees only a truncated prefix of the large frame followed by the close; no later
         // frame ever follows the partial one.
         var received = await DrainUntilClosedAsync(pair);
-        Assert.True(received < large.Length, $"Receiver observed {received} of {large.Length} bytes.");
+        var attempted = completedBytes + large.Length;
+        Assert.True(received < attempted, $"Receiver observed {received} of {attempted} bytes.");
+    }
+
+    private static async Task<(Task Send, long CompletedBytes)> SendUntilWriteStallsAsync(
+        TcpSendTestPair pair,
+        byte[] frame,
+        CancellationToken cancellationToken)
+    {
+        long completedBytes = 0;
+        for (var attempt = 0; attempt < 32; attempt++)
+        {
+            var send = pair.Connection.SendValueAsync(frame, cancellationToken).AsTask();
+            if (await Task.WhenAny(send, Task.Delay(TimeSpan.FromMilliseconds(100))) != send)
+            {
+                return (send, completedBytes);
+            }
+
+            await send;
+            completedBytes += frame.Length;
+        }
+
+        throw new InvalidOperationException("The non-reading peer never applied socket backpressure.");
     }
 
     private static async Task<long> DrainUntilClosedAsync(TcpSendTestPair pair)
