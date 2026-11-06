@@ -1,5 +1,4 @@
 using System.Reflection.Emit;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 
@@ -11,6 +10,7 @@ internal static class MapGetI32LoopFastPathEmitter
 {
     private const int LoopFuel = 5;
     private const int LiteralFuel = 1;
+    private const int FallbackMapGetFuel = 1;
 
     public static bool TryEmit(
         ForRangeStatement range,
@@ -19,8 +19,8 @@ internal static class MapGetI32LoopFastPathEmitter
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         if (stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            !CanEmitBound(range.Start, stackPlan) ||
-            !CanEmitBound(range.End, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.Start, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.End, stackPlan) ||
             !TryCreatePlan(range, stackPlan, out var plan))
         {
             return false;
@@ -72,9 +72,9 @@ internal static class MapGetI32LoopFastPathEmitter
         var readFuel = il.DeclareLocal(typeof(long));
         var key = il.DeclareLocal(typeof(SandboxValue));
         var item = il.DeclareLocal(typeof(int));
-        EmitBound(range.Start, il, declare);
+        RawForRangeEmitter.EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
-        EmitBound(range.End, il, declare);
+        RawForRangeEmitter.EmitBound(range.End, il, declare);
         il.Emit(OpCodes.Stloc, end);
 
         var fallback = il.DefineLabel();
@@ -125,7 +125,6 @@ internal static class MapGetI32LoopFastPathEmitter
         EmitLoopBody(fastLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: false, chargeKey: false);
 
         il.MarkLabel(fallback);
-        CompiledMeterEmitter.Fuel(il, 1);
         EmitMapGet(plan, key, item, il, declare);
         EmitLoopBody(fallbackLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: true, chargeKey: true);
         il.MarkLabel(finish);
@@ -150,7 +149,9 @@ internal static class MapGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Ldloc, index);
         il.Emit(OpCodes.Ldloc, end);
         il.Emit(OpCodes.Bge, finish);
-        CompiledMeterEmitter.LoopIteration(il, plan.LoopFuelPerIteration);
+        // Without bulk charging the interpreter evaluates map.get every iteration (one more fuel unit than
+        // its bulk runner), so the fallback charges that unit per iteration rather than once for the hoisted read.
+        CompiledMeterEmitter.LoopIteration(il, plan.LoopFuelPerIteration + (chargeKey ? FallbackMapGetFuel : 0));
         if (chargeReadFuel)
         {
             il.Emit(OpCodes.Ldarg_0);
@@ -238,30 +239,6 @@ internal static class MapGetI32LoopFastPathEmitter
     private static bool IsTargetVariable(Expression expression, string target)
         => expression is VariableExpression variable &&
            string.Equals(variable.Name, target, StringComparison.Ordinal);
-
-    private static void EmitBound(
-        Expression expression,
-        ILGenerator il,
-        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                EmitInt32(il, value.Value);
-                break;
-            case VariableExpression variable:
-                il.Emit(OpCodes.Ldloc, declare(variable.Name).Local);
-                break;
-            default:
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.ValidationError,
-                    "unsupported forRange bound"));
-        }
-    }
-
-    private static bool CanEmitBound(Expression expression, LocalStackKindPlanner stackPlan)
-        => expression is LiteralExpression { Value: I32Value } ||
-           expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 
     private readonly record struct LoopPlan(
         string Target,

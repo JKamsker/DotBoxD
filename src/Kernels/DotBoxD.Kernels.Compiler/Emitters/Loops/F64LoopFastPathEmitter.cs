@@ -1,8 +1,6 @@
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
 
@@ -23,8 +21,8 @@ internal static class F64LoopFastPathEmitter
     {
         nonNegativeTarget = null;
         if (stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            !CanEmitBound(range.Start, stackPlan) ||
-            !CanEmitBound(range.End, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.Start, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.End, stackPlan) ||
             range.Body.Count != 1 ||
             range.Body[0] is not AssignmentStatement assignment ||
             stackPlan.LocalKind(assignment.Name) != StackKind.F64 ||
@@ -48,9 +46,9 @@ internal static class F64LoopFastPathEmitter
         var index = il.DeclareLocal(typeof(int));
         var end = il.DeclareLocal(typeof(int));
         var iterations = il.DeclareLocal(typeof(int));
-        EmitBound(range.Start, il, declare);
+        RawForRangeEmitter.EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
-        EmitBound(range.End, il, declare);
+        RawForRangeEmitter.EmitBound(range.End, il, declare);
         il.Emit(OpCodes.Stloc, end);
 
         var fallback = il.DefineLabel();
@@ -119,23 +117,4 @@ internal static class F64LoopFastPathEmitter
         il.Emit(OpCodes.Stloc, index);
         il.Emit(OpCodes.Br, loop);
     }
-
-    private static void EmitBound(Expression expression, ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                EmitInt32(il, value.Value);
-                break;
-            case VariableExpression variable:
-                il.Emit(OpCodes.Ldloc, declare(variable.Name).Local);
-                break;
-            default:
-                throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported forRange bound"));
-        }
-    }
-
-    private static bool CanEmitBound(Expression expression, LocalStackKindPlanner stackPlan)
-        => expression is LiteralExpression { Value: I32Value } ||
-           expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 }

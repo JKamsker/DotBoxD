@@ -1,6 +1,5 @@
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 
@@ -20,8 +19,8 @@ internal static class StringLengthLoopFastPathEmitter
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         if (stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            !CanEmitBound(range.Start, stackPlan) ||
-            !CanEmitBound(range.End, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.Start, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.End, stackPlan) ||
             !TryCreatePlan(range, stackPlan, bindings, out var plan))
         {
             return false;
@@ -72,9 +71,9 @@ internal static class StringLengthLoopFastPathEmitter
         var end = il.DeclareLocal(typeof(int));
         var iterations = il.DeclareLocal(typeof(int));
         var length = il.DeclareLocal(typeof(int));
-        EmitBound(range.Start, il, declare);
+        RawForRangeEmitter.EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
-        EmitBound(range.End, il, declare);
+        RawForRangeEmitter.EmitBound(range.End, il, declare);
         il.Emit(OpCodes.Stloc, end);
 
         var fallback = il.DefineLabel();
@@ -103,7 +102,7 @@ internal static class StringLengthLoopFastPathEmitter
         il.Emit(OpCodes.Ldstr, "string.length");
         il.Emit(OpCodes.Ldloc, iterations);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCalls)));
-        if (plan.AddToTarget)
+        if (plan.AddToTarget && RawForRangeEmitter.CanAccumulateInClosedForm(range, plan.Target))
         {
             // EXPERIMENT (exp/closed-form-accumulation): the hoisted length is loop-invariant, so the whole
             // accumulation loop "target += length" collapses to "target += length * iterations" computed in
@@ -116,6 +115,7 @@ internal static class StringLengthLoopFastPathEmitter
             EmitInt32(il, plan.FuelPerIteration);
             il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AccumulateLinearI32)));
             il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
+            RawForRangeEmitter.EmitStoreLastIndex(range.LocalName, end, il, declare);
             il.Emit(OpCodes.Br, finish);
         }
         else
@@ -206,30 +206,6 @@ internal static class StringLengthLoopFastPathEmitter
     private static bool IsTargetVariable(Expression expression, string target)
         => expression is VariableExpression variable &&
            string.Equals(variable.Name, target, StringComparison.Ordinal);
-
-    private static void EmitBound(
-        Expression expression,
-        ILGenerator il,
-        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                EmitInt32(il, value.Value);
-                break;
-            case VariableExpression variable:
-                il.Emit(OpCodes.Ldloc, declare(variable.Name).Local);
-                break;
-            default:
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.ValidationError,
-                    "unsupported forRange bound"));
-        }
-    }
-
-    private static bool CanEmitBound(Expression expression, LocalStackKindPlanner stackPlan)
-        => expression is LiteralExpression { Value: I32Value } ||
-           expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 
     private static bool CanUseDirectStringLength(IBindingCatalog bindings)
         => bindings.TryGet("string.length", out var binding) &&
