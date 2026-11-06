@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     /// <summary>
     /// Fails the run with a quota error before deep (host-raisable) call depth or expression nesting

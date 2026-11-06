@@ -16,6 +16,7 @@ internal static class RpcLocalCollectionAliasValidator
     private const string UnsupportedMutationMessage =
         "list/map mutation requires a newly created, unaliased local used only through direct collection operations; copying, passing or enumerating that mutable local is unsupported";
 
+    /// <summary>Reports DBXK100 when a mutated list/map local is aliased, passed, or otherwise shared.</summary>
     /// <param name="body">The kernel body (method or lambda) to validate.</param>
     /// <param name="model">The semantic model for <paramref name="body"/>.</param>
     /// <param name="token">The cancellation token.</param>

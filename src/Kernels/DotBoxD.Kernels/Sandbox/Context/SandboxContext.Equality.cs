@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     /// <summary>
     /// Evaluates kernel <c>==</c> structural equality, first charging fuel proportional to the
