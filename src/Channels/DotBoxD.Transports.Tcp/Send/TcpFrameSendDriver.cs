@@ -91,8 +91,8 @@ internal static class TcpFrameSendDriver
         {
             if (sendError is not null && writeStarted)
             {
-                // A cancelled or failed write may have put part of the frame on the wire. Poison the
-                // connection before releasing the gate so no later frame is appended to a truncated one.
+                // A failed write may have put part of the frame on the wire. Poison the connection
+                // before releasing the gate so no later frame is appended to a truncated one.
                 connection!.AbortAfterFailedWrite();
             }
 
@@ -152,10 +152,13 @@ internal static class TcpFrameSendDriver
         state.CancellationToken.ThrowIfCancellationRequested();
         connection.ThrowIfDisposedForSend();
 
+        // Frames are atomic: the caller's token only covers waiting for the gate. Once bytes may reach
+        // the wire, cancelling one call must not truncate the frame and tear down the shared
+        // connection; disposal still fails a stalled write by closing the socket.
         state.WriteStarted = true;
         var write = connection.SendStream.WriteAsync(
             state.Data,
-            state.CancellationToken);
+            CancellationToken.None);
         if (!write.IsCompleted)
         {
             state.PendingStage = TcpFrameSendStage.Write;

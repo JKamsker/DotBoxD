@@ -89,16 +89,18 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             ThrowIfDisposed();
             try
             {
-                await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+                // Frames are atomic: the caller's token covers only the gate wait, so cancelling one
+                // call never truncates a frame and tears down the shared connection.
+                await _stream.WriteAsync(data, CancellationToken.None).ConfigureAwait(false);
                 if (_stream is not PipeStream)
                 {
-                    await _stream.FlushAsync(ct).ConfigureAwait(false);
+                    await _stream.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                 }
             }
             catch
             {
-                // A cancelled or failed write may have put part of the frame on the stream; never let a
-                // later frame follow a truncated one.
+                // A failed write may have put part of the frame on the stream; never let a later frame
+                // follow a truncated one.
                 AbortAfterFailedWrite();
                 throw;
             }

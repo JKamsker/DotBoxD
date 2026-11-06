@@ -43,7 +43,7 @@ public sealed class StreamFrameSendFailureTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task PendingCancellation_ForwardsTokenAndReleasesOwnership(
+    public async Task PendingCancellation_IsNotForwardedAndFrameCompletes(
         bool cancelWrite)
     {
         var stage = cancelWrite
@@ -52,26 +52,33 @@ public sealed class StreamFrameSendFailureTests
         await using var stream = new ControlledPendingSendStream(stage);
         await using var connection = new StreamConnection(stream, ownsStream: false);
         using var cancellation = new CancellationTokenSource();
-        var frame = StreamSendTestFrames.Create(50 + (int)stage, out _);
+        var frame = StreamSendTestFrames.Create(50 + (int)stage, out var expected);
         var send = connection.SendFrameValueAsync(frame, cancellation.Token);
         var entered = stage == PendingStreamSendStage.Write
             ? stream.WriteEntered
             : stream.FlushEntered;
         await entered.WaitAsync(Guard);
 
+        // Frames are atomic: cancelling after the write started must not truncate the frame or
+        // poison the shared connection, so the token is never forwarded to the stream.
         cancellation.Cancel();
-
-        var thrown = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => send.AsTask().WaitAsync(Guard));
-        Assert.Equal(cancellation.Token, thrown.CancellationToken);
-        Assert.Equal(cancellation.Token, stream.WriteToken);
-        if (stage == PendingStreamSendStage.Flush)
+        Assert.False(send.IsCompleted);
+        Assert.False(stream.WriteToken.CanBeCanceled);
+        if (stage == PendingStreamSendStage.Write)
         {
-            Assert.Equal(cancellation.Token, stream.FlushToken);
+            stream.CompleteWrite();
+        }
+        else
+        {
+            Assert.False(stream.FlushToken.CanBeCanceled);
+            stream.CompleteFlush();
         }
 
+        await send.AsTask().WaitAsync(Guard);
+        Assert.Equal(expected, stream.WrittenBytes);
         StreamSendTestFrames.AssertDisposed(frame);
         Assert.Equal(1, connection.SendGate.CurrentCount);
+        Assert.True(connection.IsConnected);
     }
 
     [Fact]

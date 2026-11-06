@@ -90,7 +90,8 @@ internal static class TcpFrameSendFallback
             connection.ThrowIfDisposedForSend();
             try
             {
-                await connection.SendStream.WriteAsync(data, cancellationToken)
+                // Frames are atomic: once the write starts the caller's token no longer applies.
+                await connection.SendStream.WriteAsync(data, CancellationToken.None)
                     .ConfigureAwait(false);
             }
             catch

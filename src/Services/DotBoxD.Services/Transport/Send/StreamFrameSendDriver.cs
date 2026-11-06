@@ -30,9 +30,12 @@ internal static class StreamFrameSendDriver
                 state.Stage = StreamFrameSendStage.Write;
                 goto case StreamFrameSendStage.Write;
             case StreamFrameSendStage.Write:
+                // Frames are atomic: once the write starts, cancelling the caller must not truncate the
+                // frame and poison the shared connection. Only genuine I/O failures (including the
+                // stream being disposed by connection close) end a started write.
                 pendingOperation = connection.SendStream.WriteAsync(
                     state.Data,
-                    state.CallerToken);
+                    CancellationToken.None);
                 if (!pendingOperation.IsCompleted)
                 {
                     return false;
@@ -50,7 +53,7 @@ internal static class StreamFrameSendDriver
                 goto case StreamFrameSendStage.Flush;
             case StreamFrameSendStage.Flush:
                 pendingOperation = new ValueTask(
-                    connection.SendStream.FlushAsync(state.CallerToken));
+                    connection.SendStream.FlushAsync(CancellationToken.None));
                 if (!pendingOperation.IsCompleted)
                 {
                     return false;

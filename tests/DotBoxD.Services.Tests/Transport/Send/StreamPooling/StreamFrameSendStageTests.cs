@@ -67,8 +67,10 @@ public sealed class StreamFrameSendStageTests
         StreamSendTestFrames.AssertDisposed(frame);
         Assert.Equal(1, connection.SendGate.CurrentCount);
         Assert.Equal(expected, stream.WrittenBytes);
-        Assert.Equal(cancellation.Token, stream.WriteToken);
-        Assert.Equal(cancellation.Token, stream.FlushToken);
+
+        // The caller's token covers only the gate wait; a started write and flush never observe it.
+        Assert.False(stream.WriteToken.CanBeCanceled);
+        Assert.False(stream.FlushToken.CanBeCanceled);
         if (stage == PendingStage.Write)
         {
             Assert.Equal(1, stream.WriteResultCount);

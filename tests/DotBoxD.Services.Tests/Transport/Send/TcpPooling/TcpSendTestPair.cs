@@ -84,9 +84,11 @@ internal static class TcpSendTestFrames
         return payload.Memory.ToArray();
     }
 
-    public static PooledBufferWriter CreateOwned(int messageId, int bodyLength = 8)
+    public static PooledBufferWriter CreateOwned(int messageId, int bodyLength = 8) =>
+        CreateOwned(CreateBytes(messageId, bodyLength));
+
+    public static PooledBufferWriter CreateOwned(byte[] bytes)
     {
-        var bytes = CreateBytes(messageId, bodyLength);
         var frame = new PooledBufferWriter(bytes.Length);
         bytes.CopyTo(frame.GetSpan(bytes.Length));
         frame.Advance(bytes.Length);
