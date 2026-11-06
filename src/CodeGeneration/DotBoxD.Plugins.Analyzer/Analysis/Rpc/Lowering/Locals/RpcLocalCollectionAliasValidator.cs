@@ -34,8 +34,8 @@ internal static class RpcLocalCollectionAliasValidator
             return;
         }
 
-        ValidateOwners(mutations.Keys, token);
-        ValidateUses(nodes, mutations, model, token, valueBoundary);
+        ValidateOwners(mutations.Keys, token, valueBoundary);
+        ValidateUses(body, nodes, mutations, model, token, valueBoundary);
     }
 
     private static Dictionary<ISymbol, List<SyntaxNode>> FindMutations(
@@ -77,7 +77,7 @@ internal static class RpcLocalCollectionAliasValidator
         => symbol is ILocalSymbol ||
            valueBoundary && symbol is IParameterSymbol { RefKind: RefKind.None };
 
-    private static void ValidateOwners(IEnumerable<ISymbol> mutated, CancellationToken token)
+    private static void ValidateOwners(IEnumerable<ISymbol> mutated, CancellationToken token, bool valueBoundary)
     {
         foreach (var symbol in mutated)
         {
@@ -88,14 +88,22 @@ internal static class RpcLocalCollectionAliasValidator
 
             if (symbol.DeclaringSyntaxReferences.Length != 1 ||
                 symbol.DeclaringSyntaxReferences[0].GetSyntax(token) is not VariableDeclaratorSyntax declaration ||
-                declaration.Initializer is not { } initializer || !IsFreshCollection(initializer.Value))
+                !IsFreshDeclaration(declaration, valueBoundary))
             {
                 throw UnsupportedMutation();
             }
         }
     }
 
+    // On value boundaries an uninitialized declaration is fine: every later assignment must itself be a fresh
+    // collection (see IsDirectUse), so the local still never shares its CLR collection.
+    private static bool IsFreshDeclaration(VariableDeclaratorSyntax declaration, bool valueBoundary)
+        => declaration.Initializer is { } initializer
+            ? IsFreshCollection(initializer.Value)
+            : valueBoundary;
+
     private static void ValidateUses(
+        SyntaxNode body,
         SyntaxNode[] nodes,
         Dictionary<ISymbol, List<SyntaxNode>> mutations,
         SemanticModel model,
@@ -108,7 +116,7 @@ internal static class RpcLocalCollectionAliasValidator
             if (model.GetSymbolInfo(identifier, token).Symbol is { } symbol &&
                 mutations.TryGetValue(symbol, out var sites) &&
                 !IsDirectUse(identifier) &&
-                !(valueBoundary && IsValueBoundaryUse(identifier, sites)))
+                !(valueBoundary && IsValueBoundaryUse(body, identifier, sites)))
             {
                 throw UnsupportedMutation();
             }
@@ -157,19 +165,30 @@ internal static class RpcLocalCollectionAliasValidator
         };
     }
 
-    private static bool IsValueBoundaryUse(IdentifierNameSyntax identifier, List<SyntaxNode> mutationSites)
+    private static bool IsValueBoundaryUse(SyntaxNode body, IdentifierNameSyntax identifier, List<SyntaxNode> mutationSites)
     {
         var use = Outermost(identifier);
-        return use.Parent switch
+        return IsInsideFinalReturn(body, use, mutationSites) || use.Parent switch
         {
-            // The returned snapshot is final: nothing can mutate the collection after the function returns.
-            ReturnStatementSyntax => true,
             // Kernel foreach iterates a snapshot; CLR foreach throws if the body mutates the collection.
             ForEachStatementSyntax loop => loop.Expression == use &&
                 !mutationSites.Exists(site => loop.Statement.Span.Contains(site.Span)),
             _ => false
         };
     }
+
+    // A use anywhere inside a return of the validated function (returned directly or built into a returned
+    // DTO) is final: nothing can mutate the collection after the function returns. Returns of nested lambdas
+    // or local functions are not final for the enclosing body.
+    private static bool IsInsideFinalReturn(SyntaxNode body, ExpressionSyntax use, List<SyntaxNode> mutationSites)
+        => use.FirstAncestorOrSelf<ReturnStatementSyntax>() is { } returnStatement &&
+           !mutationSites.Exists(site => returnStatement.Span.Contains(site.Span)) &&
+           EnclosingFunction(use) == EnclosingFunction(returnStatement) &&
+           EnclosingFunction(returnStatement) == EnclosingFunction(body);
+
+    private static SyntaxNode? EnclosingFunction(SyntaxNode node)
+        => node.AncestorsAndSelf().FirstOrDefault(static ancestor =>
+            ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax or BaseMethodDeclarationSyntax);
 
     private static bool IsFreshCollection(ExpressionSyntax expression)
         => Unwrap(expression) is BaseObjectCreationExpressionSyntax or CollectionExpressionSyntax;
