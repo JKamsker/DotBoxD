@@ -115,15 +115,26 @@ public sealed partial class RpcPeer
         CancellationTokenSource? cts,
         TaskCompletionSource<object?> completion)
     {
+        Exception? failure = null;
         try
         {
             RpcPeerCancellation.CancelReadLoop(cts);
             await DisposeCoreAsync(readLoop, cts).ConfigureAwait(false);
-            completion.TrySetResult(null);
         }
         catch (Exception ex)
         {
-            completion.TrySetException(ex);
+            failure = ex;
+        }
+
+        // Notify the owner before completing so an awaited dispose observes the released state.
+        Interlocked.Exchange(ref _disposedCallback, null)?.Invoke(this);
+        if (failure is null)
+        {
+            completion.TrySetResult(null);
+        }
+        else
+        {
+            completion.TrySetException(failure);
         }
     }
 

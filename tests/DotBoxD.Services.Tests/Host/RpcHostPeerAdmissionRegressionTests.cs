@@ -78,6 +78,40 @@ public sealed class RpcHostPeerAdmissionRegressionTests
         await clientB.DisposeAsync();
     }
 
+    [Fact]
+    public async Task MaxAcceptedPeers_ReleasesSlotAfterApplicationDisposesPeer()
+    {
+        var transport = new QueuedServerTransport();
+        var connected = Channel.CreateUnbounded<RpcPeer>();
+        var disconnectedCount = 0;
+
+        await using var host = RpcHost.Listen(
+            transport,
+            NewSerializer(),
+            new RpcPeerOptions { MaxAcceptedPeers = 1 });
+        host.PeerConnected += (_, args) => connected.Writer.TryWrite(args.Peer);
+        host.PeerDisconnected += (_, _) => Interlocked.Increment(ref disconnectedCount);
+        await host.StartAsync();
+
+        var (clientA, serverA) = InMemoryPipe.CreateConnectionPair();
+        await transport.EnqueueAsync(serverA);
+        var peerA = await connected.Reader.ReadAsync().AsTask().WaitAsync(Timeout);
+        await WaitForAsync(() => peerA.HasStarted);
+
+        // The application kicks the peer itself; local dispose does not raise Disconnected.
+        await peerA.DisposeAsync();
+
+        var (clientB, serverB) = InMemoryPipe.CreateConnectionPair();
+        await transport.EnqueueAsync(serverB);
+        var peerB = await connected.Reader.ReadAsync().AsTask().WaitAsync(Timeout);
+
+        Assert.NotSame(peerA, peerB);
+        Assert.True(serverB.IsConnected);
+        Assert.Equal(0, Volatile.Read(ref disconnectedCount));
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
     private static async Task WaitForAsync(Func<bool> predicate)
     {
         using var cts = new CancellationTokenSource(Timeout);

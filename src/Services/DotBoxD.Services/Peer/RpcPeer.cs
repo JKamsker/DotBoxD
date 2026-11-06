@@ -26,6 +26,7 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
     private Task? _disposeTask;
+    private Action<RpcPeer>? _disposedCallback;
     private int _started;
     private int _startCompleted;
     private int _closed;
@@ -108,6 +109,13 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     /// <summary>Test seam: whether disposal has begun.</summary>
     internal bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    /// <summary>
+    /// Lets an owning host observe disposal, including a local dispose that intentionally does not
+    /// raise <see cref="Disconnected"/>. Invoked once, after teardown completes.
+    /// </summary>
+    internal void SetDisposedCallback(Action<RpcPeer> callback) =>
+        Volatile.Write(ref _disposedCallback, callback);
 
     /// <summary>The remote endpoint string of the underlying channel.</summary>
     public string RemoteEndpoint => _channel.RemoteEndpoint;

@@ -23,6 +23,9 @@ public static class RpcErrorTypes
     /// <summary>Remote type name used when the peer drops an inbound call because its queue is full.</summary>
     public const string QueueFull = "RpcQueueFull";
 
+    /// <summary>Remote type name used when a call is dropped because the peer's response stream limit is reached.</summary>
+    public const string ResponseStreamLimit = "RpcResponseStreamLimit";
+
     /// <summary>Remote type name used when a protocol-level error is detected.</summary>
     public const string ProtocolError = "RpcProtocolError";
 }

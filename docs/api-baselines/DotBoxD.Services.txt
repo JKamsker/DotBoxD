@@ -39,6 +39,7 @@ public const int DefaultMaxConcurrentInboundDispatch = 1
 public const int DefaultMaxInboundStreamsPerPeer = 1024
 public const int DefaultMaxInboundStreamsPerRequest = 32
 public const int DefaultMaxPendingRequests = 4096
+public const int DefaultMaxResponseStreamsPerPeer = 1024
 public const int EnvelopeLengthSize = 4
 public const int HeaderSize = 9
 public const int MaxMessageSize = 16 * 1024 * 1024
@@ -50,6 +51,7 @@ public const string InternalError = "RpcInternalError"
 public const string MethodNotFound = "RpcMethodNotFound"
 public const string ProtocolError = "RpcProtocolError"
 public const string QueueFull = "RpcQueueFull"
+public const string ResponseStreamLimit = "RpcResponseStreamLimit"
 public const string ServiceNotFound = "RpcServiceNotFound"
 public enum GeneratedReturnKind
 public enum GeneratedReturnKind.AsyncEnumerable
@@ -127,6 +129,7 @@ public int MaxConcurrentInboundDispatch { get; init; }
 public int MaxInboundStreamsPerPeer { get; init; }
 public int MaxInboundStreamsPerRequest { get; init; }
 public int MaxPendingRequests { get; init; }
+public int MaxResponseStreamsPerPeer { get; init; }
 public int MessageId { get; }
 public int MessageId { get; set; }
 public int StreamId { get; set; }

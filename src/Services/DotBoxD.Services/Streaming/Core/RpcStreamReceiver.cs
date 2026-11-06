@@ -131,7 +131,7 @@ internal sealed class RpcStreamReceiver
     {
         if (CancelCore())
         {
-            _ = SendCancelBestEffortAsync();
+            _manager.SendCancelInBackground(Handle.StreamId);
         }
     }
 
@@ -145,18 +145,6 @@ internal sealed class RpcStreamReceiver
     {
         Complete(error);
         DrainChunks();
-    }
-
-    private async Task SendCancelBestEffortAsync()
-    {
-        try
-        {
-            await _manager.SendCancelAsync(Handle.StreamId, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            RpcDiagnostics.Report("Stream cancel notification failed", ex);
-        }
     }
 
     private bool CancelCore()

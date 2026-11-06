@@ -1,3 +1,5 @@
+using DotBoxD.Services.Diagnostics;
+
 namespace DotBoxD.Services.Server;
 
 internal sealed partial class RpcPeerInboundDispatcher
@@ -7,6 +9,34 @@ internal sealed partial class RpcPeerInboundDispatcher
 
     private bool TryEnterActiveStream() =>
         TryEnterActiveOperation(ref _activeStreamCount, ref _activeStreamsDrained);
+
+    // A response stream outlives its dispatch slot, so the remote caller could otherwise hold
+    // unbounded pump state by never reading or canceling the streams it requests.
+    private bool TryReserveResponseStream()
+    {
+        if (Interlocked.Increment(ref _responseStreamCount) <= _maxResponseStreams)
+        {
+            return true;
+        }
+
+        Interlocked.Decrement(ref _responseStreamCount);
+        return false;
+    }
+
+    private void ReleaseResponseStream() => Interlocked.Decrement(ref _responseStreamCount);
+
+    private async Task SendResponseStreamLimitErrorAsync(int messageId)
+    {
+        try
+        {
+            using var errorFrame = _responseBuilder.BuildErrorFrame(messageId, RpcErrors.ResponseStreamLimit());
+            await _sendAsync(errorFrame.Memory, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Response stream limit error notification failed", ex);
+        }
+    }
 
     private bool TryEnterActiveOperation(
         ref int count,

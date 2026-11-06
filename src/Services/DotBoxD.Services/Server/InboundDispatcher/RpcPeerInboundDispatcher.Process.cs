@@ -53,6 +53,13 @@ internal sealed partial class RpcPeerInboundDispatcher
                 try
                 {
                     var responseStream = response.Stream;
+                    if (responseStream is not null && !TryReserveResponseStream())
+                    {
+                        await streaming.AbandonResponseAsync().ConfigureAwait(false);
+                        await SendResponseStreamLimitErrorAsync(inbound.MessageId).ConfigureAwait(false);
+                        return;
+                    }
+
                     try
                     {
                         await SendResponseFrameAsync(ref response, inbound.CancellationToken).ConfigureAwait(false);
@@ -61,6 +68,7 @@ internal sealed partial class RpcPeerInboundDispatcher
                     {
                         if (responseStream is not null)
                         {
+                            ReleaseResponseStream();
                             await streaming.AbandonResponseAsync().ConfigureAwait(false);
                         }
 
@@ -150,6 +158,7 @@ internal sealed partial class RpcPeerInboundDispatcher
             return false;
         }
 
+        ReleaseResponseStream();
         await streaming.AbandonResponseAsync().ConfigureAwait(false);
         return true;
     }
@@ -204,6 +213,7 @@ internal sealed partial class RpcPeerInboundDispatcher
         }
         finally
         {
+            ReleaseResponseStream();
             CompleteActiveStream();
             ReleaseRequest(inbound);
         }

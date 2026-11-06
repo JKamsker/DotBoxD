@@ -14,6 +14,7 @@ public sealed class RpcPeerOptions
     public const int DefaultMaxConcurrentInboundDispatch = 1;
     public const int DefaultMaxInboundStreamsPerRequest = 32;
     public const int DefaultMaxInboundStreamsPerPeer = 1024;
+    public const int DefaultMaxResponseStreamsPerPeer = 1024;
     public const int DefaultMaxAcceptedPeers = 1024;
 
     /// <summary>Default <see cref="MaxInboundBytes"/>: 64 MiB of in-flight inbound frames per peer.</summary>
@@ -24,6 +25,7 @@ public sealed class RpcPeerOptions
     private int _maxConcurrentInboundDispatch = DefaultMaxConcurrentInboundDispatch;
     private int _maxInboundStreamsPerRequest = DefaultMaxInboundStreamsPerRequest;
     private int _maxInboundStreamsPerPeer = DefaultMaxInboundStreamsPerPeer;
+    private int _maxResponseStreamsPerPeer = DefaultMaxResponseStreamsPerPeer;
     private int? _maxAcceptedPeers = DefaultMaxAcceptedPeers;
     private long? _maxInboundBytes = DefaultMaxInboundBytes;
     private QueueFullMode _queueFullMode = QueueFullMode.Wait;
@@ -226,6 +228,28 @@ public sealed class RpcPeerOptions
             }
 
             _maxInboundStreamsPerPeer = value;
+        }
+    }
+
+    /// <summary>
+    /// Maximum response streams this peer pumps to the remote peer at once. A response stream outlives
+    /// its dispatch, so this bounds stream state a remote caller can hold open; a call whose response
+    /// stream would exceed it fails with <see cref="RpcErrorTypes.ResponseStreamLimit"/>.
+    /// </summary>
+    public int MaxResponseStreamsPerPeer
+    {
+        get => _maxResponseStreamsPerPeer;
+        init
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(MaxResponseStreamsPerPeer),
+                    value,
+                    "Maximum response streams per peer must be greater than zero.");
+            }
+
+            _maxResponseStreamsPerPeer = value;
         }
     }
 

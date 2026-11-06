@@ -208,7 +208,7 @@ internal sealed partial class RpcStreamManager
     {
         if (_senders.TryGetValue(streamId, out var state))
         {
-            state.CancelInBackground();
+            CancelRemotely(state);
             return;
         }
 
@@ -217,7 +217,7 @@ internal sealed partial class RpcStreamManager
         {
             if (_senders.TryGetValue(streamId, out state))
             {
-                state.CancelInBackground();
+                CancelRemotely(state);
             }
 
             return;
@@ -227,12 +227,24 @@ internal sealed partial class RpcStreamManager
         if (_senders.TryGetValue(streamId, out state) &&
             _canceledOutbound.TryRemove(streamId, out _))
         {
-            state.CancelInBackground();
+            CancelRemotely(state);
         }
         else if (!_reservedOutbound.ContainsKey(streamId))
         {
             _canceledOutbound.TryRemove(streamId, out _);
         }
+    }
+
+    private void CancelRemotely(RpcStreamSendState state)
+    {
+        if (state.MarkRemoteCanceled())
+        {
+            // The pump already stopped without a terminal frame; the receiver's tombstone waits for one.
+            AcknowledgeRemoteCancelInBackground(state.StreamId);
+            return;
+        }
+
+        state.CancelInBackground();
     }
 
     internal void RemoveOutbound(
@@ -285,6 +297,7 @@ internal sealed partial class RpcStreamManager
         if (_canceledOutbound.TryRemove(state.StreamId, out _))
         {
             state.Cancel();
+            AcknowledgeRemoteCancelInBackground(state.StreamId);
             throw new OperationCanceledException("Stream was canceled before registration.");
         }
 
