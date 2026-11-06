@@ -149,7 +149,7 @@ internal static class TcpConnectionFrameSender
 
     private static ValueTask CompleteSynchronously(ref TcpFrameSendState state)
     {
-        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state);
+        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state, sendError: null);
         return cleanupError is null
             ? default
             : TcpFrameSendFallback.CreateFailure(cleanupError);
@@ -159,7 +159,7 @@ internal static class TcpConnectionFrameSender
         ref TcpFrameSendState state,
         Exception error)
     {
-        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state);
+        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state, error);
         return TcpFrameSendFallback.CreateFailure(cleanupError ?? error);
     }
 }

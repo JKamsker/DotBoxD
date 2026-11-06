@@ -20,6 +20,7 @@ internal static class StreamConnectionFrameSender
         }
 
         var gateHeld = false;
+        var writeStarted = false;
         var pendingHandoffStarted = false;
         try
         {
@@ -49,6 +50,7 @@ internal static class StreamConnectionFrameSender
             cancellationToken.ThrowIfCancellationRequested();
             connection.ThrowIfDisposedForSend();
 
+            writeStarted = true;
             var write = connection.SendStream.WriteAsync(data, cancellationToken);
             if (!write.IsCompleted)
             {
@@ -85,10 +87,10 @@ internal static class StreamConnectionFrameSender
         }
         catch (Exception error) when (!pendingHandoffStarted)
         {
-            return CompleteSynchronously(connection, frame, gateHeld, error);
+            return CompleteSynchronously(connection, frame, gateHeld, error, writeStarted);
         }
 
-        return CompleteSynchronously(connection, frame, gateHeld, error: null);
+        return CompleteSynchronously(connection, frame, gateHeld, error: null, writeStarted);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -137,9 +139,14 @@ internal static class StreamConnectionFrameSender
         StreamConnection connection,
         PooledBufferWriter frame,
         bool gateHeld,
-        Exception? error)
+        Exception? error,
+        bool writeStarted)
     {
-        var cleanupError = StreamFrameSendCleanup.Finish(connection, frame, gateHeld);
+        var cleanupError = StreamFrameSendCleanup.Finish(
+            connection,
+            frame,
+            gateHeld,
+            abortConnection: error is not null && writeStarted);
         error = cleanupError ?? error;
         return error is null
             ? default

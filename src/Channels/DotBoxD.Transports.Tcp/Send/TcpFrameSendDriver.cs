@@ -78,16 +78,24 @@ internal static class TcpFrameSendDriver
         }
     }
 
-    public static Exception? FinishAndClear(ref TcpFrameSendState state)
+    public static Exception? FinishAndClear(ref TcpFrameSendState state, Exception? sendError)
     {
         var connection = state.Connection;
         var frame = state.Frame;
         var ownsGate = state.OwnsGate;
+        var writeStarted = state.WriteStarted;
         state.Clear();
 
         Exception? cleanupError = null;
         try
         {
+            if (sendError is not null && writeStarted)
+            {
+                // A cancelled or failed write may have put part of the frame on the wire. Poison the
+                // connection before releasing the gate so no later frame is appended to a truncated one.
+                connection!.AbortAfterFailedWrite();
+            }
+
             if (ownsGate)
             {
                 connection!.ReleaseSendGate();
@@ -120,6 +128,7 @@ internal static class TcpFrameSendDriver
     {
         Initialize(connection, frame, cancellationToken, ref state);
         state.OwnsGate = true;
+        state.WriteStarted = true;
         state.PendingStage = TcpFrameSendStage.Write;
     }
 
@@ -131,6 +140,7 @@ internal static class TcpFrameSendDriver
     {
         Initialize(connection, data, cancellationToken, ref state);
         state.OwnsGate = true;
+        state.WriteStarted = true;
         state.PendingStage = TcpFrameSendStage.Write;
     }
 
@@ -142,6 +152,7 @@ internal static class TcpFrameSendDriver
         state.CancellationToken.ThrowIfCancellationRequested();
         connection.ThrowIfDisposedForSend();
 
+        state.WriteStarted = true;
         var write = connection.SendStream.WriteAsync(
             state.Data,
             state.CancellationToken);

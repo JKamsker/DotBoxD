@@ -166,6 +166,16 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         try
         {
             var count = reader.ReadArrayHeader();
+            // ReadArrayHeader only guarantees one byte per element, so a hostile frame could otherwise
+            // size this array from its header alone. Every handle needs at least
+            // RpcStreamHandleFormatter.MinimumEncodedSize bytes, so reject counts the remaining input cannot hold
+            // before allocating.
+            if (count > (reader.Sequence.Length - reader.Consumed) / RpcStreamHandleFormatter.MinimumEncodedSize)
+            {
+                throw new RpcEnvelopeValidationException(
+                    "RPC request stream handle count exceeds the remaining payload.");
+            }
+
             var streams = new RpcStreamHandle[count];
             for (var i = 0; i < count; i++)
             {
