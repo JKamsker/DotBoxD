@@ -189,6 +189,11 @@ internal sealed class ExpressionEmitter
 
         if (BinaryRuntimeCalls.TryGetBoxed(binary.Operator, out var method))
         {
+            if (BinaryRuntimeCalls.TakesContext(method))
+            {
+                _il.Emit(OpCodes.Ldarg_0);
+            }
+
             EmitAs(binary.Left, StackKind.Boxed);
             EmitAs(binary.Right, StackKind.Boxed);
             _il.Emit(OpCodes.Call, Runtime(method));

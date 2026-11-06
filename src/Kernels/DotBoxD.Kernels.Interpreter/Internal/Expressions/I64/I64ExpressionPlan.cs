@@ -24,7 +24,10 @@ internal sealed class I64ExpressionPlan
         _magic = magic;
         _left = left;
         _right = right;
-        FuelCost = 1 + (left?.FuelCost ?? 0) + (right?.FuelCost ?? 0);
+        // RemainderByConst folds the divisor literal into the node; it still costs the literal's
+        // 1 fuel the generic evaluator and the compiled tier charge for it.
+        var foldedLiteralCost = kind == ExpressionKind.RemainderByConst ? 1 : 0;
+        FuelCost = 1 + foldedLiteralCost + (left?.FuelCost ?? 0) + (right?.FuelCost ?? 0);
     }
 
     public int FuelCost { get; }

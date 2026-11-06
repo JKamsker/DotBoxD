@@ -32,8 +32,9 @@ internal static class OperatorEvaluator
     /// <summary>
     /// Applies <paramref name="binary"/>'s operator to its already-evaluated operands
     /// (<paramref name="left"/> and <paramref name="right"/>, in source order). String
-    /// <c>+</c> charges the concatenation through <paramref name="context"/> exactly as
-    /// the original evaluator did; every other branch is a pure result computation.
+    /// <c>+</c> charges the concatenation and <c>==</c>/<c>!=</c> charge the structural
+    /// comparison through <paramref name="context"/>; every other branch is a pure result
+    /// computation.
     /// </summary>
     public static SandboxValue ApplyBinary(
         BinaryExpression binary,
@@ -48,7 +49,7 @@ internal static class OperatorEvaluator
 
         if (IsComparisonOrEquality(binary.Operator))
         {
-            return ApplyComparisonOrEquality(binary.Operator, left, right);
+            return ApplyComparisonOrEquality(binary.Operator, left, right, context);
         }
 
         return ApplyNumericNonAdd(binary.Operator, left, right);
@@ -66,11 +67,15 @@ internal static class OperatorEvaluator
             _ => false
         };
 
-    private static SandboxValue ApplyComparisonOrEquality(string op, SandboxValue left, SandboxValue right)
+    private static SandboxValue ApplyComparisonOrEquality(
+        string op,
+        SandboxValue left,
+        SandboxValue right,
+        SandboxContext context)
         => op switch
         {
-            "==" => SandboxValue.FromBool(Equals(left, right)),
-            "!=" => SandboxValue.FromBool(!Equals(left, right)),
+            "==" => SandboxValue.FromBool(context.ChargedValueEquals(left, right)),
+            "!=" => SandboxValue.FromBool(!context.ChargedValueEquals(left, right)),
             "<" => SandboxNumericOperations.LessThan(left, right),
             "<=" => SandboxNumericOperations.LessThanOrEqual(left, right),
             ">" => SandboxNumericOperations.GreaterThan(left, right),

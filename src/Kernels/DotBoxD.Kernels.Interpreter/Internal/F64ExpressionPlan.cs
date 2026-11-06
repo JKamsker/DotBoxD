@@ -169,6 +169,7 @@ internal sealed class F64ExpressionPlan
         plan = null!;
         descriptor = null!;
         if (call.Arguments.Count != 1 ||
+            frame.Layout.IsModuleFunction(call.Name) ||
             !TryGetKind(call.Name, out var kind) ||
             !CanUseDirectIntrinsic(bindings, call.Name, kind, out descriptor) ||
             !TryCreate(call.Arguments[0], frame, targetName, bindings, out var operand, out var operandBinding) ||

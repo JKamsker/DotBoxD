@@ -42,10 +42,12 @@ internal static class BoolReturnFastPathEmitter
         // a hit. Over-charging is the safe direction: the sandbox fuel budget is a cap, not an exact
         // contract, and a fast path may charge >= the slow path but must never charge less (which could
         // let a guest under-pay). It can never under-fuel, so it cannot widen the compute a guest gets.
+        // The string comparison itself also charges its per-character cost, like the generic `==`.
         CompiledMeterEmitter.Fuel(il, 4);
+        il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldloc, declare(leftString).Local);
         il.Emit(OpCodes.Ldloc, declare(rightString).Local);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringEqualsRaw)));
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringEqualsRawCharged)));
         il.Emit(OpCodes.Brfalse, falseLabel);
 
         CompiledMeterEmitter.Fuel(il, 3);

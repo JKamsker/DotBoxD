@@ -58,6 +58,7 @@ internal readonly partial struct ExpressionEvaluator
         }
 
         Context.ChargeFuel(1);
+        SandboxContext.EnsureSufficientExecutionStack();
         WriteTrace(expression, frame);
         return expression switch
         {
