@@ -114,6 +114,9 @@ internal static class DotBoxDCapturedConstantLocal
                 ExpressionNamesLocal(assignment.Left, local, model, cancellationToken),
             ArgumentSyntax argument when IsWritableByRef(argument) =>
                 ExpressionNamesLocal(argument.Expression, local, model, cancellationToken),
+            // `ref var r = ref limit;` (or a ref return/ternary) lets later writes through `r` change the local.
+            RefExpressionSyntax reference =>
+                ExpressionNamesLocal(reference.Expression, local, model, cancellationToken),
             PrefixUnaryExpressionSyntax prefix =>
                 IsPrefixMutationOfLocal(prefix, local, model, cancellationToken),
             PostfixUnaryExpressionSyntax postfix =>
@@ -127,8 +130,10 @@ internal static class DotBoxDCapturedConstantLocal
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        // `&limit` escapes the local to a pointer that unsafe code can write through.
         if (!prefix.IsKind(SyntaxKind.PreIncrementExpression) &&
-            !prefix.IsKind(SyntaxKind.PreDecrementExpression))
+            !prefix.IsKind(SyntaxKind.PreDecrementExpression) &&
+            !prefix.IsKind(SyntaxKind.AddressOfExpression))
         {
             return false;
         }

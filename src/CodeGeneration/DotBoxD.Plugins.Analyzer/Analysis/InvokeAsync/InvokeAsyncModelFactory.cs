@@ -231,6 +231,7 @@ internal static partial class InvokeAsyncModelFactory
             serverContextParameterName: shape.WorldParameterName,
             serverContextType: shape.WorldType);
         var bodyJson = shape.LowerBody(lowerer, shape.Block);
+        RpcLocalCollectionAliasValidator.Validate(shape.Block, model, cancellationToken, valueBoundary: true);
         effects.Add(DotBoxDGenerationNames.Effects.Cpu);
         if (lowerer.Allocates)
         {
