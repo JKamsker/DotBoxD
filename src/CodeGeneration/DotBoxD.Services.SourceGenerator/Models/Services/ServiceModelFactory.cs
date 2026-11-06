@@ -37,30 +37,16 @@ internal static partial class ServiceModelFactory
             return rejectedService;
         }
 
-        if (!TryCollectServiceMembers(
+        if (!TryCollectInspectedServiceMembers(
                 interfaceSymbol,
                 context.SemanticModel.Compilation,
                 buildContext,
                 ct,
                 out var members,
+                out var memberSuppressions,
                 out var rejectedMembers))
         {
             return rejectedMembers;
-        }
-
-        if (MemberUsageSuppressionInspector.Inspect(
-                interfaceSymbol,
-                members.Methods,
-                members.Properties,
-                context.SemanticModel.Compilation,
-                ct,
-                out var memberSuppressions) is { } rejectedMemberUsage)
-        {
-            return RejectedService(
-                buildContext.DisplayName,
-                rejectedMemberUsage.Reason,
-                rejectedMemberUsage.Location,
-                buildContext.QualifiedInterfaceName);
         }
 
         ct.ThrowIfCancellationRequested();

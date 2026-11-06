@@ -12,7 +12,14 @@ internal readonly partial struct StatementExecutor
         int end,
         InterpreterFrame frame)
         => IsRawInt32LoopSlot(statement, frame) &&
-           (MapGetI32ForLoopRunner.TryRun(
+           TryRunRawInt32LoopFastPath(statement, start, end, frame);
+
+    private bool TryRunRawInt32LoopFastPath(
+        ForRangeStatement statement,
+        int start,
+        int end,
+        InterpreterFrame frame)
+        => MapGetI32ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options) ||
            ListGetI32ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options) ||
@@ -31,7 +38,7 @@ internal readonly partial struct StatementExecutor
            I64ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options) ||
            TryRunNestedForLoopFastPath(
-               statement, start, end, frame, Context, Options));
+               statement, start, end, frame, Context, Options);
 
     // Every fast path writes the loop variable through the raw i32 slot array. A loop variable
     // whose name is also assigned a non-i32 value elsewhere in the function lives in a boxed slot,
