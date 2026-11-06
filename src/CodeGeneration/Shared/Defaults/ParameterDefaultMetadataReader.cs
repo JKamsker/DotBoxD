@@ -85,8 +85,10 @@ internal static class ParameterDefaultMetadataReader
             ")] ";
     }
 
-    public static string FormatDefaultParameterValueAttribute(IParameterSymbol parameter)
-        => TryFormatDefaultParameterValueAttributeLiteral(parameter, out var literal)
+    public static string FormatDefaultParameterValueAttribute(
+        IParameterSymbol parameter,
+        System.Func<ITypeSymbol, string>? formatType = null)
+        => TryFormatDefaultParameterValueAttributeLiteral(parameter, out var literal, formatType)
             ? "[global::System.Runtime.InteropServices.DefaultParameterValueAttribute(" + literal + ")] "
             : string.Empty;
 
@@ -141,7 +143,8 @@ internal static class ParameterDefaultMetadataReader
 
     public static bool TryFormatDefaultParameterValueAttributeLiteral(
         IParameterSymbol parameter,
-        out string literal)
+        out string literal,
+        System.Func<ITypeSymbol, string>? formatType = null)
     {
         foreach (var attribute in parameter.GetAttributes())
         {
@@ -152,7 +155,7 @@ internal static class ParameterDefaultMetadataReader
                 continue;
             }
 
-            return CSharpLiteralFormatter.TryFormatAttributeValue(attribute.ConstructorArguments[0], out literal);
+            return CSharpLiteralFormatter.TryFormatAttributeValue(attribute.ConstructorArguments[0], out literal, formatType);
         }
 
         literal = string.Empty;

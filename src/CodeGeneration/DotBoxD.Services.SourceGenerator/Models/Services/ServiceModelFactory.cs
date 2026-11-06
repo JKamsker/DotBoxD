@@ -110,10 +110,12 @@ internal static partial class ServiceModelFactory
         var externAliases = new HashSet<string>(StringComparer.Ordinal);
         foreach (var method in methods)
         {
-            foreach (var externAlias in method.ExternAliases.Array)
-            {
-                externAliases.Add(externAlias);
-            }
+            AddExternAliases(externAliases, method.ExternAliases);
+        }
+
+        foreach (var property in properties)
+        {
+            AddExternAliases(externAliases, property.ExternAliases);
         }
 
         return new ServiceResult(
@@ -253,4 +255,11 @@ internal static partial class ServiceModelFactory
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));
 
+    private static void AddExternAliases(HashSet<string> target, EquatableArray<string> aliases)
+    {
+        if (!aliases.IsEmpty)
+        {
+            target.UnionWith(aliases.Array);
+        }
+    }
 }

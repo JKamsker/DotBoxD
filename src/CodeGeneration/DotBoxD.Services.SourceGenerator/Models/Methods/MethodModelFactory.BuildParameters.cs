@@ -173,6 +173,7 @@ internal static partial class MethodModelFactory
         CancellationToken ct)
     {
         var declaredType = GetDeclaredParameterType(parameter, typeFormatter, ct);
+        string FormatType(ITypeSymbol type) => typeFormatter.Format(type, s_qualifiedFormat);
         var hasDefaultValue = ParameterDefaultValueEmitter.HasDefaultValue(parameter);
         var preserveOptionalAttributeDefault =
             ParameterDefaultValueEmitter.ShouldPreserveOptionalAttributeDefault(methodSymbol, parameterIndex);
@@ -181,13 +182,15 @@ internal static partial class MethodModelFactory
             : ParameterDefaultValueEmitter.FormatSignatureDefaultLiteral(
                 parameter,
                 hasDefaultValue,
-                DefaultLiteralOptions.SourceGenerator) ?? string.Empty;
+                DefaultLiteralOptions.SourceGenerator,
+                FormatType) ?? string.Empty;
         var metadataDefaultValueExpression = isCancellationToken
             ? string.Empty
             : ParameterDefaultValueEmitter.FormatMetadataDefaultValueExpression(
                 parameter,
                 hasDefaultValue,
-                defaultValueLiteral);
+                defaultValueLiteral,
+                FormatType);
 
         return new ParameterModel(
             IdentifierHelpers.EscapeIdentifier(parameter.Name),
@@ -206,7 +209,8 @@ internal static partial class MethodModelFactory
                 parameter,
                 ct,
                 preserveOptionalAttributeDefault,
-                preserveMetadataDefaultAttributes: defaultValueLiteral.Length == 0),
+                preserveMetadataDefaultAttributes: defaultValueLiteral.Length == 0,
+                FormatType),
             ScopeKeyword: ParameterScopeKeyword(parameter, ct),
             ExternAliases: declaredType.ExternAliases);
     }
