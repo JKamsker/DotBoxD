@@ -66,7 +66,7 @@ internal sealed class StreamFrameSendOperation :
 
     private void CompleteResult()
     {
-        var cleanupError = FinishAndClear();
+        var cleanupError = FinishAndClear(error: null);
         if (cleanupError is null)
         {
             PublishResult();
@@ -79,14 +79,14 @@ internal sealed class StreamFrameSendOperation :
 
     private void CompleteException(Exception error)
     {
-        var cleanupError = FinishAndClear();
+        var cleanupError = FinishAndClear(error);
         PublishException(cleanupError ?? error);
     }
 
-    private Exception? FinishAndClear()
+    private Exception? FinishAndClear(Exception? error)
     {
         var state = _state;
         _state = default;
-        return StreamFrameSendCleanup.Finish(ref state);
+        return StreamFrameSendCleanup.Finish(ref state, error);
     }
 }

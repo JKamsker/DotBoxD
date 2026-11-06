@@ -12,6 +12,7 @@ internal static class StreamFrameSendFallback
         StreamFrameSendState state,
         ValueTask pendingOperation)
     {
+        Exception? error = null;
         try
         {
             while (true)
@@ -25,9 +26,14 @@ internal static class StreamFrameSendFallback
                 }
             }
         }
+        catch (Exception caught)
+        {
+            error = caught;
+            throw;
+        }
         finally
         {
-            StreamFrameSendCleanup.FinishOrThrow(ref state);
+            StreamFrameSendCleanup.FinishOrThrow(ref state, error);
         }
     }
 }

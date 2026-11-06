@@ -103,7 +103,7 @@ internal sealed class TcpFrameSendOperation :
     {
         var state = _state;
         _state.Clear();
-        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state);
+        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state, error);
         error = cleanupError ?? error;
 
         if (error is null)

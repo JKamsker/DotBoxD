@@ -18,5 +18,8 @@ internal struct TcpFrameSendState
     public TcpFrameSendStage PendingStage;
     public bool OwnsGate;
 
+    // Set once WriteAsync was issued: a failure after this point may have left a partial frame on the wire.
+    public bool WriteStarted;
+
     public void Clear() => this = default;
 }

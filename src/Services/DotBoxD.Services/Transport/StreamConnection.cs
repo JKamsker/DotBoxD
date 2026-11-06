@@ -62,6 +62,10 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     internal void ReleaseSendGate() =>
         TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
+    // Publishes disposal synchronously (the close itself completes in the background), so the next
+    // sender observes it before the failed sender releases the gate.
+    internal void AbortAfterFailedWrite() => _ = StartClose();
+
     internal bool OwnsStream => _ownsStream;
     internal bool HasActiveReceive => Volatile.Read(ref _activeReceives) != 0;
 
@@ -83,10 +87,20 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         {
             ct.ThrowIfCancellationRequested();
             ThrowIfDisposed();
-            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
-            if (_stream is not PipeStream)
+            try
             {
-                await _stream.FlushAsync(ct).ConfigureAwait(false);
+                await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+                if (_stream is not PipeStream)
+                {
+                    await _stream.FlushAsync(ct).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                // A cancelled or failed write may have put part of the frame on the stream; never let a
+                // later frame follow a truncated one.
+                AbortAfterFailedWrite();
+                throw;
             }
         }
         finally
@@ -175,7 +189,11 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     public async Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        await TransportTaskWaiter.WaitAsync(StartClose(), ct).ConfigureAwait(false);
+    }
 
+    private Task StartClose()
+    {
         Task closeTask;
         // Semaphore operations do not take the object's CLR monitor, so the private send gate can
         // also serialize one-time close publication without another per-connection allocation.
@@ -195,7 +213,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             closeTask = _closeTask;
         }
 
-        await TransportTaskWaiter.WaitAsync(closeTask, ct).ConfigureAwait(false);
+        return closeTask;
     }
 
     private async Task CloseCoreAsync()
