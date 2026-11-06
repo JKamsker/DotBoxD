@@ -213,6 +213,7 @@ The one subtlety: detecting `[RpcService]` on a return type symbol requires walk
 - Authentication / authorization scoping on sub-service handles. Out of scope; carrier-level auth still applies to the connection.
 - Sub-services returning sub-services arbitrarily deep - supported in principle by recursion of the rules above; no special test plan, just recursion.
 - Nested generic sub-services (`ISubService<T>`). Already rejected by existing DBXS003 (generic service interfaces).
+- Cyclic sub-service **properties** (`IFolder Parent { get; }`, or `IGame.Players` + `IPlayers.Game`). Rejected with DBXS003: proxies construct property proxies eagerly and `Provide*` registers property implementations recursively, so a cycle would never terminate. Expose the back-reference as a method returning the sub-service instead.
 - Serialization of a `ServiceHandle` returned in a *user DTO field* (e.g. `record Result(int Count, ISubService Inner)`). Not supported - handles must be the direct return value.
 
 ---

@@ -166,6 +166,15 @@ internal static class ExtensionsGenerator
         foreach (var service in services.Array)
         {
             yield return service.ExperimentalDiagnosticId;
+            if (service.PropertySuppressionIds.IsEmpty)
+            {
+                continue;
+            }
+
+            foreach (var id in service.PropertySuppressionIds.Array)
+            {
+                yield return id;
+            }
         }
     }
 

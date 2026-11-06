@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Generation;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -31,14 +29,16 @@ internal static partial class MethodModelFactory
         ct.ThrowIfCancellationRequested();
 
         var returnType = methodSymbol.ReturnType;
-        var declaredReturn = GetDeclaredReturnType(methodSymbol, returnType, ct);
-        var returnKind = ReturnTypeClassifier.Classify(returnType, ct, out var unwrappedReturnType, out var subService);
-        if (returnKind == MethodReturnKind.Sync && declaredReturn.ExternAliases.Array.Length > 0)
-        {
-            unwrappedReturnType = declaredReturn.Type;
-        }
+        var typeFormatter = new ExternAliasTypeFormatter(compilation);
+        var declaredReturnType = typeFormatter.Format(returnType, s_qualifiedFormat);
+        var returnKind = ReturnTypeClassifier.Classify(
+            returnType,
+            type => typeFormatter.Format(type, s_qualifiedFormat),
+            ct,
+            out var unwrappedReturnType,
+            out var subService);
         var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
-        var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, ct);
+        var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, typeFormatter, ct);
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
         var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol, ct);
         string? unsupportedReason = null;
@@ -79,6 +79,7 @@ internal static partial class MethodModelFactory
             cancellationTokenSymbol,
             rpcStreamHandleSymbol,
             validationCache,
+            typeFormatter,
             ct,
             ref unsupportedReason,
             ref unsupportedLocation);
@@ -96,22 +97,13 @@ internal static partial class MethodModelFactory
         }
 
         var configuredRpcName = configuredMethodName ?? methodSymbol.Name;
-        var externAliases = new HashSet<string>(declaredReturn.ExternAliases.Array, StringComparer.Ordinal);
-        foreach (var parameter in parameters)
-        {
-            foreach (var externAlias in parameter.ExternAliases.Array)
-            {
-                externAliases.Add(externAlias);
-            }
-        }
-
         return new MethodModel(
             Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
             ExplicitImplementationType: GetExplicitImplementationType(methodSymbol.ContainingType),
             RpcName: LiteralHelpers.EscapeStringLiteral(configuredRpcName),
-            ExternAliases: externAliases.ToEquatableArray(),
+            ExternAliases: typeFormatter.UsedAliases.ToEquatableArray(),
             ReturnKind: returnKind,
-            DeclaredReturnType: declaredReturn.Type,
+            DeclaredReturnType: declaredReturnType,
             UnwrappedReturnType: unwrappedReturnType,
             MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, compilation, ct) +
                 BuildMemberAttributePrefix(methodSymbol, ct),
@@ -135,125 +127,15 @@ internal static partial class MethodModelFactory
     internal static string GetExplicitImplementationType(INamedTypeSymbol type) =>
         type.ToDisplayString(s_qualifiedFormat);
 
-    private static (string Type, EquatableArray<string> ExternAliases) GetDeclaredReturnType(
-        IMethodSymbol methodSymbol,
-        ITypeSymbol returnType,
-        CancellationToken ct)
-    {
-        var declaredReturnType = returnType.ToDisplayString(s_qualifiedFormat);
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(ct) is not Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax declaration)
-            {
-                continue;
-            }
-
-            var aliases = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var externAlias in declaration.SyntaxTree.GetRoot(ct)
-                         .DescendantNodes()
-                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExternAliasDirectiveSyntax>())
-            {
-                aliases.Add(externAlias.Identifier.ValueText);
-            }
-
-            var usedAliases = new List<string>();
-            foreach (var aliasName in declaration.ReturnType
-                         .DescendantNodesAndSelf()
-                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
-            {
-                var alias = aliasName.Alias.Identifier.ValueText;
-                if (aliases.Contains(alias) && !usedAliases.Contains(alias, StringComparer.Ordinal))
-                {
-                    usedAliases.Add(alias);
-                }
-            }
-
-            if (usedAliases.Count > 0)
-            {
-                return (declaration.ReturnType.ToString(), usedAliases.ToEquatableArray());
-            }
-        }
-
-        return (declaredReturnType, EquatableArray<string>.Empty);
-    }
-
     private static (string Type, string MetadataType, EquatableArray<string> ExternAliases) GetDeclaredParameterType(
         IParameterSymbol parameter,
+        ExternAliasTypeFormatter typeFormatter,
         CancellationToken ct)
     {
-        var metadataType = TypeOfExpressionFormatter.Format(parameter.Type, ct);
-        foreach (var syntaxReference in parameter.DeclaringSyntaxReferences)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(ct) is not Microsoft.CodeAnalysis.CSharp.Syntax.ParameterSyntax declaration ||
-                declaration.Type is null)
-            {
-                continue;
-            }
-
-            var aliases = GetUsedExternAliases(declaration.Type, ct);
-            if (!aliases.IsEmpty)
-            {
-                return (
-                    declaration.Type.ToString(),
-                    ApplyExternAliases(metadataType, declaration.Type, ct),
-                    aliases);
-            }
-        }
-
-        return (parameter.Type.ToDisplayString(s_qualifiedFormat), metadataType, EquatableArray<string>.Empty);
-    }
-
-    private static EquatableArray<string> GetUsedExternAliases(
-        Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type,
-        CancellationToken ct)
-    {
-        var declaredAliases = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var directive in type.SyntaxTree.GetRoot(ct)
-                     .DescendantNodes()
-                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExternAliasDirectiveSyntax>())
-        {
-            declaredAliases.Add(directive.Identifier.ValueText);
-        }
-
         var usedAliases = new List<string>();
-        foreach (var aliasName in type.DescendantNodesAndSelf()
-                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
-        {
-            var alias = aliasName.Alias.Identifier.ValueText;
-            if (declaredAliases.Contains(alias) && !usedAliases.Contains(alias, StringComparer.Ordinal))
-            {
-                usedAliases.Add(alias);
-            }
-        }
-
-        return usedAliases.ToEquatableArray();
-    }
-
-    private static string ApplyExternAliases(
-        string type,
-        Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax declaration,
-        CancellationToken ct)
-    {
-        var searchStart = 0;
-        foreach (var aliasName in declaration.DescendantNodesAndSelf()
-                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
-        {
-            ct.ThrowIfCancellationRequested();
-            var globalName = ServicesGeneratorTypeNames.GlobalPrefix + aliasName.Name;
-            var match = type.IndexOf(globalName, searchStart, StringComparison.Ordinal);
-            if (match < 0)
-            {
-                continue;
-            }
-
-            var declaredName = aliasName.ToString();
-            type = type.Substring(0, match) + declaredName + type.Substring(match + globalName.Length);
-            searchStart = match + declaredName.Length;
-        }
-
-        return type;
+        var metadataType = TypeOfExpressionFormatter.Format(parameter.Type, ct, typeFormatter, usedAliases);
+        var type = typeFormatter.Format(parameter.Type, s_qualifiedFormat, usedAliases);
+        return (type, metadataType, usedAliases.ToEquatableArray());
     }
 
     private static string? GetConfiguredMethodName(IMethodSymbol methodSymbol)

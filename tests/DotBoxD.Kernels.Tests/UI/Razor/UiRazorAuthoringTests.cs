@@ -272,4 +272,18 @@ public sealed class UiRazorAuthoringTests
         Assert.All(steps.SelectMany(s => s.Outputs), o => Assert.Contains(o.Reason,
             new[] { IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged }));
     }
+
+    [Fact]
+    public void Component_models_are_equatable_and_hold_no_symbols_or_compilations()
+    {
+        var initial = Generate(Component, Markup);
+        var changed = initial.Compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText("internal class Unrelated {}"));
+        var driver = initial.Driver.RunGeneratorsAndUpdateCompilation(changed, out _, out _);
+        var outputs = driver.GetRunResult().Results[1].TrackedSteps["UiRazorComponentModels"].SelectMany(s => s.Outputs).ToArray();
+        Assert.NotEmpty(outputs);
+        Assert.All(outputs, o => Assert.Contains(o.Reason,
+            new[] { IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged }));
+        Assert.All(outputs.SelectMany(o => o.Value.GetType().GetProperties().Select(p => p.PropertyType)), type =>
+            Assert.False(typeof(ISymbol).IsAssignableFrom(type) || typeof(Compilation).IsAssignableFrom(type), type.FullName));
+    }
 }

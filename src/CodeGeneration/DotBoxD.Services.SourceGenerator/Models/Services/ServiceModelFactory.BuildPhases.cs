@@ -84,6 +84,7 @@ internal static partial class ServiceModelFactory
             interfaceMethods,
             interfaceProperties,
             ct);
+        unsupportedMemberDiagnostic ??= SubServicePropertyCycleDetector.Find(interfaceSymbol, interfaceProperties, ct);
         if (unsupportedMemberDiagnostic is not null)
         {
             members = default!;

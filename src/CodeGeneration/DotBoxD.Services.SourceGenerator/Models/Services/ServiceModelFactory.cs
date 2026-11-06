@@ -48,6 +48,21 @@ internal static partial class ServiceModelFactory
             return rejectedMembers;
         }
 
+        if (MemberUsageSuppressionInspector.Inspect(
+                interfaceSymbol,
+                members.Methods,
+                members.Properties,
+                context.SemanticModel.Compilation,
+                ct,
+                out var memberSuppressions) is { } rejectedMemberUsage)
+        {
+            return RejectedService(
+                buildContext.DisplayName,
+                rejectedMemberUsage.Reason,
+                rejectedMemberUsage.Location,
+                buildContext.QualifiedInterfaceName);
+        }
+
         ct.ThrowIfCancellationRequested();
 
         var serviceName = GetConfiguredServiceName(serviceAttribute) ?? interfaceSymbol.Name;
@@ -127,6 +142,7 @@ internal static partial class ServiceModelFactory
                 ObsoleteAttribute: obsoleteAttribute.Source,
                 TypeAttributePrefix: typeAttributePrefix,
                 ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId,
+                MemberUsageSuppressions: memberSuppressions,
                 GeneratedExtensionsType: GeneratedServiceTypeNames.Extensions(interfaceSymbol.ContainingAssembly.Name)),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
