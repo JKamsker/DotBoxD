@@ -7,6 +7,13 @@ namespace DotBoxD.Codecs.MessagePack;
 
 internal sealed class RpcStreamHandleFormatter : IMessagePackFormatter<RpcStreamHandle>
 {
+    /// <summary>
+    /// Smallest possible encoding of a valid handle: a fixmap header (1), the "StreamId" fixstr key (9)
+    /// with a positive fixint value (1), and the "Kind" fixstr key (5) with a fixint value (1). Both
+    /// fields are required, so no valid handle is shorter.
+    /// </summary>
+    internal const int MinimumEncodedSize = 17;
+
     public static readonly RpcStreamHandleFormatter Instance = new();
 
     private static readonly byte[] StreamIdKey = Encoding.UTF8.GetBytes("StreamId");

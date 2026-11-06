@@ -7,10 +7,13 @@ public static class SandboxLiteralConstraints
 {
     public const int MaxTextLiteralLength = 65_536;
 
+    // Windows reserves COM/LPT with digits 0-9 and the superscript digits 1-3 (U+00B9, U+00B2, U+00B3).
     private static readonly string[] ReservedWindowsDeviceNames = [
         "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+        "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "COM\u00B9", "COM\u00B2", "COM\u00B3",
+        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "LPT\u00B9", "LPT\u00B2", "LPT\u00B3"
     ];
 
     public static bool IsPortableRelativePath(string? path)
@@ -57,9 +60,11 @@ public static class SandboxLiteralConstraints
             return false;
         }
 
+        // Win32 path normalization strips trailing spaces from the base name, so "CON .txt" still
+        // opens the CON device.
         var extensionStart = segment.IndexOf('.');
         var deviceName = extensionStart < 0 ? segment : segment[..extensionStart];
-        return !IsReservedWindowsDeviceName(deviceName);
+        return !IsReservedWindowsDeviceName(deviceName.TrimEnd(' '));
     }
 
     public static bool IsSandboxUri(string? value)

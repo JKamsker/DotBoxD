@@ -37,12 +37,13 @@ internal static partial class ServiceModelFactory
             return rejectedService;
         }
 
-        if (!TryCollectServiceMembers(
+        if (!TryCollectInspectedServiceMembers(
                 interfaceSymbol,
                 context.SemanticModel.Compilation,
                 buildContext,
                 ct,
                 out var members,
+                out var memberSuppressions,
                 out var rejectedMembers))
         {
             return rejectedMembers;
@@ -127,6 +128,7 @@ internal static partial class ServiceModelFactory
                 ObsoleteAttribute: obsoleteAttribute.Source,
                 TypeAttributePrefix: typeAttributePrefix,
                 ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId,
+                MemberUsageSuppressions: memberSuppressions,
                 GeneratedExtensionsType: GeneratedServiceTypeNames.Extensions(interfaceSymbol.ContainingAssembly.Name)),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),

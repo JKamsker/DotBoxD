@@ -118,6 +118,29 @@ public sealed class UiCollectionTests
     }
 
     [Fact]
+    public async Task Grid_rejects_layouts_outside_install_ranges_at_build_time()
+    {
+        var builder = new UiBuilder();
+        var cells = Enumerable.Range(0, 65).Select(i => builder.Text($"cell {i}")).ToArray();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Grid(65, cells[0]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Grid(1, cells));
+
+        // Rejection happens before any child is given auto-placed Row/Column properties.
+        var untouched = builder.Build(builder.Stack(cells));
+        Assert.All(cells, cell => Assert.Single(untouched.Nodes.Single(n => n.Id == cell.Id).Properties));
+
+        // The largest valid shapes still build and install.
+        var valid = new UiBuilder();
+        var maxColumns = valid.Grid(64, [.. Enumerable.Range(0, 64).Select(i => valid.Text($"column {i}"))]);
+        var maxRows = valid.Grid(1, [.. Enumerable.Range(0, 64).Select(i => valid.Text($"row {i}"))]);
+        using var sandbox = UiTestFixture.Sandbox();
+        await using var session = await UiTestFixture.Host(sandbox)
+            .InstallAsync(valid.Build(valid.Stack(maxColumns, maxRows)), new RecordingUiRenderer());
+        Assert.NotNull(session);
+    }
+
+    [Fact]
     public async Task Keyed_rows_obey_the_independent_child_limit_before_install()
     {
         var b = new UiBuilder();

@@ -23,7 +23,7 @@ public sealed partial class PluginSession
         {
             ThrowIfDisposed();
             var kernel = await _server.InstallOwnedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
-            _ownedInstallIds.Add(kernel.InstallId);
+            TrackOwnedInstall(kernel);
             return kernel;
         }
         finally
@@ -49,7 +49,7 @@ public sealed partial class PluginSession
         {
             ThrowIfDisposed();
             var kernel = await _server.InstallOwnedServerExtensionAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
-            _ownedInstallIds.Add(kernel.InstallId);
+            TrackOwnedInstall(kernel);
             return kernel;
         }
         finally
@@ -146,7 +146,7 @@ public sealed partial class PluginSession
             // wiring has succeeded.
             staged = await _server.InstallOwnedStagedAsync(this, package, installPolicy, cancellationToken)
                 .ConfigureAwait(false);
-            _ownedInstallIds.Add(staged.InstallId);
+            TrackOwnedInstall(staged);
             cancellationToken.ThrowIfCancellationRequested();
 
             wire(staged);
@@ -154,6 +154,7 @@ public sealed partial class PluginSession
             cancellationToken.ThrowIfCancellationRequested();
 
             _server.PromoteOwned(this, staged);
+            PruneUnregisteredInstallIds();
             return staged;
         }
         catch
@@ -246,7 +247,7 @@ public sealed partial class PluginSession
         {
             ThrowIfDisposed();
             var kernel = await _server.InstallOwnedStagedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
-            _ownedInstallIds.Add(kernel.InstallId);
+            TrackOwnedInstall(kernel);
             return kernel;
         }
         finally
@@ -275,6 +276,7 @@ public sealed partial class PluginSession
             }
 
             _server.PromoteOwned(this, kernel);
+            PruneUnregisteredInstallIds();
         }
         finally
         {

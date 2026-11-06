@@ -74,6 +74,7 @@ public sealed class TcpFrameSendOperationTests
         Assert.Equal("controlled write failure", error.Message);
         Assert.Equal(1, source.GetResultCount);
         Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
+        Assert.False(pair.Connection.IsConnected);
         TcpSendTestFrames.AssertDisposed(frame);
     }
 
@@ -99,6 +100,10 @@ public sealed class TcpFrameSendOperationTests
         Assert.Equal(cancellation.Token, error.CancellationToken);
         Assert.True(send.IsCanceled);
         Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
+
+        // The write had started, so a partial frame may be on the wire: the connection must be poisoned
+        // rather than left reusable for a later frame to be appended after a truncated one.
+        Assert.False(pair.Connection.IsConnected);
         TcpSendTestFrames.AssertDisposed(frame);
     }
 
@@ -123,13 +128,17 @@ public sealed class TcpFrameSendOperationTests
         TcpSendTestFrames.AssertDisposed(frame);
         Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
 
+        // The failed write may have left a partial frame on the wire, so its connection is poisoned;
+        // operation reuse is observed on a fresh connection.
+        Assert.False(pair.Connection.IsConnected);
+        await using var successorPair = await TcpSendTestPair.CreateAsync();
         var retainedBeforeReuse = TcpFrameSendOperation.RetainedCountForTests;
         Assert.True(retainedBeforeReuse > 0);
-        Assert.True(pair.Connection.SendGate.Wait(0));
+        Assert.True(successorPair.Connection.SendGate.Wait(0));
         var successorFrame = TcpSendTestFrames.CreateOwned(messageId: 616);
         var successorSource = new ControlledPendingSend();
         var successor = TcpConnectionFrameSender.ContinuePendingWriteForTests(
-            pair.Connection,
+            successorPair.Connection,
             successorFrame,
             CancellationToken.None,
             successorSource.Pending);
@@ -140,7 +149,7 @@ public sealed class TcpFrameSendOperationTests
 
         Assert.Equal(1, successorSource.GetResultCount);
         Assert.Equal(retainedBeforeReuse, TcpFrameSendOperation.RetainedCountForTests);
-        Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
+        Assert.Equal(1, successorPair.Connection.SendGate.CurrentCount);
         TcpSendTestFrames.AssertDisposed(successorFrame);
     }
 

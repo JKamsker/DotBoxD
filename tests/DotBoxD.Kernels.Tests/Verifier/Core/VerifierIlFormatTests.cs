@@ -64,6 +64,38 @@ public sealed class VerifierIlFormatTests
         Assert.Contains(result.Diagnostics, d => d.Code == "V-IL-FORMAT");
     }
 
+    [Theory]
+    [InlineData(0x70000001)]
+    [InlineData(0x01000001)]
+    public async Task Verifier_reports_non_member_call_token_as_il_format(int token)
+    {
+        var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var method = type.DefineMethod(
+                "Execute",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext), typeof(SandboxValue)]);
+            var il = method.GetILGenerator();
+            for (var i = 0; i < 5; i++)
+            {
+                il.Emit(OpCodes.Nop);
+            }
+
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ret);
+        });
+        var ilBytes = ReadExecuteIl(bytes);
+        var ilStart = IndexOf(bytes, ilBytes);
+        bytes[ilStart] = 0x28;
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(ilStart + 1, sizeof(int)), token);
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code is "V-IL-FORMAT" or "V-MEMBER");
+    }
+
     private static byte[] ReadExecuteIl(byte[] assemblyBytes)
     {
         using var stream = new MemoryStream(assemblyBytes, writable: false);

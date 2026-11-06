@@ -81,10 +81,13 @@ public sealed class OwnedFrameSendLifecycleTests
         Assert.Same(failure, thrown);
         AssertDisposed(frame);
 
-        var followUp = CreateFrame(out var expected);
-        await connection.SendFrameValueAsync(followUp).AsTask().WaitAsync(Timeout);
+        // The failed write/flush may have left a partial frame on the stream, so the connection is
+        // poisoned instead of reused: a follow-up frame must never be appended after a truncated one.
+        Assert.False(connection.IsConnected);
+        var followUp = CreateFrame(out _);
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => connection.SendFrameValueAsync(followUp).AsTask().WaitAsync(Timeout));
         AssertDisposed(followUp);
-        Assert.Equal(expected, stream.WrittenBytes);
     }
 
     [Theory]

@@ -80,6 +80,7 @@ public sealed partial class HookRegistry
                 created = false;
                 var pipeline = (HookPipeline<TEvent, HookContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, ServerContextFactory<HookContext>.Identity, "hook");
+                _provisionalWirePipelines.Remove(existing);
                 return pipeline;
             }
 
@@ -91,8 +92,10 @@ public sealed partial class HookRegistry
                 _kernels,
                 _installer,
                 _onFault,
-                NextResultOrder);
+                NextResultOrder,
+                _throwIfDisposed);
             _pipelines[key] = createdPipeline;
+            _provisionalWirePipelines.Add(createdPipeline);
             PublishEventFanoutLocked(typeof(TEvent));
             return createdPipeline;
         }
@@ -105,7 +108,9 @@ public sealed partial class HookRegistry
         lock (_gate)
         {
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (!_pipelines.TryGetValue(key, out var existing) ||
+            // Only the creating wire may roll back, and only while no other caller has claimed the pipeline.
+            if (!_provisionalWirePipelines.Remove(pipeline) ||
+                !_pipelines.TryGetValue(key, out var existing) ||
                 !ReferenceEquals(existing, pipeline) ||
                 !pipeline.UsesAdapter(adapter))
             {

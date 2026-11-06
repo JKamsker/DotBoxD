@@ -114,6 +114,7 @@ public sealed partial class RpcHost : IAsyncDisposable
         }
 
         peer.Disconnected += OnPeerDisconnected;
+        peer.SetDisposedCallback(OnPeerDisposed);
         if (!TryRegisterPeer(peer, admission))
         {
             await DisposeUnregisteredPeerAsync(peer, admission).ConfigureAwait(false);
@@ -237,6 +238,13 @@ public sealed partial class RpcHost : IAsyncDisposable
 
     private void RaiseAcceptError(Exception ex) =>
         RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
+
+    // A locally disposed peer does not raise Disconnected, so this is what frees its slot then.
+    private void OnPeerDisposed(RpcPeer peer)
+    {
+        peer.Disconnected -= OnPeerDisconnected;
+        _peers.Remove(peer);
+    }
 
     private void OnPeerDisconnected(object? sender, RpcDisconnectedEventArgs args)
     {

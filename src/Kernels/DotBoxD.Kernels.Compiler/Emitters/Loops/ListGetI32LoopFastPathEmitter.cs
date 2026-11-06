@@ -1,5 +1,4 @@
 using System.Reflection.Emit;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 
@@ -18,8 +17,8 @@ internal static class ListGetI32LoopFastPathEmitter
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         if (stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            !CanEmitBound(range.Start, stackPlan) ||
-            !CanEmitBound(range.End, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.Start, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.End, stackPlan) ||
             !TryCreatePlan(range, stackPlan, out var plan))
         {
             return false;
@@ -70,9 +69,9 @@ internal static class ListGetI32LoopFastPathEmitter
         var count = il.DeclareLocal(typeof(int));
         var readFuel = il.DeclareLocal(typeof(long));
         var reader = il.DeclareLocal(typeof(object));
-        EmitBound(range.Start, il, declare);
+        RawForRangeEmitter.EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
-        EmitBound(range.End, il, declare);
+        RawForRangeEmitter.EmitBound(range.End, il, declare);
         il.Emit(OpCodes.Stloc, end);
 
         var fallback = il.DefineLabel();
@@ -131,7 +130,10 @@ internal static class ListGetI32LoopFastPathEmitter
         ILGenerator il,
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
+        // The cycle helper assumes the index sequence 0..n-1 is independent of the target, so a target that
+        // is the loop variable itself (rewritten every iteration) must take the per-iteration loop.
         if (!plan.AddToTarget ||
+            string.Equals(plan.Target, range.LocalName, StringComparison.Ordinal) ||
             range.Start is not LiteralExpression { Value: I32Value { Value: 0 } } ||
             !plan.Index.TryGetVariableRemainderConstant(out var name, out var divisor) ||
             !string.Equals(name, range.LocalName, StringComparison.Ordinal) ||
@@ -269,30 +271,6 @@ internal static class ListGetI32LoopFastPathEmitter
     private static bool IsTargetVariable(Expression expression, string target)
         => expression is VariableExpression variable &&
            string.Equals(variable.Name, target, StringComparison.Ordinal);
-
-    private static void EmitBound(
-        Expression expression,
-        ILGenerator il,
-        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                EmitInt32(il, value.Value);
-                break;
-            case VariableExpression variable:
-                il.Emit(OpCodes.Ldloc, declare(variable.Name).Local);
-                break;
-            default:
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.ValidationError,
-                    "unsupported forRange bound"));
-        }
-    }
-
-    private static bool CanEmitBound(Expression expression, LocalStackKindPlanner stackPlan)
-        => expression is LiteralExpression { Value: I32Value } ||
-           expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 
     private readonly record struct LoopPlan(string Target, string Source, I32IndexExpressionPlan Index, bool AddToTarget, int LoopFuelPerIteration);
 }

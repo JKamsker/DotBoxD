@@ -21,15 +21,18 @@ internal sealed class FunctionFrameLayout
 
     private readonly Dictionary<string, int> _slots;
     private readonly SlotKind[] _slotKinds;
+    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _moduleFunctions;
     private FunctionLoopPlans _loopPlans;
 
     private FunctionFrameLayout(
         string functionId,
         Dictionary<string, int> slots,
         SlotKind[] slotKinds,
-        int parameterSlotCount)
+        int parameterSlotCount,
+        IReadOnlyDictionary<string, FunctionAnalysis> moduleFunctions)
     {
         FunctionId = functionId;
+        _moduleFunctions = moduleFunctions;
         _slots = slots;
         _slotKinds = slotKinds;
         SlotCount = slots.Count;
@@ -71,8 +74,12 @@ internal sealed class FunctionFrameLayout
             function.Id,
             slots,
             BuildSlotKinds(function, functionAnalysis, bindings, slots),
-            parameterSlotCount);
+            parameterSlotCount,
+            functionAnalysis);
     }
+
+    // A module function shadows any binding with the same id (validation resolves it first).
+    public bool IsModuleFunction(string id) => _moduleFunctions.ContainsKey(id);
 
     public int GetSlot(string name)
         => _slots.TryGetValue(name, out var slot)

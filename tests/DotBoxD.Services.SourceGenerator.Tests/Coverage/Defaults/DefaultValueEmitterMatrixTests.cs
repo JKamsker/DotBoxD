@@ -9,6 +9,7 @@ public sealed class ServiceDefaultValueEmitterMatrixTests
         { "primitive", "int amount = 7", "int amount = 7" },
         { "nullable", "int? maybe = null", "int? maybe = null" },
         { "enum", "Mode mode = Mode.Slow", "global::Matrix.Service.Mode mode = (global::Matrix.Service.Mode)2" },
+        { "negative-enum", "Mode mode = Mode.Neg", "global::Matrix.Service.Mode mode = (global::Matrix.Service.Mode)(-1)" },
         {
             "datetime-metadata",
             "[Optional, DateTimeConstant(0L)] DateTime when",
@@ -63,6 +64,7 @@ public sealed class ServiceDefaultValueEmitterMatrixTests
 
             public enum Mode
             {
+                Neg = -1,
                 Fast = 1,
                 Slow = 2
             }

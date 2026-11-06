@@ -68,6 +68,41 @@ internal static partial class ServiceModelFactory
             : null;
     }
 
+    private static bool TryCollectInspectedServiceMembers(
+        INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
+        ServiceBuildContext context,
+        CancellationToken ct,
+        out ServiceMembers members,
+        out MemberUsageSuppressions suppressions,
+        out ServiceResult rejected)
+    {
+        suppressions = default!;
+        if (!TryCollectServiceMembers(interfaceSymbol, compilation, context, ct, out members, out rejected))
+        {
+            return false;
+        }
+
+        var unsupported = MemberUsageSuppressionInspector.Inspect(
+            interfaceSymbol,
+            members.Methods,
+            members.Properties,
+            compilation,
+            ct,
+            out suppressions);
+        if (unsupported is null)
+        {
+            return true;
+        }
+
+        rejected = RejectedService(
+            context.DisplayName,
+            unsupported.Value.Reason,
+            unsupported.Value.Location,
+            context.QualifiedInterfaceName);
+        return false;
+    }
+
     private static bool TryCollectServiceMembers(
         INamedTypeSymbol interfaceSymbol,
         Compilation compilation,
@@ -84,6 +119,7 @@ internal static partial class ServiceModelFactory
             interfaceMethods,
             interfaceProperties,
             ct);
+        unsupportedMemberDiagnostic ??= SubServicePropertyCycleDetector.Find(interfaceSymbol, interfaceProperties, ct);
         if (unsupportedMemberDiagnostic is not null)
         {
             members = default!;

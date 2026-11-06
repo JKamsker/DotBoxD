@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
@@ -78,7 +79,19 @@ internal sealed record ServiceModel(
     string ObsoleteAttribute = "",
     string TypeAttributePrefix = "",
     string ExperimentalDiagnosticId = "",
-    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions");
+    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions",
+    MemberUsageSuppressions? MemberUsageSuppressions = null)
+{
+    /// <summary>Warning/experimental ids the per-service generated files suppress.</summary>
+    public IEnumerable<string> GeneratedSuppressionIds()
+    {
+        yield return ExperimentalDiagnosticId;
+        foreach (var id in (MemberUsageSuppressions ?? MemberUsageSuppressions.None).All)
+        {
+            yield return id;
+        }
+    }
+}
 
 /// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
 internal sealed record ServicePropertyModel(

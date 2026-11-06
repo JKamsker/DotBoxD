@@ -106,7 +106,13 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         public override void Post(SendOrPostCallback d, object? state)
         {
             ArgumentNullException.ThrowIfNull(d);
-            Enqueue(new WorkItem(d, state, null));
+            if (!TryEnqueue(new WorkItem(d, state, null)))
+            {
+                // A host binding that outlived the kernel run (wall-time timeout or cancellation) may still
+                // resume an await captured on this pump; run it on the thread pool instead of throwing from
+                // the continuation dispatch, which would surface as an unhandled thread-pool exception.
+                base.Post(d, state);
+            }
         }
 
         public override void Send(SendOrPostCallback d, object? state)
@@ -119,7 +125,7 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
             }
 
             using var waitState = new SendWaitState(this);
-            Enqueue(new WorkItem(d, state, waitState));
+            ObjectDisposedException.ThrowIf(!TryEnqueue(new WorkItem(d, state, waitState)), this);
             waitState.Wait();
         }
 
@@ -142,7 +148,18 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
 
             foreach (var item in pending)
             {
-                item.WaitState?.CancelDisposed();
+                if (item.WaitState is null)
+                {
+                    // Forward queued posts (e.g. await continuations of a binding abandoned on timeout) to
+                    // the thread pool so their finally blocks still run; the pump no longer retains them.
+                    // The disposing thread's execution context is not theirs, so do not flow it.
+                    ThreadPool.UnsafeQueueUserWorkItem(
+                        static work => work.Callback(work.State), item, preferLocal: false);
+                }
+                else
+                {
+                    item.WaitState.CancelDisposed();
+                }
             }
 
             _signal.Dispose();
@@ -160,13 +177,18 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
             }
         }
 
-        private void Enqueue(WorkItem item)
+        private bool TryEnqueue(WorkItem item)
         {
             lock (_queue)
             {
-                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_disposed)
+                {
+                    return false;
+                }
+
                 _queue.Enqueue(item);
                 Signal();
+                return true;
             }
         }
 

@@ -16,8 +16,7 @@ internal static class InvokeAsyncClosureCaptureWeaver
         }
 
         var closureMap = InvokeAsyncClosureMap.Discover(module, generatedType);
-        var targetGetter = module.ImportReference(
-            typeof(Delegate).GetProperty(nameof(Delegate.Target))!.GetMethod);
+        var targetGetter = CreateDelegateTargetGetter(module);
         var rewrittenInterceptors = 0;
         var rewrittenAccesses = 0;
 
@@ -62,6 +61,14 @@ internal static class InvokeAsyncClosureCaptureWeaver
             return 0;
         }
 
+        if (IsGeneric(closure))
+        {
+            // A closure of a generic method/type (<>c__DisplayClass0_0`1<T>) can only be cast to and
+            // loaded from through its instantiation, which the call site does not provide here.
+            info($"DotBoxD InvokeAsync weaver kept reflection fallback for {interceptor.Name}: closure type is generic.");
+            return 0;
+        }
+
         if (!CanExposeClosure(closure))
         {
             warning($"DotBoxD InvokeAsync weaver kept reflection fallback for {interceptor.Name}: closure type is not safely accessible.");
@@ -71,6 +78,34 @@ internal static class InvokeAsyncClosureCaptureWeaver
         MakeClosureAssemblyVisible(closure);
         return captureMethods.Sum(method =>
             InvokeAsyncCaptureAccessRewriter.Rewrite(method, closure, targetGetter, warning));
+    }
+
+    // Reference Delegate.get_Target through the woven module's own core library (mscorlib,
+    // netstandard, or System.Runtime) rather than through the reflection type of the build host,
+    // which would add a System.Private.CoreLib reference the target framework may not have.
+    private static MethodReference CreateDelegateTargetGetter(ModuleDefinition module)
+    {
+        var delegateType = new TypeReference("System", "Delegate", module, module.TypeSystem.CoreLibrary);
+        return new MethodReference(
+            DotBoxDInvokeAsyncWeaverNames.DelegateTargetGetterName,
+            module.TypeSystem.Object,
+            delegateType)
+        {
+            HasThis = true,
+        };
+    }
+
+    private static bool IsGeneric(TypeDefinition closure)
+    {
+        for (var current = closure; current is not null; current = current.DeclaringType)
+        {
+            if (current.HasGenericParameters)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IEnumerable<MethodDefinition> FindCaptureMethods(

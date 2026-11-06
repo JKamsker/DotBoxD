@@ -58,6 +58,9 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
     internal void ReleaseSendGate() => TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
+    // Disposal is synchronous here; it publishes the disposed state the next sender observes.
+    internal void AbortAfterFailedWrite() => DisposeCore();
+
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         SendValueAsync(data, ct).AsTask();
 
@@ -155,13 +158,19 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
 
     public ValueTask DisposeAsync()
     {
+        DisposeCore();
+        return default;
+    }
+
+    private void DisposeCore()
+    {
         if (!ReceiveConcurrencyGuard.TryPublishDisposedAndReleaseBufferIfIdle(
                 ref _disposed,
                 ref _activeReceive,
                 hasPooledBuffer: true,
                 ref _receiveBuffer))
         {
-            return default;
+            return;
         }
 
         TransportSendGate.WakeDisposedWaiters(_sendLock);
@@ -176,8 +185,6 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
         {
             // Ignore errors during cleanup
         }
-
-        return default;
     }
 
     private void ThrowIfDisposed()

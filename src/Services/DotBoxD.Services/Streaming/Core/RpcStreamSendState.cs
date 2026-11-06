@@ -4,12 +4,18 @@ namespace DotBoxD.Services.Streaming.Core;
 
 internal sealed class RpcStreamSendState : IDisposable
 {
+    private const int TerminalPending = 0;
+    private const int TerminalRemoteCanceled = 1;
+    private const int TerminalSettled = 2;
+    private const int TerminalMissing = 3;
+
     private readonly CancellationTokenSource _cts;
     private readonly CancellationToken _token;
     private readonly SemaphoreSlim _credits = new(0);
     private int _availableCredits;
     private int _disposed;
     private int _removalClaimed;
+    private int _terminalState;
 
     public RpcStreamSendState(int streamId, CancellationToken ownerToken)
     {
@@ -80,6 +86,34 @@ internal sealed class RpcStreamSendState : IDisposable
         }
     }
 
+    // The receiver keeps a tombstone after it sends StreamCancel until a terminal frame arrives,
+    // so a remotely canceled stream must still end with exactly one terminal frame.
+    internal bool IsRemoteCanceled => Volatile.Read(ref _terminalState) == TerminalRemoteCanceled;
+
+    /// <summary>
+    /// Records a remote StreamCancel. Returns <see langword="true"/> when the pump already ended
+    /// without a terminal frame, so the caller must send the acknowledgement itself.
+    /// </summary>
+    internal bool MarkRemoteCanceled() =>
+        Interlocked.CompareExchange(ref _terminalState, TerminalRemoteCanceled, TerminalPending) != TerminalPending &&
+        Interlocked.CompareExchange(ref _terminalState, TerminalSettled, TerminalMissing) == TerminalMissing;
+
+    /// <summary>
+    /// Records that the pump stopped. Returns <see langword="true"/> when a remote cancel arrived and
+    /// no terminal frame was sent, so the pump must send the acknowledgement.
+    /// </summary>
+    internal bool CompletePump(bool terminalSent)
+    {
+        var next = terminalSent ? TerminalSettled : TerminalMissing;
+        if (Interlocked.CompareExchange(ref _terminalState, next, TerminalPending) == TerminalPending)
+        {
+            return false;
+        }
+
+        Volatile.Write(ref _terminalState, TerminalSettled);
+        return !terminalSent;
+    }
+
     internal bool TryClaimRemoval() => Interlocked.Exchange(ref _removalClaimed, 1) == 0;
 
     public void Cancel()
@@ -127,5 +161,35 @@ internal sealed class RpcStreamSendState : IDisposable
 
         _credits.Dispose();
         _cts.Dispose();
+    }
+
+    // A canceled wait can abandon a terminal send that still completes. After a remote cancel,
+    // observe its real outcome (its token is canceled) so the acknowledgement is not duplicated.
+    internal ValueTask<bool> WasTerminalSentAsync(Task? terminal)
+    {
+        if (terminal is null)
+        {
+            return new ValueTask<bool>(false);
+        }
+
+        if (terminal.IsCompleted || !IsRemoteCanceled)
+        {
+            return new ValueTask<bool>(terminal.IsCompletedSuccessfully);
+        }
+
+        return WaitForSendAsync(terminal);
+
+        static async ValueTask<bool> WaitForSendAsync(Task send)
+        {
+            try
+            {
+                await send.ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

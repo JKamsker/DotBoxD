@@ -63,6 +63,44 @@ public sealed class EventQueryPlanContractTests
         Assert.Equal(IndexCoverage.Partial, plan.Coverage);
     }
 
+    [Theory]
+    [InlineData(QueryComparisonOperator.GreaterThan)]
+    [InlineData(QueryComparisonOperator.GreaterThanOrEqual)]
+    [InlineData(QueryComparisonOperator.LessThan)]
+    [InlineData(QueryComparisonOperator.LessThanOrEqual)]
+    public void String_and_boolean_ranges_stay_residual_instead_of_claiming_host_coverage(QueryComparisonOperator op)
+    {
+        // The query comparer orders strings ordinally and never matches a boolean ordering, whereas a host
+        // index orders by its own rules; claiming full coverage would let the host index decide these terms.
+        foreach (var value in new[] { QueryValue.FromString("B"), QueryValue.FromBoolean(false) })
+        {
+            var term = QueryFilter.Compare("AttackerId", op, value);
+
+            var plan = EventQueryPlanner.Plan(term);
+
+            Assert.Empty(plan.IndexedPredicates);
+            Assert.Empty(plan.RoutingKeys);
+            Assert.Same(term, plan.ResidualFilter);
+            Assert.Equal(IndexCoverage.None, plan.Coverage);
+        }
+    }
+
+    [Fact]
+    public void String_and_boolean_equality_remain_host_indexed()
+    {
+        var filter = QueryFilter.And(
+        [
+            QueryFilter.Compare("AttackerId", QueryComparisonOperator.Equal, QueryValue.FromString("B")),
+            QueryFilter.Compare("Critical", QueryComparisonOperator.Equal, QueryValue.FromBoolean(true)),
+        ]);
+
+        var plan = EventQueryPlanner.Plan(filter);
+
+        Assert.Equal(2, plan.IndexedPredicates.Count);
+        Assert.Null(plan.ResidualFilter);
+        Assert.Equal(IndexCoverage.Full, plan.Coverage);
+    }
+
     private static EventQueryPlan CreateMalformedPlan(MalformedPlanShape shape)
     {
         var predicate = Predicate("AttackerId");

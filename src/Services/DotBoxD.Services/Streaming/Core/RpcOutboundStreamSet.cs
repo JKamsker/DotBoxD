@@ -185,10 +185,12 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     private async Task PumpAsync(RpcStreamAttachment attachment, RpcStreamSendState state)
     {
+        Task? terminal = null;
         try
         {
             await attachment.PumpCoreAsync(_manager, _serializer, state.Token).ConfigureAwait(false);
-            await SendStreamCompleteAsync(state).ConfigureAwait(false);
+            terminal = _manager.SendStreamCompleteAsync(state.StreamId, state.Token);
+            await RpcTaskWaiter.WaitAsync(terminal, state.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (state.IsCancellationRequested)
         {
@@ -203,7 +205,8 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             RpcDiagnostics.Report("Outbound stream pump failed", ex);
             try
             {
-                await SendStreamErrorAsync(state, ex).ConfigureAwait(false);
+                terminal = _manager.SendStreamErrorAsync(state.StreamId, ex, state.Token);
+                await RpcTaskWaiter.WaitAsync(terminal, state.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (state.IsCancellationRequested)
             {
@@ -215,21 +218,20 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
         finally
         {
-            _manager.RemoveOutbound(state, completed: true);
-            attachment.ReleaseOutboundRegistration();
+            try
+            {
+                // Acknowledge before removal so the stream id stays claimed until its terminal frame.
+                if (state.CompletePump(await state.WasTerminalSentAsync(terminal).ConfigureAwait(false)))
+                {
+                    await _manager.AcknowledgeRemoteCancelAsync(state.StreamId).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _manager.RemoveOutbound(state, completed: true);
+                attachment.ReleaseOutboundRegistration();
+            }
         }
-    }
-
-    private async Task SendStreamCompleteAsync(RpcStreamSendState state)
-    {
-        var send = _manager.SendStreamCompleteAsync(state.StreamId, state.Token);
-        await RpcTaskWaiter.WaitAsync(send, state.Token).ConfigureAwait(false);
-    }
-
-    private async Task SendStreamErrorAsync(RpcStreamSendState state, Exception error)
-    {
-        var send = _manager.SendStreamErrorAsync(state.StreamId, error, state.Token);
-        await RpcTaskWaiter.WaitAsync(send, state.Token).ConfigureAwait(false);
     }
 
     private async Task WaitForPumpTasksAsync(Task[] tasks)

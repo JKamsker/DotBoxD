@@ -65,7 +65,7 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
 
             var currentIndex = analysis.IndexByOffset[candidate.Offset];
             var charged = state.Charged ||
-                IsChargeForLocal(analysis.Instructions, currentIndex, localIndex);
+                IsChargeForLocal(analysis, currentIndex, localIndex);
             if (candidate.Opcode == ILOpCode.Ret)
             {
                 if (!charged &&
@@ -105,18 +105,23 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         }
     }
 
+    // The charged operand is read from the textually preceding loads, so they must reach the charge
+    // call by straight-line fall-through; a branch could otherwise skip them with another value.
     private static bool IsChargeForLocal(
-        IReadOnlyList<GeneratedInstruction> instructions,
+        GeneratedMethodFlow analysis,
         int index,
         int localIndex)
     {
+        var instructions = analysis.Instructions;
         var instruction = instructions[index];
         return instruction.CalledMember switch
         {
             var signature when signature == ChargeSandboxValueSignature
-                => PreviousInstructionLoadsLocal(instructions, index, localIndex),
+                => GeneratedInstructionPredecessors.PreviousRunIsStraightLine(analysis, index, 1) &&
+                   PreviousInstructionLoadsLocal(instructions, index, localIndex),
             var signature when signature == ChargeSandboxValuesSignature
-                => ValueArgumentLoadsLocal(instructions, index, localIndex) &&
+                => GeneratedInstructionPredecessors.PreviousRunIsStraightLine(analysis, index, 2) &&
+                   ValueArgumentLoadsLocal(instructions, index, localIndex) &&
                    PreviousInstructionLoadsPositiveInt32(instructions, index),
             _ => false
         };

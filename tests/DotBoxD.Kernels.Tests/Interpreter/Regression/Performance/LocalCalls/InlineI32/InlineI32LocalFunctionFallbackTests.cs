@@ -173,24 +173,18 @@ public sealed class InlineI32LocalFunctionFallbackTests
     }
 
     [Fact]
-    public async Task Collection_intrinsic_keeps_precedence_over_a_colliding_local_function()
+    public async Task Local_function_colliding_with_a_collection_intrinsic_is_rejected()
     {
+        // The inline fast path resolves local functions before intrinsics, so a colliding helper
+        // would make call resolution backend-dependent; validation rejects the module instead.
         using var host = SandboxTestHost.Create();
-        var plan = await InlineI32LocalFunctionTestSupport.PrepareAsync(
-            host,
-            InlineI32LocalFunctionModules.CollectionPrecedence);
-        var result = await new SandboxInterpreter().ExecuteAsync(
-            plan,
-            "main",
-            SandboxValue.FromList(
-                [SandboxValue.FromInt32(1), SandboxValue.FromInt32(2)],
-                SandboxType.I32),
-            InlineI32LocalFunctionTestSupport.Options(),
-            CancellationToken.None);
 
-        Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal(2, InlineI32LocalFunctionTestSupport.ReadInt32(result));
-        Assert.Equal(10, result.ResourceUsage.FuelUsed);
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await InlineI32LocalFunctionTestSupport.PrepareAsync(
+                host,
+                InlineI32LocalFunctionModules.CollectionPrecedence));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-STRUCT-FN-SHADOW" && d.Message.Contains("list.count", StringComparison.Ordinal));
     }
 
     [Fact]

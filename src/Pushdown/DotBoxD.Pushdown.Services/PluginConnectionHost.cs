@@ -22,6 +22,25 @@ namespace DotBoxD.Pushdown.Services;
 /// <typeparam name="TConnection">The per-connection object <c>configure</c> returns (e.g. the control service).</typeparam>
 public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
 {
+    // Concurrent inbound handlers the default plugin-boundary profile admits per connection.
+    private const int DefaultMaxConcurrentInboundDispatch = 64;
+
+    // Default for the untrusted plugin boundary. It keeps the low-allocation server profile's request
+    // timeout and handler-cancellation choices, but NOT its unbounded inbound queue: an unbounded queue
+    // dispatches every request immediately with no cap on concurrent work or buffered bytes, which a
+    // plugin flooding requests (while never reading responses) could use to grow host memory without
+    // bound. Inbound work is instead bounded by the library's normal secure defaults (queue capacity +
+    // MaxInboundBytes) with concurrent - not serial - dispatch, so long-held plugin calls (e.g. a
+    // "hold until shutdown" call) do not block later calls from the same plugin.
+    private static readonly RpcPeerOptions DefaultPluginPeerOptions = new()
+    {
+        RequestTimeout = Timeout.InfiniteTimeSpan,
+        DisableInboundRequestCancellation = true,
+        InboundQueueCapacity = RpcPeerOptions.DefaultInboundQueueCapacity,
+        MaxInboundBytes = RpcPeerOptions.DefaultMaxInboundBytes,
+        MaxConcurrentInboundDispatch = DefaultMaxConcurrentInboundDispatch
+    };
+
     private readonly TaskCompletionSource<TConnection> _connected =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -59,7 +78,8 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     /// high-entropy pipe-name validation). For the connecting peer the host mints a session and invokes
     /// <paramref name="configure"/>(peer, session) — where the caller provides its host services over the session
     /// and returns the per-connection object surfaced by <see cref="Connected"/>. The session is disposed
-    /// automatically when the peer disconnects or the host is stopped/disposed.
+    /// automatically when the peer disconnects or the host is stopped/disposed. A <see langword="null"/>
+    /// <paramref name="options"/> uses a bounded inbound profile suited to an untrusted plugin peer.
     /// </summary>
     public static Task<PluginConnectionHost<TConnection>> StartAsync(
         PluginServer server,
@@ -72,13 +92,14 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
             server,
             pipeName,
             configure,
-            configurePeer => RpcMessagePackIpc.ListenNamedPipe(pipeName, configurePeer, options));
+            configurePeer => RpcMessagePackIpc.ListenNamedPipe(pipeName, configurePeer, options ?? DefaultPluginPeerOptions));
     }
 
     /// <summary>
     /// Starts listening over any <paramref name="transport"/> (TCP, in-memory, …) — the transport-agnostic
     /// form, so a host is not locked to named pipes. Same per-connection lifecycle as the pipe overload;
-    /// <see cref="PipeName"/> is empty.
+    /// <see cref="PipeName"/> is empty. A <see langword="null"/> <paramref name="options"/> uses the same bounded
+    /// inbound profile as the pipe overload.
     /// </summary>
     public static Task<PluginConnectionHost<TConnection>> StartAsync(
         PluginServer server,
@@ -91,7 +112,7 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
             server,
             pipeName: string.Empty,
             configure,
-            configurePeer => RpcMessagePackIpc.Listen(transport, configurePeer, options));
+            configurePeer => RpcMessagePackIpc.Listen(transport, configurePeer, options ?? DefaultPluginPeerOptions));
     }
 
     private static async Task<PluginConnectionHost<TConnection>> StartCoreAsync(

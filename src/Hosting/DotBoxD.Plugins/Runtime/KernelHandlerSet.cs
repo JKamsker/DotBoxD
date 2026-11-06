@@ -23,6 +23,13 @@ internal sealed class KernelHandlerSet<TEvent, TContext>
     {
         lock (_gate)
         {
+            // Revocation sets the flag before detaching the kernel's handlers (under this gate), so a kernel
+            // revoked while it is being wired is either seen here or removed afterward; never left dangling.
+            if (kernel.IsRevoked)
+            {
+                return;
+            }
+
             AddCore(handler);
             if (!_kernelHandlers.TryGetValue(kernel, out var handlers))
             {
@@ -38,6 +45,11 @@ internal sealed class KernelHandlerSet<TEvent, TContext>
     {
         lock (_gate)
         {
+            if (pool.IsRevoked)
+            {
+                return;
+            }
+
             AddCore(handler);
             if (!_poolHandlers.TryGetValue(pool, out var handlers))
             {

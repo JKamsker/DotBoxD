@@ -111,6 +111,7 @@ internal static class StringLengthForLoopRunner
     {
         sourceSlot = 0;
         return expression is CallExpression { Name: "string.length", Arguments.Count: 1 } call &&
+               !frame.Layout.IsModuleFunction(call.Name) &&
                call.Arguments[0] is VariableExpression source &&
                frame.TryGetStringSlot(source.Name, out sourceSlot);
     }

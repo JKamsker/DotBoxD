@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter.Regression.ReviewFindings;
 
 namespace DotBoxD.Kernels.Tests.Interpreter.Regression.Performance;
 
@@ -43,6 +44,15 @@ public sealed class I64LoopPlanSemanticsTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.InvalidInput, result.Error!.Code);
         Assert.Equal("integer overflow", result.Error.SafeMessage);
+    }
+
+    [Fact]
+    public async Task Planned_remainder_by_constant_charges_the_divisor_literal_like_other_tiers()
+    {
+        var results = await TierParityRunner.RunAsync(RemainderByConstantModule, SandboxValue.FromInt64(40));
+
+        results.AssertAllSucceededWith(SandboxValue.FromInt64(15));
+        results.AssertFuelAgrees();
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(
@@ -167,6 +177,38 @@ public sealed class I64LoopPlanSemanticsTests
             }]
           },
           { "op": "return", "value": { "var": "result" } }
+        ]
+      }]
+    }
+    """;
+
+    private const string RemainderByConstantModule = """
+    {
+      "id": "i64-loop-plan-remainder-by-constant",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [{ "name": "value", "type": "I64" }],
+        "returnType": "I64",
+        "body": [
+          { "op": "set", "name": "total", "value": { "i64": 0 } },
+          {
+            "op": "forRange",
+            "local": "i",
+            "start": { "i32": 0 },
+            "end": { "i32": 3 },
+            "body": [{
+              "op": "set",
+              "name": "total",
+              "value": {
+                "op": "add",
+                "left": { "var": "total" },
+                "right": { "op": "rem", "left": { "var": "value" }, "right": { "i64": 7 } }
+              }
+            }]
+          },
+          { "op": "return", "value": { "var": "total" } }
         ]
       }]
     }

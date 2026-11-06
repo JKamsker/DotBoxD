@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Policies;
+
 namespace DotBoxD.Kernels.Model;
 
 internal static class PolicyHash
@@ -6,7 +8,7 @@ internal static class PolicyHash
     {
         var records = new List<string> {
             CanonicalEncoding.Record(
-                "policy-v2",
+                "policy-v3",
                 policy.PolicyId,
                 Format((long)policy.AllowedEffects),
                 policy.Deterministic.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -48,7 +50,11 @@ internal static class PolicyHash
             return;
         }
 
-        var grantRecords = new string[grants.Count];
+        // Exact grants resolve by id, so their list order is irrelevant and they are sorted. Wildcard
+        // grants resolve first-active-match in list order (SandboxPolicy.TryGetActiveGrant), so their
+        // relative order is part of the policy's meaning and is preserved after the exact grants.
+        var exactRecords = new List<string>(grants.Count);
+        var wildcardRecords = new List<string>();
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
@@ -59,14 +65,13 @@ internal static class PolicyHash
                     nameof(SandboxPolicy.Grants));
             }
 
-            grantRecords[i] = GrantRecord(grant);
+            var isWildcard = grant.Id is not null && CapabilityPattern.IsWildcard(grant.Id);
+            (isWildcard ? wildcardRecords : exactRecords).Add(GrantRecord(grant));
         }
 
-        Array.Sort(grantRecords, StringComparer.Ordinal);
-        for (var i = 0; i < grantRecords.Length; i++)
-        {
-            records.Add(grantRecords[i]);
-        }
+        exactRecords.Sort(StringComparer.Ordinal);
+        records.AddRange(exactRecords);
+        records.AddRange(wildcardRecords);
     }
 
     private static string ResourceLimitRecord(ResourceLimits limits)

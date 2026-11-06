@@ -20,6 +20,33 @@ internal static class RpcOperatorSemanticsValidator
             ValidateReferenceOperand(right);
         }
 
+        ValidateUserDefinedBinaryOperator(binary, model, cancellationToken);
+    }
+
+    /// <summary>
+    /// The operator checks shared with the handle/hook-chain expression lowerer. Its operands are already
+    /// restricted to scalar tags (and DateTime equality), so only the enum-width and user-defined operator
+    /// rules apply: e.g. TimeSpan/TimeOnly ride as I64 ticks and DateOnly as an I32 day number, so their
+    /// arithmetic operators (tick division, TimeOnly wrap-around) must not lower to plain integer math.
+    /// </summary>
+    public static void ValidateHandleBinary(BinaryExpressionSyntax binary, SemanticModel model, CancellationToken cancellationToken)
+    {
+        var left = model.GetTypeInfo(binary.Left, cancellationToken).Type;
+        var right = model.GetTypeInfo(binary.Right, cancellationToken).Type;
+        ValidateUnsignedEnumOrdering(binary.Kind(), left, right);
+        ValidateEnumArithmetic(binary.Kind(), left, right);
+        ValidateUserDefinedBinaryOperator(binary, model, cancellationToken);
+    }
+
+    /// <summary>Rejects relational patterns (<c>is &gt; X</c>) whose input cannot be ordered by its wire value.</summary>
+    public static void ValidateRelationalPattern(ITypeSymbol? inputType)
+        => ValidateUnsignedEnumOrdering(SyntaxKind.LessThanExpression, inputType, null);
+
+    private static void ValidateUserDefinedBinaryOperator(
+        BinaryExpressionSyntax binary,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         if (model.GetSymbolInfo(binary, cancellationToken).Symbol is
             IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator } method &&
             !IsSupportedBinaryOperator(binary.Kind(), method.ContainingType))

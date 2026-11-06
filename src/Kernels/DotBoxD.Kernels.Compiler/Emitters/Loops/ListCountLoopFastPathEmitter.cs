@@ -1,7 +1,5 @@
 using System.Reflection.Emit;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
 
@@ -18,8 +16,8 @@ internal static class ListCountLoopFastPathEmitter
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         if (stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            !CanEmitBound(range.Start, stackPlan) ||
-            !CanEmitBound(range.End, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.Start, stackPlan) ||
+            !RawForRangeEmitter.CanEmitBound(range.End, stackPlan) ||
             !TryCreatePlan(range, stackPlan, out var plan))
         {
             return false;
@@ -69,9 +67,9 @@ internal static class ListCountLoopFastPathEmitter
         var iterations = il.DeclareLocal(typeof(int));
         var count = il.DeclareLocal(typeof(int));
         var readFuel = il.DeclareLocal(typeof(long));
-        EmitBound(range.Start, il, declare);
+        RawForRangeEmitter.EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
-        EmitBound(range.End, il, declare);
+        RawForRangeEmitter.EmitBound(range.End, il, declare);
         il.Emit(OpCodes.Stloc, end);
 
         var fallback = il.DefineLabel();
@@ -104,7 +102,7 @@ internal static class ListCountLoopFastPathEmitter
         il.Emit(OpCodes.Ldloc, readFuel);
         il.Emit(OpCodes.Ldloc, iterations);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBulkFuel)));
-        if (plan.AddToTarget)
+        if (plan.AddToTarget && RawForRangeEmitter.CanAccumulateInClosedForm(range, plan.Target))
         {
             // The hoisted count is loop-invariant, so "target += count" collapses to "target += count *
             // iterations" via AccumulateLinearI32 (identical loop-iteration fuel and overflow-throw point);
@@ -116,6 +114,7 @@ internal static class ListCountLoopFastPathEmitter
             EmitInt32(il, plan.LoopFuelPerIteration);
             il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AccumulateLinearI32)));
             il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
+            RawForRangeEmitter.EmitStoreLastIndex(range.LocalName, end, il, declare);
             il.Emit(OpCodes.Br, finish);
         }
         else
@@ -207,30 +206,6 @@ internal static class ListCountLoopFastPathEmitter
     private static bool IsTargetVariable(Expression expression, string target)
         => expression is VariableExpression variable &&
            string.Equals(variable.Name, target, StringComparison.Ordinal);
-
-    private static void EmitBound(
-        Expression expression,
-        ILGenerator il,
-        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                EmitInt32(il, value.Value);
-                break;
-            case VariableExpression variable:
-                il.Emit(OpCodes.Ldloc, declare(variable.Name).Local);
-                break;
-            default:
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.ValidationError,
-                    "unsupported forRange bound"));
-        }
-    }
-
-    private static bool CanEmitBound(Expression expression, LocalStackKindPlanner stackPlan)
-        => expression is LiteralExpression { Value: I32Value } ||
-           expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 
     private readonly record struct LoopPlan(
         string Target,

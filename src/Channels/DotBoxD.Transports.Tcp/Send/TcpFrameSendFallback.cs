@@ -56,7 +56,7 @@ internal static class TcpFrameSendFallback
             error = caught;
         }
 
-        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state);
+        var cleanupError = TcpFrameSendDriver.FinishAndClear(ref state, error);
         error = cleanupError ?? error;
         if (error is not null)
         {
@@ -88,8 +88,17 @@ internal static class TcpFrameSendFallback
         {
             cancellationToken.ThrowIfCancellationRequested();
             connection.ThrowIfDisposedForSend();
-            await connection.SendStream.WriteAsync(data, cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await connection.SendStream.WriteAsync(data, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // A partial frame may be on the wire; never let a later frame follow it.
+                connection.AbortAfterFailedWrite();
+                throw;
+            }
         }
         finally
         {

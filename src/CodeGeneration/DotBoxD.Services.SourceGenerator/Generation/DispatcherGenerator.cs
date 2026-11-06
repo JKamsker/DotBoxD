@@ -22,7 +22,7 @@ internal static class DispatcherGenerator
         {
             sb.AppendLine($"extern alias {externAlias};");
         }
-        GeneratedWarningPragmaEmitter.AppendDisable(sb, service.ExperimentalDiagnosticId);
+        GeneratedWarningPragmaEmitter.AppendDisable(sb, service.GeneratedSuppressionIds());
         sb.AppendLine();
 
         if (!string.IsNullOrEmpty(service.Namespace))
@@ -71,7 +71,7 @@ internal static class DispatcherGenerator
             sb.AppendLine("}");
         }
 
-        GeneratedWarningPragmaEmitter.AppendRestore(sb, service.ExperimentalDiagnosticId);
+        GeneratedWarningPragmaEmitter.AppendRestore(sb, service.GeneratedSuppressionIds());
         return sb.ToString();
     }
 

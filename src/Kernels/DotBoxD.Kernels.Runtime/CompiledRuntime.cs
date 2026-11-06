@@ -139,6 +139,10 @@ public static partial class CompiledRuntime
     public static SandboxValue NotBool(SandboxValue value) => Bool(!AsBool(value));
     public static SandboxValue Eq(SandboxValue left, SandboxValue right) => Bool(Equals(left, right));
     public static SandboxValue Ne(SandboxValue left, SandboxValue right) => Bool(!Equals(left, right));
+    public static SandboxValue EqCharged(SandboxContext context, SandboxValue left, SandboxValue right)
+        => Bool(context.ChargedValueEquals(left, right));
+    public static SandboxValue NeCharged(SandboxContext context, SandboxValue left, SandboxValue right)
+        => Bool(!context.ChargedValueEquals(left, right));
 
     public static SandboxValue LtI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) < AsI32(right));
     public static SandboxValue LteI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) <= AsI32(right));

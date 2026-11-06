@@ -1,7 +1,9 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Validation;
 
 namespace DotBoxD.Kernels.Tests.Policy;
 
@@ -82,6 +84,37 @@ public sealed class SandboxPolicyOpaqueIdDeclarationTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(UndeclaredOpaqueIdLiterals))]
+    public void Validate_rejects_undeclared_opaque_id_brand_in_literal_position(string scenario, SandboxValue literal)
+    {
+        var undeclared = new ModuleValidator().Validate(
+            ModuleAssigningLiteral(literal),
+            new BindingRegistry([]),
+            DefaultPolicy("undeclared-literal-brand"));
+
+        Assert.False(undeclared.Succeeded, scenario);
+        Assert.Contains(undeclared.Diagnostics, IsOpaqueIdPolicyDiagnostic);
+
+        var declared = new ModuleValidator().Validate(
+            ModuleAssigningLiteral(literal),
+            new BindingRegistry([]),
+            DefaultPolicy("declared-literal-brand") with
+            {
+                DeclaredOpaqueIdTypes = new HashSet<string>(StringComparer.Ordinal) { "PlayerId" }
+            });
+
+        Assert.True(declared.Succeeded, $"{scenario}: {string.Join("; ", declared.Diagnostics.Select(d => d.Code))}");
+    }
+
+    public static TheoryData<string, SandboxValue> UndeclaredOpaqueIdLiterals()
+        => new()
+        {
+            { "scalar", SandboxValue.FromOpaqueId("PlayerId", "player-1") },
+            { "list element", SandboxValue.FromList([SandboxValue.FromOpaqueId("PlayerId", "player-1")]) },
+            { "empty list type", SandboxValue.FromList([], SandboxType.Scalar("PlayerId")) }
+        };
+
     public static TheoryData<string?> InvalidOpaqueIdDeclarations()
         => new()
         {
@@ -113,6 +146,28 @@ public sealed class SandboxPolicyOpaqueIdDeclarationTests
             SandboxEffects.Pure,
             [],
             new ResourceLimits(MaxFuel: 5_000));
+
+    private static SandboxModule ModuleAssigningLiteral(SandboxValue literal)
+    {
+        var span = new SourceSpan(0, 0);
+        return new SandboxModule(
+            "opaque-id-literal-policy",
+            SemVersion.One,
+            SandboxLanguage.CurrentVersion,
+            [],
+            [
+                new SandboxFunction(
+                    "main",
+                    IsEntrypoint: true,
+                    [],
+                    SandboxType.I32,
+                    [
+                        new AssignmentStatement("hidden", new LiteralExpression(literal, span), span),
+                        new ReturnStatement(new LiteralExpression(SandboxValue.FromInt32(1), span), span)
+                    ])
+            ],
+            new Dictionary<string, string>());
+    }
 
     private static string ModuleReturningOpaqueId()
         => """

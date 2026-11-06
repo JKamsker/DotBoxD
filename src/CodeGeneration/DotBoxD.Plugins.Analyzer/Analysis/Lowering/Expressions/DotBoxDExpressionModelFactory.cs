@@ -72,6 +72,7 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             return literal;
         }
+        DotBoxDOperatorSemanticsGuard.ValidateUnary(unary, context);
         var operand = Lower(unary.Operand, context);
         return unary.Kind() switch
         {
@@ -106,6 +107,7 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             return patternCapture;
         }
+        DotBoxDOperatorSemanticsGuard.ValidateBinary(binary, context);
         var left = Lower(binary.Left, context);
         var right = Lower(binary.Right, context);
         DotBoxDNumericConstantPromoter.Promote(binary, context, ref left, ref right);

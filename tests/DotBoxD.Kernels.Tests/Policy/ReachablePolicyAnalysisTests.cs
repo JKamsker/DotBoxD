@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -43,16 +44,15 @@ public sealed class ReachablePolicyAnalysisTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(RecordIntrinsicWithShadowedFunctionJson());
 
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
-        var result = await host.ExecuteAsync(
-            plan,
-            "main",
-            SandboxValue.Unit,
-            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+        // The reference collector still resolves the intrinsic, never the shadowing function...
+        var references = BindingReferenceCollector.CollectByFunction(module, new BindingRegistry([]));
+        Assert.DoesNotContain("file.readText", references["main"]);
 
-        Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal(7, ((I32Value)result.Value!).Value);
-        Assert.DoesNotContain("file.readText", plan.BindingReferences["main"]);
+        // ...and validation rejects the shadowing declaration outright, because backends do not all
+        // share the validator's call-resolution order.
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build()));
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-STRUCT-FN-SHADOW" && d.Message.Contains("record.get", StringComparison.Ordinal));
     }
 
     private static string ModuleWithPrivateFileRead(bool privateIsEntrypoint)

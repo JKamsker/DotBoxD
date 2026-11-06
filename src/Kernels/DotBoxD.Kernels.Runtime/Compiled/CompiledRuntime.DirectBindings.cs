@@ -33,6 +33,9 @@ public static partial class CompiledRuntime
     public static bool StringEqualsRaw(SandboxValue left, SandboxValue right)
         => string.Equals(((StringValue)left).Value, ((StringValue)right).Value, StringComparison.Ordinal);
 
+    public static bool StringEqualsRawCharged(SandboxContext context, SandboxValue left, SandboxValue right)
+        => context.ChargedValueEquals((StringValue)left, (StringValue)right);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ChargeFuel64(SandboxContext context, long amount) => context.ChargeFuel(amount);
 

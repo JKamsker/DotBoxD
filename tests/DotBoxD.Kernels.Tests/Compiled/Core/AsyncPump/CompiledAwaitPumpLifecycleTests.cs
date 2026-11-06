@@ -35,9 +35,13 @@ public sealed class CompiledAwaitPumpLifecycleTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(8)]
-    public void Disposal_discards_pending_posts_and_rejects_new_posts(int count)
+    public void Disposal_forwards_pending_posts_to_the_thread_pool_and_accepts_new_posts(int count)
     {
-        var invoked = 0;
+        // Await continuations of a binding abandoned on timeout can be queued (or posted) after the pump is
+        // gone. They must still run (so the binding's finally blocks execute) and must never throw from the
+        // continuation dispatch, which would crash the process as an unhandled thread-pool exception.
+        var invokedOnPump = 0;
+        using var forwarded = new CountdownEvent(count + 1);
         SynchronizationContext? context = null;
         var result = CompiledAwaitPumpFixture.Result();
         _ = CompiledAsyncWorker.RunInline(() =>
@@ -45,14 +49,38 @@ public sealed class CompiledAwaitPumpLifecycleTests
             context = SynchronizationContext.Current!;
             for (var index = 0; index < count; index++)
             {
-                context.Post(_ => invoked++, null);
+                context.Post(_ => forwarded.Signal(), null);
             }
+            invokedOnPump = forwarded.CurrentCount;
             return result;
         });
 
-        Assert.Equal(0, invoked);
+        Assert.Equal(count + 1, invokedOnPump);
         ((IDisposable)context!).Dispose();
-        Assert.Throws<ObjectDisposedException>(() => context.Post(_ => invoked++, null));
+        var exception = Record.Exception(() => context.Post(_ => forwarded.Signal(), null));
+
+        Assert.Null(exception);
+        Assert.True(forwarded.Wait(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void Disposed_pump_rejects_new_sends()
+    {
+        SynchronizationContext? context = null;
+        var result = CompiledAwaitPumpFixture.Result();
+        _ = CompiledAsyncWorker.RunInline(() =>
+        {
+            context = SynchronizationContext.Current!;
+            return result;
+        });
+        var invoked = 0;
+        Exception? error = null;
+        var sender = new Thread(() => error = Record.Exception(() => context!.Send(_ => invoked++, null)));
+
+        sender.Start();
+
+        Assert.True(sender.Join(TimeSpan.FromSeconds(5)));
+        Assert.IsType<ObjectDisposedException>(error);
         Assert.Equal(0, invoked);
     }
 

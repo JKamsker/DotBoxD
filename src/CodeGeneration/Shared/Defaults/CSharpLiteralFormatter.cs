@@ -111,7 +111,7 @@ internal static class CSharpLiteralFormatter
             argument.Value is not null &&
             FormatPrimitiveLiteral(argument.Value, DefaultLiteralOptions.SourceGenerator) is { } enumValue)
         {
-            literal = "(" + argument.Type.ToDisplayString(s_qualifiedFormat) + ")" + enumValue;
+            literal = "(" + argument.Type.ToDisplayString(s_qualifiedFormat) + ")" + ParenthesizeNegative(enumValue);
             return true;
         }
 
@@ -171,9 +171,13 @@ internal static class CSharpLiteralFormatter
             return null;
         }
 
-        var cast = "(" + enumType.ToDisplayString(s_qualifiedFormat) + ")" + enumValue;
+        var cast = "(" + enumType.ToDisplayString(s_qualifiedFormat) + ")" + ParenthesizeNegative(enumValue);
         return options.UseUncheckedEnumCasts ? "unchecked(" + cast + ")" : cast;
     }
+
+    // "(T)-1" parses as a subtraction (CS0075), so a negative operand of a cast must be parenthesized.
+    private static string ParenthesizeNegative(string literal)
+        => literal.StartsWith("-", System.StringComparison.Ordinal) ? "(" + literal + ")" : literal;
 
     private static string FormatSignedEnumLiteral(
         INamedTypeSymbol enumType,

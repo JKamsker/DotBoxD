@@ -5,6 +5,9 @@ namespace DotBoxD.UI;
 /// <summary>Checks evaluated properties before controls are created or a state batch is committed.</summary>
 public static class UiMaterializationValidator
 {
+    internal const int MaxGridColumns = 64;
+    internal const int MaxGridCellIndex = MaxGridColumns - 1;
+
     private static readonly IReadOnlyDictionary<UiPropertyId, UiValueKind> PropertyKinds =
         new Dictionary<UiPropertyId, UiValueKind>
         {
@@ -85,8 +88,8 @@ public static class UiMaterializationValidator
         var value = property.Value;
         var valid = property.PropertyId switch
         {
-            UiPropertyId.Columns => InRange(value.Integer, 1, 64),
-            UiPropertyId.Row or UiPropertyId.Column => InRange(value.Integer, 0, 63),
+            UiPropertyId.Columns => InRange(value.Integer, 1, MaxGridColumns),
+            UiPropertyId.Row or UiPropertyId.Column => InRange(value.Integer, 0, MaxGridCellIndex),
             UiPropertyId.Padding or UiPropertyId.Spacing => InRange(value.Number, 0, 1024),
             UiPropertyId.Maximum => PositiveRange(value.Number),
             UiPropertyId.Value => InRange(value.Number, 0, 1_000_000_000),

@@ -97,8 +97,11 @@ public sealed class UiBuilder
     public UiElement Stack(params UiElement[] children) => Element(UiPrimitive.Stack, [], children);
     public UiElement Grid(int columns, params UiElement[] children)
     {
+        // Mirror the install-time layout ranges so an invalid grid fails here, not at install.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(columns);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(columns, UiMaterializationValidator.MaxGridColumns);
         ValidateChildren(children);
+        ValidateGridRows(columns, children);
         for (var index = 0; index < children.Length; index++)
         {
             var id = children[index].Id;
@@ -114,6 +117,21 @@ public sealed class UiBuilder
         }
         return Element(UiPrimitive.Grid, [UiLiteral.Integer(columns).Property(UiPropertyId.Columns)], children);
     }
+
+    private void ValidateGridRows(int columns, UiElement[] children)
+    {
+        for (var index = children.Length - 1; index / columns > UiMaterializationValidator.MaxGridCellIndex; index--)
+        {
+            if (!_nodes[children[index].Id - 1].Properties.Any(p => p.Id == UiPropertyId.Row || p.Id == UiPropertyId.Column))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(children),
+                    children.Length,
+                    $"A grid with {columns} column(s) can auto-place at most {(UiMaterializationValidator.MaxGridCellIndex + 1) * columns} children.");
+            }
+        }
+    }
+
     public UiElement Border(UiElement child, double padding = 0)
         => Element(UiPrimitive.Border, [UiLiteral.Number(padding).Property(UiPropertyId.Padding)], child);
     public UiElement Scroll(UiElement child) => Element(UiPrimitive.ScrollViewer, [], child);

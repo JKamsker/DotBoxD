@@ -165,7 +165,8 @@ public sealed partial record QueryValue
     /// Normalizes a CLR object into a <see cref="QueryValue"/>. Supported inputs are <c>null</c>, <c>bool</c>,
     /// the integral types (<c>ulong</c> kept exact), <c>float</c>/<c>double</c>, <c>decimal</c> (kept exact),
     /// <c>string</c>, <c>enum</c> (by its integral value), <see cref="System.Guid"/>, and the date/time types
-    /// (<c>DateTime</c>/<c>DateTimeOffset</c>/<c>DateOnly</c>, normalized to a UTC instant). Returns
+    /// (<c>DateTime</c>/<c>DateTimeOffset</c>/<c>DateOnly</c>, normalized to a UTC timestamp; a <c>DateTime</c>
+    /// keeps its clock ticks regardless of <see cref="DateTimeKind"/>, matching C# <c>DateTime</c> comparison). Returns
     /// <see langword="false"/> for unsupported types.
     /// </summary>
     /// <summary>Renders a stable, culture-invariant textual form used for In-list sort ordering and diagnostics.</summary>
@@ -242,11 +243,9 @@ public sealed partial record QueryValue
             char.IsAsciiDigit(tail[4]) && char.IsAsciiDigit(tail[5]);
     }
 
-    private static DateTimeOffset ToOffset(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => new DateTimeOffset(value, TimeSpan.Zero),
-        DateTimeKind.Local => new DateTimeOffset(value),
-        // Unspecified: assume UTC so the captured instant is deterministic across machines.
-        _ => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero),
-    };
+    // C# DateTime equality and ordering compare raw Ticks and ignore Kind, so carry the clock reading as-is
+    // (labelled UTC) for every Kind. Converting Local values through the host time zone would make results
+    // machine-dependent and diverge from LINQ-to-objects; DateTimeOffset keeps its instant semantics.
+    private static DateTimeOffset ToOffset(DateTime value)
+        => new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
 }
