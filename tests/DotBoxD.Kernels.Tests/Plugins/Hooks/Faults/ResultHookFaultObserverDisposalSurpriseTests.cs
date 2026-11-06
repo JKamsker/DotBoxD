@@ -44,6 +44,39 @@ public sealed class ResultHookFaultObserverDisposalSurpriseTests
         Assert.Single(faults);
     }
 
+    [Fact]
+    public async Task FireAsync_on_wire_created_pipeline_stops_before_fallback_when_fault_observer_disposes_server()
+    {
+        PluginServer? server = null;
+        var faults = new List<ResultHookFault>();
+        server = PluginServer.Create(onResultHookFault: fault =>
+        {
+            faults.Add(fault);
+            server!.Dispose();
+        });
+        var fallbackInvoked = false;
+        // PluginServer.WireHook creates its pipeline through OnForWire; it must honor disposal like On<TEvent>().
+        var pipeline = server.Hooks.OnForWire(new TestEventAdapter(), out var created);
+        Assert.True(created);
+
+        ResultSlot(pipeline).AddDirect(
+            priority: 100,
+            static (_, _, _) => throw new InvalidOperationException("result handler failure"));
+        ResultSlot(pipeline).AddDirect(
+            priority: 0,
+            (_, _, _) =>
+            {
+                fallbackInvoked = true;
+                return ValueTask.FromResult<IHookResult?>(new TestResult(true, null, 42));
+            });
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            async () => await server.Hooks.FireAsync<TestEvent, TestResult>(new TestEvent()));
+
+        Assert.False(fallbackInvoked);
+        Assert.Single(faults);
+    }
+
     private static ResultHookSlot<TestEvent, HookContext> ResultSlot(HookPipeline<TestEvent, HookContext> pipeline)
         => (ResultHookSlot<TestEvent, HookContext>)(typeof(HookPipeline<TestEvent, HookContext>)
             .GetField("_resultHooks", BindingFlags.Instance | BindingFlags.NonPublic)!

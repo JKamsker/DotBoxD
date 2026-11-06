@@ -44,6 +44,18 @@ public sealed partial class PluginServer
             _kernelPools.Add(pool);
         }
 
+        if (IsDisposedAfterRegistration())
+        {
+            // Dispose may have snapshotted the pools before this one was added; revoking is idempotent.
+            lock (_poolGate)
+            {
+                _kernelPools.Remove(pool);
+            }
+
+            pool.Revoke();
+            throw new ObjectDisposedException(nameof(PluginServer));
+        }
+
         return pool;
     }
 
@@ -69,6 +81,7 @@ public sealed partial class PluginServer
         }
 
         ClearServerExtensionRegistrations(package.Manifest.PluginId);
+        ThrowIfDisposedAfterRegistration(kernel);
         return kernel;
     }
 
@@ -97,15 +110,17 @@ public sealed partial class PluginServer
             // incumbent). A wiring failure rolls this instance back with the incumbent untouched.
             Kernels.AddInstance(kernel);
             RegisterKernelRevocationCleanup(kernel);
+            ThrowIfDisposedAfterRegistration(kernel);
             return kernel;
         }
 
         var replaced = AddKernel(kernel);
         if (replaced is not null)
         {
-            RemoveKernelReferences(replaced);
+            DetachReplacedKernel(replaced);
         }
 
+        ThrowIfDisposedAfterRegistration(kernel);
         return kernel;
     }
 
@@ -170,7 +185,35 @@ public sealed partial class PluginServer
         var replaced = Kernels.Promote(kernel);
         if (replaced is not null)
         {
-            RemoveKernelReferences(replaced);
+            DetachReplacedKernel(replaced);
+        }
+    }
+
+    // A replaced kernel may have been a server extension (same plugin id), so drop its contract registration too,
+    // as Uninstall does; otherwise ServerExtension<T>() keeps resolving the revoked or wrong-kind kernel.
+    private void DetachReplacedKernel(InstalledKernel replaced)
+    {
+        RemoveKernelReferences(replaced);
+        ClearServerExtensionRegistrations(replaced.Manifest.PluginId);
+    }
+
+    // Dispose flips _disposed under _lifecycleGate before snapshotting the registry, so a kernel registered before
+    // this check is revoked by that snapshot, and one registered after it is revoked here (its revocation callback
+    // unregisters it and detaches its references).
+    private void ThrowIfDisposedAfterRegistration(InstalledKernel kernel)
+    {
+        if (IsDisposedAfterRegistration())
+        {
+            kernel.Revoke();
+            throw new ObjectDisposedException(nameof(PluginServer));
+        }
+    }
+
+    private bool IsDisposedAfterRegistration()
+    {
+        lock (_lifecycleGate)
+        {
+            return Volatile.Read(ref _disposed) != 0;
         }
     }
 

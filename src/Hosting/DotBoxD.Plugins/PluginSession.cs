@@ -170,6 +170,23 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         }
     }
 
+    // Callers hold _gate.
+    private void TrackOwnedInstall(InstalledKernel kernel)
+    {
+        _ownedInstallIds.Add(kernel.InstallId);
+        PruneUnregisteredInstallIds();
+    }
+
+    // Drops ids whose kernels are no longer registered (displaced by a same-id reinstall or promotion, or removed by
+    // the host) so the owned set does not grow with every hot-replace. Callers hold _gate.
+    private void PruneUnregisteredInstallIds()
+    {
+        var registered = _server.Kernels.Snapshot()
+            .Select(static kernel => kernel.InstallId)
+            .ToHashSet(StringComparer.Ordinal);
+        _ownedInstallIds.RemoveWhere(installId => !registered.Contains(installId));
+    }
+
     public ValueTask DisposeAsync()
     {
         Dispose();

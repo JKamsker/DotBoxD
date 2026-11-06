@@ -14,6 +14,9 @@ public sealed class SubscriptionRegistry
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
 
+    // Pipelines a wire created and may still roll back; see HookRegistry for the claim semantics.
+    private readonly HashSet<object> _provisionalWirePipelines = new(ReferenceEqualityComparer.Instance);
+
     // Writers clone under _gate and publish the completed dictionary; a published instance is never mutated.
     private Dictionary<Type, CachedPipelineFanout> _pipelineFanout = [];
     private readonly IPluginMessageSink _messages;
@@ -63,7 +66,7 @@ public sealed class SubscriptionRegistry
     {
         ArgumentNullException.ThrowIfNull(adapter);
         ThrowIfDisposed();
-        return GetOrAddPipeline(adapter, ServerContextFactory<HookContext>.Identity, out created);
+        return GetOrAddPipeline(adapter, ServerContextFactory<HookContext>.Identity, out created, forWire: true);
     }
 
     internal void RemoveWirePipeline<TEvent>(
@@ -73,7 +76,8 @@ public sealed class SubscriptionRegistry
         lock (_gate)
         {
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (!_pipelines.TryGetValue(key, out var existing) ||
+            if (!_provisionalWirePipelines.Remove(pipeline) ||
+                !_pipelines.TryGetValue(key, out var existing) ||
                 !ReferenceEquals(existing, pipeline) ||
                 !pipeline.UsesAdapter(adapter))
             {
@@ -119,7 +123,8 @@ public sealed class SubscriptionRegistry
     private SubscriptionPipeline<TEvent, TContext> GetOrAddPipeline<TEvent, TContext>(
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext,
-        out bool created)
+        out bool created,
+        bool forWire = false)
     {
         lock (_gate)
         {
@@ -130,6 +135,7 @@ public sealed class SubscriptionRegistry
                 created = false;
                 var pipeline = (SubscriptionPipeline<TEvent, TContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
+                _provisionalWirePipelines.Remove(existing);
                 return pipeline;
             }
 
@@ -143,6 +149,11 @@ public sealed class SubscriptionRegistry
                 _onFault,
                 _throwIfDisposed);
             _pipelines[key] = createdPipeline;
+            if (forWire)
+            {
+                _provisionalWirePipelines.Add(createdPipeline);
+            }
+
             PublishEventFanoutLocked(typeof(TEvent));
             return createdPipeline;
         }
