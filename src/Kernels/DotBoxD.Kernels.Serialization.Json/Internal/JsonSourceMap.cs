@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using DotBoxD.Kernels.Model;
@@ -7,183 +9,75 @@ namespace DotBoxD.Kernels.Serialization.Json.Internal;
 internal sealed class JsonSourceMap
 {
     private readonly JsonElement _root;
-    private readonly IReadOnlyList<SourceSpan> _tokenSpans;
-    private readonly Dictionary<JsonElement, SourceSpan> _spansByElement;
+    private readonly Dictionary<long, SourceSpan> _spansByOffset;
 
-    private JsonSourceMap(
-        JsonElement root,
-        IReadOnlyList<SourceSpan> tokenSpans,
-        Dictionary<JsonElement, SourceSpan> spansByElement)
+    private JsonSourceMap(JsonElement root, Dictionary<long, SourceSpan> spansByOffset)
     {
         _root = root;
-        _tokenSpans = tokenSpans;
-        _spansByElement = spansByElement;
+        _spansByOffset = spansByOffset;
     }
 
     public static JsonSourceMap Create(string json, JsonElement root)
     {
         var tokenSpans = JsonTokenSpans.Read(json);
-        // JsonElement equality is document/index identity, which is exactly what this map needs.
-        // Its default hash is value-oriented and can walk large subtrees, so use a non-value hash
-        // and let the identity equality check disambiguate the small per-document span table.
-#pragma warning disable MA0066
-        var spansByElement = new Dictionary<JsonElement, SourceSpan>(JsonElementIdentityComparer.Instance);
-#pragma warning restore MA0066
+        var map = new JsonSourceMap(root, new Dictionary<long, SourceSpan>(tokenSpans.Count));
         var index = 0;
-        Visit(root, tokenSpans, spansByElement, ref index);
-        return new JsonSourceMap(root, tokenSpans, spansByElement);
+        map.Visit(root, tokenSpans, ref index);
+        return map;
     }
 
     public SourceSpan SpanFor(JsonElement element)
-    {
-        if (_spansByElement.TryGetValue(element, out var span))
-        {
-            return span;
-        }
+        => TryGetOffset(element, out var offset) && _spansByOffset.TryGetValue(offset, out var span)
+            ? span
+            : JsonImport.JsonSpan;
 
-        var index = 0;
-        return TryFindSpan(_root, _tokenSpans, element, ref index, out span) ? span : JsonImport.JsonSpan;
-    }
-
-    private static void Visit(
-        JsonElement element,
-        IReadOnlyList<SourceSpan> tokenSpans,
-        Dictionary<JsonElement, SourceSpan> spansByElement,
-        ref int index)
+    private void Visit(JsonElement element, IReadOnlyList<SourceSpan> tokenSpans, ref int index)
     {
         var span = index < tokenSpans.Count ? tokenSpans[index] : JsonImport.JsonSpan;
         index++;
+        if (TryGetOffset(element, out var offset))
+        {
+            _spansByOffset[offset] = span;
+        }
 
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-                spansByElement[element] = span;
                 foreach (var property in element.EnumerateObject())
                 {
-                    Visit(property.Value, tokenSpans, spansByElement, ref index);
+                    Visit(property.Value, tokenSpans, ref index);
                 }
 
                 break;
             case JsonValueKind.Array:
-                spansByElement[element] = span;
                 foreach (var item in element.EnumerateArray())
                 {
-                    Visit(item, tokenSpans, spansByElement, ref index);
+                    Visit(item, tokenSpans, ref index);
                 }
 
                 break;
         }
     }
 
-    private static bool TryFindSpan(
-        JsonElement current,
-        IReadOnlyList<SourceSpan> tokenSpans,
-        JsonElement target,
-        ref int index,
-        out SourceSpan span)
+    /// <summary>
+    /// Identifies an element by where its raw UTF-8 value starts inside the root's raw value. Every
+    /// value token starts at a distinct byte, so the offset is a unique, O(1) identity for elements of
+    /// this tree. (Keying on <see cref="JsonElement"/> itself falls back to reflection-based equality and
+    /// shape hashes that collide for identically shaped containers, which made large payloads quadratic.)
+    /// Elements outside the root's byte range belong to another tree and have no span here.
+    /// </summary>
+    private bool TryGetOffset(JsonElement element, out long offset)
     {
-        var currentSpan = index < tokenSpans.Count ? tokenSpans[index] : JsonImport.JsonSpan;
-        index++;
-#pragma warning disable MA0065
-        if (current.Equals(target))
-#pragma warning restore MA0065
+        offset = 0;
+        if (element.ValueKind == JsonValueKind.Undefined)
         {
-            span = currentSpan;
-            return true;
+            return false;
         }
 
-        switch (current.ValueKind)
-        {
-            case JsonValueKind.Object:
-                foreach (var property in current.EnumerateObject())
-                {
-                    if (TryFindSpan(property.Value, tokenSpans, target, ref index, out span))
-                    {
-                        return true;
-                    }
-                }
-
-                break;
-            case JsonValueKind.Array:
-                foreach (var item in current.EnumerateArray())
-                {
-                    if (TryFindSpan(item, tokenSpans, target, ref index, out span))
-                    {
-                        return true;
-                    }
-                }
-
-                break;
-        }
-
-        span = JsonImport.JsonSpan;
-        return false;
-    }
-
-    private sealed class JsonElementIdentityComparer : IEqualityComparer<JsonElement>
-    {
-        public static readonly JsonElementIdentityComparer Instance = new();
-
-        private JsonElementIdentityComparer()
-        {
-        }
-
-        public bool Equals(JsonElement x, JsonElement y)
-        {
-#pragma warning disable MA0065
-            return x.Equals(y);
-#pragma warning restore MA0065
-        }
-
-        public int GetHashCode(JsonElement obj)
-        {
-            var hash = new HashCode();
-            hash.Add(obj.ValueKind);
-            switch (obj.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    AddObjectHash(ref hash, obj);
-                    break;
-                case JsonValueKind.Array:
-                    hash.Add(obj.GetArrayLength());
-                    break;
-            }
-
-            return hash.ToHashCode();
-        }
-
-        private static void AddObjectHash(ref HashCode hash, JsonElement obj)
-        {
-            var count = 0;
-            foreach (var property in obj.EnumerateObject())
-            {
-                count++;
-                hash.Add(property.Name, StringComparer.Ordinal);
-                AddShallowValueHash(ref hash, property.Value);
-            }
-
-            hash.Add(count);
-        }
-
-        private static void AddShallowValueHash(ref HashCode hash, JsonElement value)
-        {
-            hash.Add(value.ValueKind);
-            switch (value.ValueKind)
-            {
-                case JsonValueKind.String:
-                    hash.Add(value.GetString(), StringComparer.Ordinal);
-                    break;
-                case JsonValueKind.Number when value.TryGetInt64(out var integer):
-                    hash.Add(integer);
-                    break;
-                case JsonValueKind.Number when value.TryGetDouble(out var number):
-                    hash.Add(number);
-                    break;
-                case JsonValueKind.Array:
-                    hash.Add(value.GetArrayLength());
-                    break;
-            }
-        }
+        var root = JsonMarshal.GetRawUtf8Value(_root);
+        var raw = JsonMarshal.GetRawUtf8Value(element);
+        offset = Unsafe.ByteOffset(ref MemoryMarshal.GetReference(root), ref MemoryMarshal.GetReference(raw));
+        return offset >= 0 && offset + raw.Length <= root.Length;
     }
 
     private static class JsonTokenSpans

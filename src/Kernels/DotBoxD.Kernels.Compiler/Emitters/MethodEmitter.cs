@@ -130,6 +130,8 @@ internal sealed class MethodEmitter
         {
             _il.Emit(OpCodes.Br, endLabel);
         }
+        // Facts learned in the then-branch do not hold when the else-branch runs.
+        _nonNegativeF64Locals.Clear();
         _il.MarkLabel(elseLabel);
         var elseReturns = EmitBlock(branch.Else);
         if (!thenReturns || !elseReturns)
