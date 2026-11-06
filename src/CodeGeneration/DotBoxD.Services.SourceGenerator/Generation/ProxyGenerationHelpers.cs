@@ -129,20 +129,18 @@ internal static class ProxyGenerationHelpers
             ? "(" + ServicesGeneratorTypeNames.GlobalObject + ")" + parameter.Name
             : parameter.Name;
 
+    /// <summary>
+    /// Maps a qualified interface name to its sibling proxy, keeping the qualifier: both
+    /// <c>global::Ns.IFoo</c> and an extern-alias form such as <c>Lib::Ns.IFoo</c> are supported.
+    /// </summary>
     public static string BuildSubProxyTypeName(string qualifiedInterfaceName)
     {
-        const string globalPrefix = ServicesGeneratorTypeNames.GlobalPrefix;
-        var startsWithGlobal = qualifiedInterfaceName.StartsWith(globalPrefix, System.StringComparison.Ordinal);
-        var searchStart = startsWithGlobal ? globalPrefix.Length : 0;
-        var lastDot = qualifiedInterfaceName.LastIndexOf('.');
-        var hasNamespace = lastDot >= searchStart;
-        var qualifierPart = hasNamespace
-            ? qualifiedInterfaceName.Substring(0, lastDot + 1)
-            : startsWithGlobal ? globalPrefix : string.Empty;
-        var simpleName = hasNamespace
-            ? qualifiedInterfaceName.Substring(lastDot + 1)
-            : startsWithGlobal ? qualifiedInterfaceName.Substring(globalPrefix.Length) : qualifiedInterfaceName;
-        return qualifierPart + NamingHelpers.StripInterfacePrefix(simpleName) + "Proxy";
+        var aliasSeparator = qualifiedInterfaceName.IndexOf("::", System.StringComparison.Ordinal);
+        var qualifierLength = aliasSeparator < 0 ? 0 : aliasSeparator + 2;
+        var simpleNameStart = System.Math.Max(qualifiedInterfaceName.LastIndexOf('.') + 1, qualifierLength);
+        return qualifiedInterfaceName.Substring(0, simpleNameStart) +
+            NamingHelpers.StripInterfacePrefix(qualifiedInterfaceName.Substring(simpleNameStart)) +
+            "Proxy";
     }
 
     public static bool MethodNameRequiresExplicitImplementation(string methodName, string proxyName)

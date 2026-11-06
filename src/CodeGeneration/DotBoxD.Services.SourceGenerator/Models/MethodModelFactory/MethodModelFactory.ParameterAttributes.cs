@@ -12,24 +12,27 @@ internal static partial class MethodModelFactory
     private static readonly Dictionary<string, CallerInfoAttributeAppender> CallerInfoAttributeAppenders = new(StringComparer.Ordinal)
     {
         ["System.Runtime.CompilerServices.DateTimeConstantAttribute"] =
-            static (attributes, parameter, _, preserve) => AppendDateTimeConstantAttribute(attributes, parameter, preserve),
+            static (attributes, parameter, _, preserve, _) => AppendDateTimeConstantAttribute(attributes, parameter, preserve),
         ["System.Runtime.CompilerServices.DecimalConstantAttribute"] =
-            static (attributes, parameter, _, preserve) => AppendDecimalConstantAttribute(attributes, parameter, preserve),
+            static (attributes, parameter, _, preserve, _) => AppendDecimalConstantAttribute(attributes, parameter, preserve),
         ["System.Runtime.InteropServices.DefaultParameterValueAttribute"] =
-            static (attributes, parameter, _, preserve) => AppendDefaultParameterValueAttribute(attributes, parameter, preserve),
+            static (attributes, parameter, _, preserve, formatType) =>
+                AppendDefaultParameterValueAttribute(attributes, parameter, preserve, formatType),
     };
 
     private delegate void CallerInfoAttributeAppender(
         StringBuilder attributes,
         IParameterSymbol parameter,
         AttributeData attr,
-        bool preserveMetadataDefaultAttributes);
+        bool preserveMetadataDefaultAttributes,
+        Func<ITypeSymbol, string> formatType);
 
     private static string BuildCallerInfoAttributePrefix(
         IParameterSymbol parameter,
         CancellationToken ct,
         bool preserveOptionalAttributeDefault,
-        bool preserveMetadataDefaultAttributes)
+        bool preserveMetadataDefaultAttributes,
+        Func<ITypeSymbol, string> formatType)
     {
         var attributes = new StringBuilder();
         var hasDateTimeConstant = preserveMetadataDefaultAttributes &&
@@ -51,7 +54,7 @@ internal static partial class MethodModelFactory
         foreach (var attr in parameter.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-            AppendCallerInfoAttribute(attributes, parameter, attr, preserveMetadataDefaultAttributes);
+            AppendCallerInfoAttribute(attributes, parameter, attr, preserveMetadataDefaultAttributes, formatType);
         }
 
         return attributes.ToString();
@@ -61,7 +64,8 @@ internal static partial class MethodModelFactory
         StringBuilder attributes,
         IParameterSymbol parameter,
         AttributeData attr,
-        bool preserveMetadataDefaultAttributes)
+        bool preserveMetadataDefaultAttributes,
+        Func<ITypeSymbol, string> formatType)
     {
         if (CallerInfoAttributeFormatter.TryAppend(attributes, attr))
         {
@@ -76,7 +80,7 @@ internal static partial class MethodModelFactory
         var name = attr.AttributeClass?.ToDisplayString();
         if (name is not null && CallerInfoAttributeAppenders.TryGetValue(name, out var append))
         {
-            append(attributes, parameter, attr, preserveMetadataDefaultAttributes);
+            append(attributes, parameter, attr, preserveMetadataDefaultAttributes, formatType);
         }
     }
 
@@ -96,11 +100,15 @@ internal static partial class MethodModelFactory
         }
     }
 
-    private static void AppendDefaultParameterValueAttribute(StringBuilder attributes, IParameterSymbol parameter, bool preserve)
+    private static void AppendDefaultParameterValueAttribute(
+        StringBuilder attributes,
+        IParameterSymbol parameter,
+        bool preserve,
+        Func<ITypeSymbol, string> formatType)
     {
         if (preserve)
         {
-            attributes.Append(ParameterDefaultValueEmitter.FormatDefaultParameterValueAttribute(parameter));
+            attributes.Append(ParameterDefaultValueEmitter.FormatDefaultParameterValueAttribute(parameter, formatType));
         }
     }
 

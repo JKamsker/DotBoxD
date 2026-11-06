@@ -149,7 +149,7 @@ public sealed class TaskBackedDirectCompletionTests
     }
 
     [Fact]
-    public async Task Pending_send_starts_timeout_after_send_and_sends_one_cancel()
+    public async Task Pending_send_times_out_at_deadline_and_sends_one_cancel_after_late_send()
     {
         var requestTimeout = TimeSpan.FromMilliseconds(80);
         await using var harness = new ValueTaskTimeoutTestHarness(
@@ -160,12 +160,13 @@ public sealed class TaskBackedDirectCompletionTests
         var messageId = harness.LastRequestMessageId;
         var pending = Assert.IsType<TimeoutOnlyPendingUnaryResponse<int>>(
             harness.LastSentPendingResponse);
-        var premature = await Task.WhenAny(call, Task.Delay(requestTimeout * 3));
-        Assert.NotSame(call, premature);
 
-        harness.ReleaseRequestSend();
+        // The deadline covers the send, so the stuck send does not hold the call open.
         await Assert.ThrowsAsync<ServiceTimeoutException>(() => call.WaitAsync(TestTimeout));
         Assert.Equal(PendingCancellationKind.Timeout, pending.CancellationKind);
+        Assert.Equal(0, harness.CancelCount);
+
+        harness.ReleaseRequestSend();
         Assert.Equal(messageId, await harness.WaitForCancelAsync(TestTimeout));
         Assert.Equal(1, harness.CancelCount);
 

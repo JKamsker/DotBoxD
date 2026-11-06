@@ -8,6 +8,8 @@ internal struct StreamFrameSendState
     public StreamConnection? Connection;
     public PooledBufferWriter? Frame;
     public ReadOnlyMemory<byte> Data;
+
+    // Covers only the gate wait; a started write or flush is never cancelled by the caller.
     public CancellationToken CallerToken;
     public StreamFrameSendStage Stage;
     public bool GateHeld;

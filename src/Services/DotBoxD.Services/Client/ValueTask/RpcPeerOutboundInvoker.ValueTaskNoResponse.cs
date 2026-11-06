@@ -144,6 +144,8 @@ internal sealed partial class RpcPeerOutboundInvoker
         PooledBufferWriter frame,
         CancellationToken ct)
     {
+        // Take the deadline before the send starts so RequestTimeout covers send + response.
+        var deadline = GetRequestDeadline();
         var sendFrameAsync = _sendFrameAsync;
         if (sendFrameAsync is not null)
         {
@@ -172,17 +174,12 @@ internal sealed partial class RpcPeerOutboundInvoker
                 }
 
                 return ct.CanBeCanceled
-                    ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, ct)
-                    : CompletePooledNoResponseSendDirectly(pending);
+                    ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, deadline, ct)
+                    : CompletePooledNoResponseSendDirectly(pending, deadline);
             }
 
             pending.TransferSetupToWrapper();
-            return PooledNoResponsePendingSend.AwaitFrameAsync(
-                this,
-                messageId,
-                pending,
-                sendValueTask,
-                ct);
+            return AwaitPooledNoResponseFrameSendAsync(messageId, pending, sendValueTask, deadline, ct);
         }
 
         Task sendTask;
@@ -201,28 +198,23 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             frame.Dispose();
             return ct.CanBeCanceled
-                ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, ct)
-                : CompletePooledNoResponseSendDirectly(pending);
+                ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, deadline, ct)
+                : CompletePooledNoResponseSendDirectly(pending, deadline);
         }
 
         pending.TransferSetupToWrapper();
-        return PooledNoResponsePendingSend.AwaitMemoryAsync(
-            this,
-            messageId,
-            pending,
-            frame,
-            sendTask,
-            ct);
+        return AwaitPooledNoResponseMemorySendAsync(messageId, pending, frame, sendTask, deadline, ct);
     }
 
     private ValueTask CompleteCallerCancelablePooledNoResponseSendDirectly(
         PendingValueTaskNoResponse pending,
+        long deadline,
         CancellationToken callerToken)
     {
         try
         {
             pending.RegisterOwnedCallerCancellation(callerToken);
-            StartPooledTimeoutIfNeeded(pending);
+            StartPooledTimeoutIfNeeded(pending, deadline);
         }
         catch (Exception ex)
         {
@@ -233,9 +225,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         return pending.GetDirectValueTask(this);
     }
 
-    private ValueTask CompletePooledNoResponseSendDirectly(PendingValueTaskNoResponse pending)
+    private ValueTask CompletePooledNoResponseSendDirectly(
+        PendingValueTaskNoResponse pending,
+        long deadline)
     {
-        StartPooledTimeoutIfNeeded(pending);
+        StartPooledTimeoutIfNeeded(pending, deadline);
         return pending.GetDirectValueTask(this);
     }
 }

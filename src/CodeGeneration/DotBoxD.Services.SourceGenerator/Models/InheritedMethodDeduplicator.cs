@@ -205,9 +205,21 @@ internal static class InheritedMethodDeduplicator
 
     public static MethodModel AddAdditionalExplicitImplementation(
         MethodModel method,
-        INamedTypeSymbol implementationType)
+        INamedTypeSymbol implementationType,
+        Compilation compilation)
     {
-        var typeName = MethodModelFactory.GetExplicitImplementationType(implementationType);
+        // The model was built before this duplicate was seen, so aliases the additional interface needs
+        // (extern alias X;) are merged in here for the generated files to declare.
+        var externAliases = new List<string>();
+        if (!method.ExternAliases.IsEmpty)
+        {
+            externAliases.AddRange(method.ExternAliases.Array);
+        }
+
+        var typeName = MethodModelFactory.GetExplicitImplementationType(
+            implementationType,
+            new ExternAliasTypeFormatter(compilation),
+            externAliases);
         var types = new List<string>();
         foreach (var type in method.AdditionalExplicitImplementationTypes)
         {
@@ -222,6 +234,7 @@ internal static class InheritedMethodDeduplicator
         return method with
         {
             AdditionalExplicitImplementationTypes = types.ToEquatableArray(),
+            ExternAliases = externAliases.ToEquatableArray(),
             RequiresDispatcherReceiverCast = true,
         };
     }

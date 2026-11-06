@@ -53,7 +53,7 @@ public sealed class PooledCompletionOwnershipTests
     }
 
     [Fact]
-    public async Task Pending_send_does_not_start_finite_timeout_until_send_completes()
+    public async Task Pending_send_times_out_at_deadline_and_cancels_after_late_send()
     {
         var requestTimeout = TimeSpan.FromMilliseconds(80);
         await using var harness = new ValueTaskTimeoutTestHarness(
@@ -65,21 +65,21 @@ public sealed class PooledCompletionOwnershipTests
         var pending = harness.GetPendingResponse(messageId);
         var task = call.AsTask();
 
-        var premature = await Task.WhenAny(task, Task.Delay(requestTimeout * 3));
-        Assert.NotSame(task, premature);
-
-        harness.ReleaseRequestSend();
+        // The deadline covers the send, so the stuck send does not hold the call open.
         var error = await Assert.ThrowsAsync<ServiceTimeoutException>(
             () => task.WaitAsync(TestTimeout));
         Assert.Contains(
             $"{ValueTaskTimeoutTestHarness.Service}.{ValueTaskTimeoutTestHarness.Method}",
             error.Message);
+        Assert.Equal(0, harness.CancelCount);
+
+        harness.ReleaseRequestSend();
         Assert.Equal(messageId, await harness.WaitForCancelAsync(TestTimeout));
         Assert.IsType<PendingValueTaskUnaryResponse<int>>(pending);
     }
 
     [Fact]
-    public async Task No_response_pending_send_starts_finite_timeout_after_send_completes()
+    public async Task No_response_pending_send_times_out_at_deadline_and_cancels_after_late_send()
     {
         var requestTimeout = TimeSpan.FromMilliseconds(80);
         await using var harness = new ValueTaskTimeoutTestHarness(
@@ -91,16 +91,15 @@ public sealed class PooledCompletionOwnershipTests
         var pending = harness.GetPendingResponse(messageId);
         var task = call.AsTask();
 
-        var premature = await Task.WhenAny(task, Task.Delay(requestTimeout * 3));
-        Assert.NotSame(task, premature);
-
-        harness.ReleaseRequestSend();
         var error = await Assert.ThrowsAsync<ServiceTimeoutException>(
             () => task.WaitAsync(TestTimeout));
         Assert.Contains(
             $"{ValueTaskTimeoutTestHarness.Service}.{ValueTaskTimeoutTestHarness.Method}",
             error.Message);
         Assert.False(task.IsCanceled);
+        Assert.Equal(0, harness.CancelCount);
+
+        harness.ReleaseRequestSend();
         Assert.Equal(messageId, await harness.WaitForCancelAsync(TestTimeout));
         Assert.Equal(1, harness.CancelCount);
         Assert.IsType<PendingValueTaskNoResponse>(pending);

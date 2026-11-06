@@ -144,6 +144,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
             typeof(SandboxValue),
             [typeof(SandboxContext), typeof(SandboxValue)]);
 
+        var bindings = new ModuleScopedBindingCatalog(plan.Bindings, plan.Module.Functions);
         EmitExecute(execute.GetILGenerator(), function, functions[function.Id]);
         foreach (var item in reachableFunctions)
         {
@@ -152,7 +153,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
                 item,
                 methodReferences,
                 functionModels,
-                plan.Bindings,
+                bindings,
                 plan.FunctionAnalysis,
                 recordReturnValidation:
                     StringComparer.Ordinal.Equals(item.Id, function.Id) &&

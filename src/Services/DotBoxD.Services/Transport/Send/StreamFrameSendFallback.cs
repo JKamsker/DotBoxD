@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace DotBoxD.Services.Transport;
 
 /// <summary>Task-backed overflow when every reusable Stream send source is unavailable.</summary>
@@ -22,18 +24,19 @@ internal static class StreamFrameSendFallback
                     ref state,
                     out pendingOperation))
                 {
-                    return;
+                    break;
                 }
             }
         }
         catch (Exception caught)
         {
             error = caught;
-            throw;
         }
-        finally
+
+        // Cleanup runs before completion is published and decides the exception the send reports.
+        if (StreamFrameSendCleanup.Complete(ref state, error) is { } failure)
         {
-            StreamFrameSendCleanup.FinishOrThrow(ref state, error);
+            ExceptionDispatchInfo.Throw(failure);
         }
     }
 }

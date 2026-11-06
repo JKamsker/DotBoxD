@@ -51,17 +51,43 @@ public sealed class StreamFrameSendFallbackTests
     {
         await using var stream = new ControlledPendingSendStream(PendingStreamSendStage.Write);
         await using var connection = new StreamConnection(stream, ownsStream: false);
+        Assert.True(connection.SendGate.Wait(0));
         using var cancellation = new CancellationTokenSource();
         var frame = StreamSendTestFrames.Create(200, out _);
         var send = connection.SendFrameValueAsync(frame, cancellation.Token);
         Assert.False(send.IsCompleted);
 
+        // The caller's token covers the gate wait, so cancelling there fails the send untouched.
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => send.AsTask().WaitAsync(Guard));
         StreamSendTestFrames.AssertDisposed(frame);
+        Assert.Equal(0, stream.WriteCount);
+        connection.SendGate.Release();
         Assert.Equal(1, connection.SendGate.CurrentCount);
+        await VerifyCanceledMidWriteFallbackAsync();
+    }
+
+    private static async Task VerifyCanceledMidWriteFallbackAsync()
+    {
+        await using var stream = new ControlledPendingSendStream(PendingStreamSendStage.Write);
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        using var cancellation = new CancellationTokenSource();
+        var frame = StreamSendTestFrames.Create(203, out var expected);
+        var send = connection.SendFrameValueAsync(frame, cancellation.Token);
+        await stream.WriteEntered.WaitAsync(Guard);
+
+        // Frames are atomic: once the write started, cancellation no longer applies to it.
+        cancellation.Cancel();
+        Assert.False(send.IsCompleted);
+        stream.CompleteWrite();
+
+        await send.AsTask().WaitAsync(Guard);
+        StreamSendTestFrames.AssertDisposed(frame);
+        Assert.Equal(expected, stream.WrittenBytes);
+        Assert.Equal(1, connection.SendGate.CurrentCount);
+        Assert.True(connection.IsConnected);
     }
 
     private static async Task VerifySuccessfulFallbackAsync()

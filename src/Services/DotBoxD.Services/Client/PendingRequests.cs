@@ -120,14 +120,15 @@ internal sealed class PendingRequests : IDisposable
         }
     }
 
-    public void StartTimeout(IPendingResponse pending, TimeSpan timeout)
+    // The deadline is taken before the request send starts, so RequestTimeout covers send + response.
+    // long.MaxValue (no finite timeout) leaves the request unscheduled.
+    public void StartTimeout(IPendingResponse pending, long deadline)
     {
-        if (timeout == Timeout.InfiniteTimeSpan)
+        if (deadline == long.MaxValue)
         {
             return;
         }
 
-        var deadline = PendingRequestTimeoutScheduler.GetDeadline(timeout);
         pending.SetTimeoutDeadline(deadline);
         _timeouts.Schedule(deadline);
     }

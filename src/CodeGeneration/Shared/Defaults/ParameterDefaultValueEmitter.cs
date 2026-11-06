@@ -49,20 +49,22 @@ internal static class ParameterDefaultValueEmitter
     public static string? FormatSignatureDefaultLiteral(
         IParameterSymbol parameter,
         bool hasDefaultValue,
-        DefaultLiteralOptions options)
+        DefaultLiteralOptions options,
+        System.Func<ITypeSymbol, string>? formatType = null)
     {
         if (!parameter.HasExplicitDefaultValue)
         {
             return hasDefaultValue ? "default" : null;
         }
 
-        return CSharpLiteralFormatter.FormatValue(parameter.ExplicitDefaultValue, parameter.Type, options);
+        return CSharpLiteralFormatter.FormatValue(parameter.ExplicitDefaultValue, parameter.Type, options, formatType);
     }
 
     public static string FormatMetadataDefaultValueExpression(
         IParameterSymbol parameter,
         bool hasDefaultValue,
-        string defaultValueLiteral)
+        string defaultValueLiteral,
+        System.Func<ITypeSymbol, string>? formatType = null)
     {
         if (!hasDefaultValue)
         {
@@ -85,7 +87,8 @@ internal static class ParameterDefaultValueEmitter
 
         if (ParameterDefaultMetadataReader.TryFormatDefaultParameterValueAttributeLiteral(
             parameter,
-            out var attributeLiteral))
+            out var attributeLiteral,
+            formatType))
         {
             return attributeLiteral;
         }
@@ -114,8 +117,10 @@ internal static class ParameterDefaultValueEmitter
     public static string FormatDecimalConstantAttribute(IParameterSymbol parameter)
         => ParameterDefaultMetadataReader.FormatDecimalConstantAttribute(parameter);
 
-    public static string FormatDefaultParameterValueAttribute(IParameterSymbol parameter)
-        => ParameterDefaultMetadataReader.FormatDefaultParameterValueAttribute(parameter);
+    public static string FormatDefaultParameterValueAttribute(
+        IParameterSymbol parameter,
+        System.Func<ITypeSymbol, string>? formatType = null)
+        => ParameterDefaultMetadataReader.FormatDefaultParameterValueAttribute(parameter, formatType);
 
     public static string FormatMetadataDefaultAttributePrefix(
         IParameterSymbol parameter,

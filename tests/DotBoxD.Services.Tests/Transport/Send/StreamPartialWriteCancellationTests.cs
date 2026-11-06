@@ -4,16 +4,18 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Transport;
 
-// Regression: once a stream write has started, a cancelled or failed write may have put part of the frame
-// on the stream (named pipes). The connection must be poisoned rather than released for reuse, otherwise
-// the next frame is appended after a truncated one and the receiver's framing desynchronizes.
+// Frames are atomic. The caller's token covers only waiting for the send gate: once a write has started,
+// cancelling that one call must neither truncate the frame nor tear down the shared connection (which
+// would fail every other call on the peer). A genuine I/O failure mid-write still poisons the connection,
+// so no later frame is ever appended after a truncated one.
 [Collection(StreamSendOperationCollection.Name)]
 public sealed class StreamPartialWriteCancellationTests
 {
     private static readonly TimeSpan Guard = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(100);
 
     [Fact]
-    public async Task RawSend_CancelledMidWrite_PoisonsConnection()
+    public async Task RawSend_CancelledMidWrite_CompletesFrameAndKeepsConnectionUsable()
     {
         var stream = new ControlledSendStream(SendBlockPoint.Write);
         await using var connection = new StreamConnection(stream, ownsStream: false);
@@ -23,26 +25,40 @@ public sealed class StreamPartialWriteCancellationTests
         var send = connection.SendValueAsync(bytes, cancellation.Token).AsTask();
         await stream.WriteEntered.WaitAsync(Guard);
         cancellation.Cancel();
+        await AssertStillWritingAsync(send);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Guard));
-        await AssertPoisonedAsync(connection, messageId: 742);
+        stream.ReleaseWrite();
+        await send.WaitAsync(Guard);
+
+        Assert.Equal(bytes, stream.WrittenBytes);
+        await AssertUsableAsync(connection, stream, messageId: 742);
     }
 
-    [Fact]
-    public async Task OwnedFrameSend_CancelledMidWrite_PoisonsConnection()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnedFrameSend_CancelledAfterWriteStarted_CompletesFrameAndKeepsConnectionUsable(
+        bool cancelDuringFlush)
     {
-        var stream = new ControlledSendStream(SendBlockPoint.Write);
+        var stream = new ControlledSendStream(
+            cancelDuringFlush ? SendBlockPoint.Flush : SendBlockPoint.Write);
         await using var connection = new StreamConnection(stream, ownsStream: false);
-        var frame = StreamSendTestFrames.Create(messageId: 743, out _);
+        var frame = StreamSendTestFrames.Create(messageId: 743, out var bytes);
         using var cancellation = new CancellationTokenSource();
 
         var send = connection.SendFrameValueAsync(frame, cancellation.Token).AsTask();
-        await stream.WriteEntered.WaitAsync(Guard);
+        var entered = cancelDuringFlush ? stream.FlushEntered : stream.WriteEntered;
+        await entered.WaitAsync(Guard);
         cancellation.Cancel();
+        await AssertStillWritingAsync(send);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Guard));
+        stream.ReleaseWrite();
+        stream.ReleaseFlush();
+        await send.WaitAsync(Guard);
+
         StreamSendTestFrames.AssertDisposed(frame);
-        await AssertPoisonedAsync(connection, messageId: 744);
+        Assert.Equal(bytes, stream.WrittenBytes);
+        await AssertUsableAsync(connection, stream, messageId: 744);
     }
 
     [Fact]
@@ -60,17 +76,56 @@ public sealed class StreamPartialWriteCancellationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Guard));
         connection.ReleaseSendGate();
 
-        Assert.True(connection.IsConnected);
-        using var next = StreamSendTestFrames.Create(messageId: 746, out var nextBytes);
-        await connection.SendValueAsync(nextBytes).AsTask().WaitAsync(Guard);
-        Assert.Equal(nextBytes, stream.WrittenBytes);
+        Assert.Null(stream.WrittenBytes);
+        StreamSendTestFrames.AssertDisposed(frame);
+        await AssertUsableAsync(connection, stream, messageId: 746);
     }
 
-    private static async Task AssertPoisonedAsync(StreamConnection connection, int messageId)
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IoFailureMidWrite_PoisonsConnection(bool ownedFrame)
     {
+        var failure = new IOException("simulated mid-write failure");
+        var stream = new ControlledSendStream(SendBlockPoint.Write, writeFailure: failure);
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        var frame = StreamSendTestFrames.Create(messageId: 747, out var bytes);
+
+        var send = ownedFrame
+            ? connection.SendFrameValueAsync(frame).AsTask()
+            : connection.SendValueAsync(bytes).AsTask();
+        await stream.WriteEntered.WaitAsync(Guard);
+        stream.ReleaseWrite();
+
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => send.WaitAsync(Guard)));
+        if (!ownedFrame)
+        {
+            frame.Dispose();
+        }
+
         Assert.False(connection.IsConnected);
-        using var next = StreamSendTestFrames.Create(messageId, out var nextBytes);
+        using var next = StreamSendTestFrames.Create(messageId: 748, out var nextBytes);
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => connection.SendValueAsync(nextBytes).AsTask().WaitAsync(Guard));
+    }
+
+    private static async Task AssertStillWritingAsync(Task send)
+    {
+        // The caller's cancellation must not abandon a frame whose bytes may already be on the stream.
+        await Task.Delay(SettleDelay);
+        Assert.False(send.IsCompleted, $"Send completed as {send.Status} after mid-write cancellation.");
+    }
+
+    private static async Task AssertUsableAsync(
+        StreamConnection connection,
+        ControlledSendStream stream,
+        int messageId)
+    {
+        Assert.True(connection.IsConnected);
+        using var next = StreamSendTestFrames.Create(messageId, out var nextBytes);
+        stream.ReleaseWrite();
+        stream.ReleaseFlush();
+        await connection.SendValueAsync(nextBytes).AsTask().WaitAsync(Guard);
+        Assert.Equal(nextBytes, stream.WrittenBytes);
     }
 }

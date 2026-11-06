@@ -93,21 +93,29 @@ public sealed class OwnedFrameSendLifecycleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Cancellation_during_write_or_flush_disposes_frame(bool cancelDuringFlush)
+    public async Task Cancellation_during_write_or_flush_completes_frame_then_disposes_it(
+        bool cancelDuringFlush)
     {
         var blockPoint = cancelDuringFlush ? SendBlockPoint.Flush : SendBlockPoint.Write;
         await using var stream = new ControlledSendStream(blockPoint);
         await using var connection = new StreamConnection(stream, ownsStream: false);
         using var cancellation = new CancellationTokenSource();
-        var frame = CreateFrame(out _);
+        var frame = CreateFrame(out var expected);
         var send = connection.SendFrameValueAsync(frame, cancellation.Token).AsTask();
         var entered = cancelDuringFlush ? stream.FlushEntered : stream.WriteEntered;
         await entered.WaitAsync(Timeout);
 
+        // Frames are atomic: a started write ignores the caller's token, so the frame stays owned by
+        // the in-flight I/O until it completes and is then delivered intact.
         cancellation.Cancel();
+        Assert.Equal(expected, frame.WrittenMemory.ToArray());
+        stream.ReleaseWrite();
+        stream.ReleaseFlush();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Timeout));
+        await send.WaitAsync(Timeout);
         AssertDisposed(frame);
+        Assert.Equal(expected, stream.WrittenBytes);
+        Assert.True(connection.IsConnected);
     }
 
     private static PooledBufferWriter CreateFrame(out byte[] expected)

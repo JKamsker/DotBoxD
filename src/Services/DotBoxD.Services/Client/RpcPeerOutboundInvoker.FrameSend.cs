@@ -47,10 +47,67 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
-    private async Task<ReceivedResponse> SendFrameAndAwaitAsync(
+    private Task<ReceivedResponse> SendFrameAndAwaitAsync(
         int messageId,
         PendingReceivedResponse pending,
         PooledBufferWriter frame,
+        string service,
+        string method,
+        RpcOutboundStreamSet outboundStreams,
+        CancellationToken ct)
+    {
+        var deadline = GetRequestDeadline();
+        Task? send;
+        try
+        {
+            var sendTask = SendOwnedFrameAsync(frame, ct);
+            if (sendTask.IsCompletedSuccessfully)
+            {
+                sendTask.GetAwaiter().GetResult();
+                send = null;
+            }
+            else
+            {
+                send = sendTask.AsTask();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Let the awaiting method own the failure so cleanup stays in one place.
+            send = Task.FromException(ex);
+        }
+
+        // The deadline was taken before the send started; arm it while the send may still be in flight.
+        _pending.StartTimeout(pending, deadline);
+        if (send is not null && ShouldRaceSend(send.IsCompleted, ct))
+        {
+            return AwaitSentFrameWithinDeadlineAsync(
+                pending,
+                send,
+                deadline,
+                service,
+                method,
+                outboundStreams,
+                ct);
+        }
+
+        return AwaitSentFrameResponseAsync(
+            pending,
+            send ?? Task.CompletedTask,
+            sendDetached: false,
+            service,
+            method,
+            outboundStreams,
+            ct);
+    }
+
+    // Kept parameter-lean: this state machine is allocated per call, including synchronous sends.
+    // The send is awaited through ValueTask so the awaiter slot is shared with the stream cleanup
+    // await below; a synchronously completed send arrives as Task.CompletedTask.
+    private async Task<ReceivedResponse> AwaitSentFrameResponseAsync(
+        PendingReceivedResponse pending,
+        Task send,
+        bool sendDetached,
         string service,
         string method,
         RpcOutboundStreamSet outboundStreams,
@@ -60,16 +117,23 @@ internal sealed partial class RpcPeerOutboundInvoker
         var requestSent = false;
         try
         {
-            await SendOwnedFrameAsync(frame, ct).ConfigureAwait(false);
-            requestSent = true;
-            outboundStreams.Start();
+            await new ValueTask(send).ConfigureAwait(false);
+
+            // A detached send means the call ended before the request was known to be written: the
+            // detached send owns the slot and the late cancel frame, and its streams never start.
+            // A response that already arrived proves the remote holds the request, though, so its
+            // streams start even while the local write is unfinished: the remote may wait for them.
+            requestSent = IsRequestDelivered(pending, sendDetached);
+            if (requestSent)
+            {
+                outboundStreams.Start();
+            }
 
             var callerCancellation = ct.CanBeCanceled
                 ? ct.Register(static state => ((IPendingResponse)state!).CancelByCaller(), pending)
                 : default;
             using (callerCancellation)
             {
-                _pending.StartTimeout(pending, _timeout);
                 try
                 {
                     var received = await pending.Task.ConfigureAwait(false);
@@ -84,14 +148,14 @@ internal sealed partial class RpcPeerOutboundInvoker
                 }
                 catch (OperationCanceledException) when (pending.CancellationKind == PendingCancellationKind.Timeout)
                 {
-                    TrySendCancelForSentRequest(requestSent, messageId);
+                    TrySendCancelForSentRequest(requestSent, pending.MessageId);
                     ct.ThrowIfCancellationRequested();
                     RpcTelemetry.RequestTimedOut();
                     throw new ServiceTimeoutException($"Request to {service}.{method} timed out.");
                 }
                 catch (OperationCanceledException) when (pending.CancellationKind == PendingCancellationKind.Caller)
                 {
-                    TrySendCancelForSentRequest(requestSent, messageId);
+                    TrySendCancelForSentRequest(requestSent, pending.MessageId);
                     ct.ThrowIfCancellationRequested();
                     throw;
                 }
@@ -101,10 +165,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             if (!consumed)
             {
-                _pending.Remove(messageId, pending, consumed: false);
+                _pending.Remove(pending.MessageId, pending, consumed: false);
             }
 
-            ReleasePendingSlot();
+            ReleasePendingSlotUnlessDetached(sendDetached);
+
             if (!consumed)
             {
                 if (requestSent)
@@ -120,6 +185,11 @@ internal sealed partial class RpcPeerOutboundInvoker
             }
         }
     }
+
+    // Detaching needs a timed-out, caller-cancelled or already-completed pending, so a detached
+    // call's response, if any, is already here; the response is the remote's proof of receipt.
+    private static bool IsRequestDelivered(PendingReceivedResponse pending, bool sendDetached) =>
+        !sendDetached || pending.Task.IsCompletedSuccessfully;
 
     private void TrySendCancelForSentRequest(bool requestSent, int messageId)
     {

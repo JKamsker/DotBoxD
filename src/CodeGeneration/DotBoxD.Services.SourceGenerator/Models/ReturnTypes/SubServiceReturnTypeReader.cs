@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
@@ -56,7 +57,13 @@ internal static class SubServiceReturnTypeReader
     public static bool IsRpcInvokerType(ITypeSymbol type, INamedTypeSymbol rpcInvokerType)
         => SymbolEqualityComparer.Default.Equals(type, rpcInvokerType);
 
-    public static bool TryGetSubServiceInfo(ITypeSymbol type, CancellationToken ct, out SubServiceInfo info)
+    // format spells the interface for generated source (for example, honouring extern aliases);
+    // when omitted the emitted name is the global::-qualified identity.
+    public static bool TryGetSubServiceInfo(
+        ITypeSymbol type,
+        CancellationToken ct,
+        out SubServiceInfo info,
+        Func<ITypeSymbol, string>? format = null)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -76,11 +83,15 @@ internal static class SubServiceReturnTypeReader
             return false;
         }
 
+        var qualifiedInterfaceName = named.ToDisplayString(s_qualifiedIdentityFormat);
         info = new SubServiceInfo(
-            QualifiedInterfaceName: named.ToDisplayString(s_qualifiedIdentityFormat),
+            QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceName: LiteralHelpers.EscapeStringLiteral(ReadServiceName(named, serviceAttr, ct)),
             AllowsNull: named.NullableAnnotation == NullableAnnotation.Annotated,
-            HasProxyCompanion: ReturnTypeClassifier.HasGeneratedProxyCompanion(named, ct));
+            HasProxyCompanion: ReturnTypeClassifier.HasGeneratedProxyCompanion(named, ct),
+            EmittedInterfaceName: format is null
+                ? qualifiedInterfaceName
+                : format(named.WithNullableAnnotation(NullableAnnotation.NotAnnotated)));
         return true;
     }
 

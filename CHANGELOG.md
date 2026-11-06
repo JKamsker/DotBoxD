@@ -79,6 +79,21 @@ Services, Kernels, and Pushdown.
 - **Allocation-free I64/F64 return intermediates:** eligible non-debug unary and arithmetic return trees now remain
   primitive until the one `SandboxValue` required by the public result. Prepared literal identity, plain-variable returns,
   calls and pending continuations, trace order, checked/finite math, and resource accounting retain their existing paths.
+- **`RequestTimeout` covers the request send:** a finite `RpcPeerOptions.RequestTimeout` now bounds
+  the whole outbound call (send + response) on every call shape: Task and pooled ValueTask unary,
+  no-response, and streaming requests. A call whose request send never completes (peer not reading,
+  full TCP window, stuck send queue) now fails with `ServiceTimeoutException` instead of hanging. The
+  blocked send is left to finish rather than cancelled, so the connection stays open. It keeps its
+  `MaxPendingRequests` slot until it finishes, and a cancel frame follows a request written after its
+  caller timed out. Synchronous sends allocate exactly as before.
+- **Caller cancellation ends a blocked request send:** because frame writes are atomic, a caller's
+  `CancellationToken` no longer interrupts a request write that already started. A call whose send went
+  asynchronous now also races caller cancellation (with or without a finite `RequestTimeout`) and fails
+  with the caller's `OperationCanceledException` instead of hanging until the connection is disposed or
+  ending as a timeout. The unfinished send is detached like a timed-out one: it keeps its frame and
+  `MaxPendingRequests` slot until it finishes, and a cancel frame follows a request written late. A
+  pooled `ValueTask` call whose send completed just after the synchronous check also arms its finite
+  `RequestTimeout` again instead of waiting forever for a response.
 - **Allocation-free MessagePack envelope read state:** request and response formatters now keep their synchronous,
   formatter-private field-tracking state on the stack. Field ordering, duplicate and required-field validation, unknown
   field depth limits, stream decoding, and trailing-byte rejection are unchanged.
