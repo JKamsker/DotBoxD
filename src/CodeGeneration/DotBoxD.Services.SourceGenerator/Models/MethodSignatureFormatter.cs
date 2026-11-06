@@ -36,7 +36,10 @@ internal static class MethodSignatureFormatter
         return "<" + string.Join(", ", names) + ">";
     }
 
-    public static string GetConstraintClauses(IMethodSymbol method, CancellationToken ct)
+    public static string GetConstraintClauses(
+        IMethodSymbol method,
+        ExternAliasTypeFormatter typeFormatter,
+        CancellationToken ct)
     {
         if (!method.IsGenericMethod)
         {
@@ -47,7 +50,7 @@ internal static class MethodSignatureFormatter
         foreach (var typeParameter in method.TypeParameters)
         {
             ct.ThrowIfCancellationRequested();
-            var clause = GetConstraintClause(typeParameter, ct);
+            var clause = GetConstraintClause(typeParameter, typeFormatter, ct);
             if (clause.Length > 0)
             {
                 clauses.Add(clause);
@@ -57,14 +60,17 @@ internal static class MethodSignatureFormatter
         return string.Concat(clauses);
     }
 
-    private static string GetConstraintClause(ITypeParameterSymbol typeParameter, CancellationToken ct)
+    private static string GetConstraintClause(
+        ITypeParameterSymbol typeParameter,
+        ExternAliasTypeFormatter typeFormatter,
+        CancellationToken ct)
     {
         var constraints = new List<string>();
         AddPrimaryConstraint(typeParameter, constraints);
         foreach (var constraintType in typeParameter.ConstraintTypes)
         {
             ct.ThrowIfCancellationRequested();
-            constraints.Add(constraintType.ToDisplayString(s_qualifiedFormat));
+            constraints.Add(typeFormatter.Format(constraintType, s_qualifiedFormat));
         }
 
         if (typeParameter.HasConstructorConstraint)
