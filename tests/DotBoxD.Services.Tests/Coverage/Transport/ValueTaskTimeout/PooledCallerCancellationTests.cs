@@ -150,7 +150,7 @@ public sealed class PooledCallerCancellationTests
     }
 
     [Fact]
-    public async Task Caller_cancellation_before_response_waits_for_send_then_releases_slot()
+    public async Task Caller_cancellation_before_response_ends_call_and_holds_slot_until_send_completes()
     {
         await using var harness = new ValueTaskTimeoutTestHarness(
             Timeout.InfiniteTimeSpan,
@@ -162,16 +162,16 @@ public sealed class PooledCallerCancellationTests
         var messageId = harness.LastRequestMessageId;
         var source = harness.GetPendingResponse(messageId);
         cancellation.Cancel();
-        harness.CompleteGeneric(messageId, CallerResponse.First);
 
-        Assert.False(call.IsCompleted);
-        await Assert.ThrowsAsync<ServiceException>(
-            () => Invoke(harness, CallerResponse.Second, CancellationToken.None).AsTask());
-
-        harness.ReleaseRequestSend();
         var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => call.AsTask().WaitAsync(Guard));
         Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(harness.TryCompleteGeneric(messageId, CallerResponse.First));
+        await Assert.ThrowsAsync<ServiceException>(
+            () => Invoke(harness, CallerResponse.Second, CancellationToken.None).AsTask());
+        Assert.Equal(0, harness.CancelCount);
+
+        harness.ReleaseRequestSend();
         Assert.Equal(messageId, await harness.WaitForCancelAsync(Guard));
 
         var followUp = Invoke(harness, CallerResponse.Second, CancellationToken.None);

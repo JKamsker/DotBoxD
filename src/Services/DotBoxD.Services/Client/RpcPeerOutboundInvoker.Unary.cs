@@ -141,7 +141,7 @@ internal sealed partial class RpcPeerOutboundInvoker
 
         // The deadline was taken before the send started; arm it while the send may still be in flight.
         _pending.StartTimeout(pending, deadline);
-        if (_hasFiniteTimeout && !sendTask.IsCompleted)
+        if (ShouldRaceSend(sendTask.IsCompleted, ct))
         {
             return AwaitUnarySendWithinDeadlineAsync(
                 messageId,

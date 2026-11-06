@@ -42,7 +42,8 @@ public sealed class RpcPeerOptions
     /// send queue) when the timeout elapses fails with the same <c>ServiceTimeoutException</c> as a
     /// late response. The blocked send is not cancelled, because interrupting a partially written
     /// frame would close the connection; it keeps the call's <see cref="MaxPendingRequests"/> slot
-    /// until it finishes, and if it later writes the request, a cancel frame follows it.
+    /// until it finishes, and if it later writes the request, a cancel frame follows it. Cancelling the
+    /// caller's token ends a call with a blocked send the same way, with or without a finite timeout.
     /// </remarks>
     public TimeSpan RequestTimeout
     {

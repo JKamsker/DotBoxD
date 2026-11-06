@@ -86,6 +86,14 @@ Services, Kernels, and Pushdown.
   blocked send is left to finish rather than cancelled, so the connection stays open. It keeps its
   `MaxPendingRequests` slot until it finishes, and a cancel frame follows a request written after its
   caller timed out. Synchronous sends allocate exactly as before.
+- **Caller cancellation ends a blocked request send:** because frame writes are atomic, a caller's
+  `CancellationToken` no longer interrupts a request write that already started. A call whose send went
+  asynchronous now also races caller cancellation (with or without a finite `RequestTimeout`) and fails
+  with the caller's `OperationCanceledException` instead of hanging until the connection is disposed or
+  ending as a timeout. The unfinished send is detached like a timed-out one: it keeps its frame and
+  `MaxPendingRequests` slot until it finishes, and a cancel frame follows a request written late. A
+  pooled `ValueTask` call whose send completed just after the synchronous check also arms its finite
+  `RequestTimeout` again instead of waiting forever for a response.
 - **Allocation-free MessagePack envelope read state:** request and response formatters now keep their synchronous,
   formatter-private field-tracking state on the stack. Field ordering, duplicate and required-field validation, unknown
   field depth limits, stream decoding, and trailing-byte rejection are unchanged.

@@ -12,17 +12,32 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
-    // A send still in flight under a finite RequestTimeout races its deadline; any other unfinished
-    // send (no finite timeout, or one that already failed synchronously) keeps the plain wrapper.
+    // A send still in flight under a finite RequestTimeout or a cancelable caller token races its
+    // deadline and caller cancellation; any other send keeps the plain wrapper. The caller saw the send
+    // incomplete, but it may have completed since, so the plain wrapper arms the deadline here for a
+    // send that already succeeded, exactly as the synchronous path does. A send that already failed
+    // needs no deadline: its wrapper rethrows the failure at once.
     private ValueTask<TResponse> AwaitPooledUnaryFrameSendAsync<TResponse>(
         int messageId,
         PendingValueTaskUnaryResponse<TResponse> pending,
         ValueTask send,
         long deadline,
-        CancellationToken ct) =>
-        _hasFiniteTimeout && !send.IsCompleted
-            ? PooledUnaryPendingSend.AwaitWithinDeadlineAsync(this, messageId, pending, send.AsTask(), deadline, ct)
-            : PooledUnaryPendingSend.AwaitFrameAsync(this, messageId, pending, send, ct);
+        CancellationToken ct)
+    {
+        if (ShouldRaceSend(send.IsCompleted, ct))
+        {
+            return PooledUnaryPendingSend.AwaitWithinDeadlineAsync(
+                this,
+                messageId,
+                pending,
+                send.AsTask(),
+                deadline,
+                ct);
+        }
+
+        StartPooledTimeoutForCompletedSend(pending, send.IsCompletedSuccessfully, deadline);
+        return PooledUnaryPendingSend.AwaitFrameAsync(this, messageId, pending, send, ct);
+    }
 
     private ValueTask<TResponse> AwaitPooledUnaryMemorySendAsync<TResponse>(
         int messageId,
@@ -30,26 +45,44 @@ internal sealed partial class RpcPeerOutboundInvoker
         PooledBufferWriter frame,
         Task send,
         long deadline,
-        CancellationToken ct) =>
-        _hasFiniteTimeout && !send.IsCompleted
-            ? PooledUnaryPendingSend.AwaitWithinDeadlineAsync(
+        CancellationToken ct)
+    {
+        if (ShouldRaceSend(send.IsCompleted, ct))
+        {
+            return PooledUnaryPendingSend.AwaitWithinDeadlineAsync(
                 this,
                 messageId,
                 pending,
                 DisposeFrameAfterSendAsync(frame, send),
                 deadline,
-                ct)
-            : PooledUnaryPendingSend.AwaitMemoryAsync(this, messageId, pending, frame, send, ct);
+                ct);
+        }
+
+        StartPooledTimeoutForCompletedSend(pending, send.IsCompletedSuccessfully, deadline);
+        return PooledUnaryPendingSend.AwaitMemoryAsync(this, messageId, pending, frame, send, ct);
+    }
 
     private ValueTask AwaitPooledNoResponseFrameSendAsync(
         int messageId,
         PendingValueTaskNoResponse pending,
         ValueTask send,
         long deadline,
-        CancellationToken ct) =>
-        _hasFiniteTimeout && !send.IsCompleted
-            ? PooledNoResponsePendingSend.AwaitWithinDeadlineAsync(this, messageId, pending, send.AsTask(), deadline, ct)
-            : PooledNoResponsePendingSend.AwaitFrameAsync(this, messageId, pending, send, ct);
+        CancellationToken ct)
+    {
+        if (ShouldRaceSend(send.IsCompleted, ct))
+        {
+            return PooledNoResponsePendingSend.AwaitWithinDeadlineAsync(
+                this,
+                messageId,
+                pending,
+                send.AsTask(),
+                deadline,
+                ct);
+        }
+
+        StartPooledTimeoutForCompletedSend(pending, send.IsCompletedSuccessfully, deadline);
+        return PooledNoResponsePendingSend.AwaitFrameAsync(this, messageId, pending, send, ct);
+    }
 
     private ValueTask AwaitPooledNoResponseMemorySendAsync(
         int messageId,
@@ -57,16 +90,33 @@ internal sealed partial class RpcPeerOutboundInvoker
         PooledBufferWriter frame,
         Task send,
         long deadline,
-        CancellationToken ct) =>
-        _hasFiniteTimeout && !send.IsCompleted
-            ? PooledNoResponsePendingSend.AwaitWithinDeadlineAsync(
+        CancellationToken ct)
+    {
+        if (ShouldRaceSend(send.IsCompleted, ct))
+        {
+            return PooledNoResponsePendingSend.AwaitWithinDeadlineAsync(
                 this,
                 messageId,
                 pending,
                 DisposeFrameAfterSendAsync(frame, send),
                 deadline,
-                ct)
-            : PooledNoResponsePendingSend.AwaitMemoryAsync(this, messageId, pending, frame, send, ct);
+                ct);
+        }
+
+        StartPooledTimeoutForCompletedSend(pending, send.IsCompletedSuccessfully, deadline);
+        return PooledNoResponsePendingSend.AwaitMemoryAsync(this, messageId, pending, frame, send, ct);
+    }
+
+    private void StartPooledTimeoutForCompletedSend(
+        PooledPendingResponse pending,
+        bool sendSucceeded,
+        long deadline)
+    {
+        if (sendSucceeded)
+        {
+            StartPooledTimeoutIfNeeded(pending, deadline);
+        }
+    }
 
     /// <summary>
     /// Completes a pooled wrapper that observed its source through <paramref name="response"/>

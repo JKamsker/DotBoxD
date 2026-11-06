@@ -5,9 +5,10 @@ namespace DotBoxD.Services.Client;
 
 internal static class PooledNoResponsePendingSend
 {
-    // With a finite RequestTimeout the deadline is armed before waiting on a backpressured send. The
-    // source is consumed once, through a Task observer, so the wait can end on whichever of the send
-    // and the response (including its timeout) finishes first. Allocation stays on this slow path.
+    // With a finite RequestTimeout the deadline is armed before waiting on a backpressured send, and a
+    // cancelable caller token is raced as well. The source is consumed once, through a Task observer,
+    // so the wait can end on whichever of the send and the response (including its timeout or caller
+    // cancellation) finishes first. Allocation stays on this slow path.
     public static async ValueTask AwaitWithinDeadlineAsync(
         RpcPeerOutboundInvoker owner,
         int messageId,
@@ -22,7 +23,12 @@ internal static class PooledNoResponsePendingSend
         var ownsSlot = true;
         try
         {
-            ownsSlot = await owner.AwaitSendBeforeCompletionAsync(sendTask, response, pending, deadline)
+            ownsSlot = await owner.AwaitSendBeforeCompletionAsync(
+                    sendTask,
+                    response,
+                    pending,
+                    deadline,
+                    callerToken)
                 .ConfigureAwait(false);
 
             // A detached send owns the slot and the late cancel frame; the call has already ended.
@@ -63,8 +69,8 @@ internal static class PooledNoResponsePendingSend
         }
     }
 
-    // Used without a finite RequestTimeout, or for a send that already failed synchronously; the
-    // deadline variant above owns every send still in flight under a finite timeout.
+    // Used for a send that already completed, or one with neither a finite RequestTimeout nor a
+    // cancelable caller token to race; the deadline variant above owns every other send in flight.
     public static async ValueTask AwaitFrameAsync(
         RpcPeerOutboundInvoker owner,
         int messageId,
