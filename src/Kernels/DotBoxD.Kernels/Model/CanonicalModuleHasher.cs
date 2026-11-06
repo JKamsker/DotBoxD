@@ -34,12 +34,7 @@ public static class CanonicalModuleHasher
             return;
         }
 
-        var ordered = new CapabilityRequest[requests.Count];
-        for (var i = 0; i < requests.Count; i++)
-        {
-            ordered[i] = requests[i];
-        }
-
+        var ordered = requests.ToArray();
         Array.Sort(ordered, static (left, right) =>
         {
             var idComparison = string.Compare(left.Id, right.Id, StringComparison.Ordinal);
@@ -85,12 +80,7 @@ public static class CanonicalModuleHasher
             return;
         }
 
-        var ordered = new SandboxFunction[functions.Count];
-        for (var i = 0; i < functions.Count; i++)
-        {
-            ordered[i] = functions[i];
-        }
-
+        var ordered = functions.ToArray();
         Array.Sort(ordered, static (left, right) => string.Compare(left.Id, right.Id, StringComparison.Ordinal));
         for (var i = 0; i < ordered.Length; i++)
         {
@@ -101,6 +91,13 @@ public static class CanonicalModuleHasher
     private static void WriteFunction(CanonicalWriter writer, SandboxFunction function)
     {
         writer.Write("fn", function.IsEntrypoint ? "entry" : "private", function.Id, Type(function.ReturnType));
+        // Declared effects change the validation outcome, so they are part of module identity. The
+        // record is emitted only when present, keeping hashes of modules without them unchanged.
+        if (function.DeclaredEffects is { } declaredEffects)
+        {
+            writer.Write("effects", ((long)declaredEffects).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         foreach (var parameter in function.Parameters)
         {
             writer.Write("param", parameter.Name, Type(parameter.Type));

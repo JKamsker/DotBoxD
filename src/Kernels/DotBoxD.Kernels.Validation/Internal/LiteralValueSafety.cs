@@ -8,17 +8,19 @@ internal static class LiteralValueSafety
 {
     private const int MaxTextLiteralLength = 65_536;
 
-    public static bool Validate(SandboxValue value)
+    // declaredOpaqueIdTypes gates opaque-id brands exactly as in type position: a literal (or a
+    // collection literal's element type) naming a brand the policy did not declare is rejected.
+    public static bool Validate(SandboxValue value, IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         if (value is not (ListValue or MapValue or RecordValue))
         {
-            return ValidateScalar(value);
+            return ValidateScalar(value, declaredOpaqueIdTypes);
         }
 
         var allocates = false;
         foreach (var current in Flatten(value))
         {
-            allocates |= ValidateScalar(current);
+            allocates |= ValidateScalar(current, declaredOpaqueIdTypes);
         }
 
         return allocates;
@@ -56,7 +58,7 @@ internal static class LiteralValueSafety
         return text is not null && DangerousReferenceDetector.IsDangerousReference(text);
     }
 
-    private static bool ValidateScalar(SandboxValue value)
+    private static bool ValidateScalar(SandboxValue value, IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         switch (value)
         {
@@ -71,6 +73,7 @@ internal static class LiteralValueSafety
                     throw InvalidLiteral("E-CONST-ID", "opaque ID constant is invalid");
                 }
 
+                RequireDeclaredOpaqueIdBrands(id.Type, declaredOpaqueIdTypes);
                 return true;
             case F64Value number when !double.IsFinite(number.Value):
                 throw InvalidLiteral("E-CONST-F64", "f64 constant must be finite");
@@ -90,7 +93,14 @@ internal static class LiteralValueSafety
                 }
 
                 return true;
-            case ListValue or MapValue or RecordValue:
+            case ListValue list:
+                RequireDeclaredOpaqueIdBrands(list.ItemType, declaredOpaqueIdTypes);
+                return true;
+            case MapValue map:
+                RequireDeclaredOpaqueIdBrands(map.KeyType, declaredOpaqueIdTypes);
+                RequireDeclaredOpaqueIdBrands(map.ValueType, declaredOpaqueIdTypes);
+                return true;
+            case RecordValue:
                 return true;
             default:
                 return false;
@@ -130,6 +140,27 @@ internal static class LiteralValueSafety
                     }
 
                     break;
+            }
+        }
+    }
+
+    private static void RequireDeclaredOpaqueIdBrands(SandboxType type, IReadOnlySet<string> declaredOpaqueIdTypes)
+    {
+        var pending = new Stack<SandboxType>();
+        pending.Push(type);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (current.Arguments.Count == 0 &&
+                SandboxType.IsWellFormedOpaqueIdName(current.Name) &&
+                !declaredOpaqueIdTypes.Contains(current.Name))
+            {
+                throw InvalidLiteral("E-TYPE-UNKNOWN", $"unknown or forbidden type '{current.Name}'");
+            }
+
+            for (var i = 0; i < current.Arguments.Count; i++)
+            {
+                pending.Push(current.Arguments[i]);
             }
         }
     }

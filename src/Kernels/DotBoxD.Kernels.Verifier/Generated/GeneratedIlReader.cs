@@ -269,8 +269,10 @@ internal static class GeneratedIlReader
         }
     }
 
+    // MetadataTokens.EntityHandle/UserStringHandle throw ArgumentException for a token of the wrong
+    // table kind (e.g. a user-string token as a call operand); that is malformed IL, not a host fault.
     private static bool IsIlFormatException(Exception exception)
-        => exception is BadImageFormatException or ArgumentOutOfRangeException or InvalidOperationException;
+        => exception is BadImageFormatException or ArgumentException or InvalidOperationException;
 
     private readonly record struct DecodedOperand(
         EntityHandle? Handle = null,

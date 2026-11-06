@@ -42,6 +42,14 @@ public sealed class PathUriLiteralValidationTests
     [InlineData("config/name.")]
     [InlineData("config/name ")]
     [InlineData("config/\u0001settings.json")]
+    [InlineData("CON .txt")]
+    [InlineData("config/NUL .log")]
+    [InlineData("aux  .json")]
+    [InlineData("COM\u00B9")]
+    [InlineData("LPT\u00B2.txt")]
+    [InlineData("config/com\u00B3")]
+    [InlineData("COM0")]
+    [InlineData("LPT0.txt")]
     public void Path_factory_rejects_non_portable_values(string path)
     {
         Assert.Throws<ArgumentException>(() => SandboxValue.FromPath(path));
@@ -63,6 +71,16 @@ public sealed class PathUriLiteralValidationTests
     }
 
     [Theory]
+    [InlineData("CONSOLE.txt")]
+    [InlineData("config/COM10")]
+    [InlineData("LPT.txt")]
+    [InlineData("my CON.txt")]
+    public void Path_factory_accepts_names_that_only_resemble_devices(string path)
+    {
+        _ = SandboxValue.FromPath(path);
+    }
+
+    [Theory]
     [InlineData("not-a-uri")]
     [InlineData("https://user:pass@example.com/config")]
     public void Uri_factory_rejects_invalid_values(string uri)
@@ -76,6 +94,8 @@ public sealed class PathUriLiteralValidationTests
     [InlineData("NUL")]
     [InlineData("config/name.")]
     [InlineData("config/\u0001settings.json")]
+    [InlineData("CON .txt")]
+    [InlineData("COM\u00B9")]
     public async Task Programmatic_path_literal_rejects_non_portable_value(string path)
     {
         var module = ModuleWithValue(

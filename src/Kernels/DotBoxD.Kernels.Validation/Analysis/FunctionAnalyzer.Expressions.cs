@@ -14,7 +14,7 @@ internal sealed partial class FunctionAnalyzer
         effects |= SandboxEffect.Cpu;
         return expression switch
         {
-            LiteralExpression literal => LiteralExpressionAnalyzer.Analyze(literal, ref effects),
+            LiteralExpression literal => LiteralExpressionAnalyzer.Analyze(literal, ref effects, _declaredOpaqueIdTypes),
             VariableExpression variable => scope.Get(variable.Name, _diagnostics, variable.Span),
             UnaryExpression unary => AnalyzeUnary(unary, scope, ref effects, ref canReorder),
             BinaryExpression binary => AnalyzeBinary(binary, scope, ref effects, ref canReorder),

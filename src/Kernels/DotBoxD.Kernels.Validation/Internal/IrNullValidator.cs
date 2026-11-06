@@ -95,6 +95,9 @@ internal static class IrNullValidator
                 }
 
                 break;
+            case LiteralExpression { Value: null } literal:
+                AddNull("literal value", diagnostics, literal.Span);
+                break;
             case LiteralExpression:
             case VariableExpression:
                 break;
