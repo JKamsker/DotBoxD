@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
@@ -7,6 +8,7 @@ internal static class DotBoxDInterpolatedStringExpressionLowerer
 {
     public static DotBoxDExpressionModel Lower(
         InterpolatedStringExpressionSyntax expression,
+        DotBoxDExpressionLoweringContext context,
         Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
     {
         var parts = new List<DotBoxDExpressionModel>();
@@ -20,7 +22,7 @@ internal static class DotBoxDInterpolatedStringExpressionLowerer
                     break;
                 case InterpolationSyntax interpolation:
                     hasInterpolation = true;
-                    parts.Add(LowerInterpolation(interpolation, lowerExpression));
+                    parts.Add(LowerInterpolation(interpolation, context, lowerExpression));
                     break;
                 default:
                     return Unsupported(expression);
@@ -56,6 +58,7 @@ internal static class DotBoxDInterpolatedStringExpressionLowerer
 
     private static DotBoxDExpressionModel LowerInterpolation(
         InterpolationSyntax interpolation,
+        DotBoxDExpressionLoweringContext context,
         Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
     {
         if (interpolation.AlignmentClause is not null ||
@@ -64,19 +67,25 @@ internal static class DotBoxDInterpolatedStringExpressionLowerer
             throw new NotSupportedException("String interpolation alignment and format clauses are not supported.");
         }
 
+        // The wire tag alone does not identify the CLR formatting: enums and DateOnly also ride as Int and
+        // polymorphic handle keys as String, but C# formats them by name/date/ToString(). Only a hole whose C#
+        // type really is string or int has invariant kernel formatting.
+        var clrType = context.SemanticModel.GetTypeInfo(interpolation.Expression, context.CancellationToken).Type?.SpecialType;
         var expression = lowerExpression(interpolation.Expression);
-        if (string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.String, StringComparison.Ordinal))
+        if (clrType == SpecialType.System_String &&
+            string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.String, StringComparison.Ordinal))
         {
             return expression;
         }
 
-        if (string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal))
+        if (clrType == SpecialType.System_Int32 &&
+            string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal))
         {
             return Int32ToString(expression);
         }
 
         throw new NotSupportedException(
-            "String interpolation holes must lower to string or supported invariant string-convertible expressions.");
+            $"String interpolation hole '{interpolation.Expression}' must be a string or int expression; format other values explicitly or use a remote handler.");
     }
 
     private static DotBoxDExpressionModel Int32ToString(DotBoxDExpressionModel expression)

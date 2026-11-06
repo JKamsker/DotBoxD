@@ -186,6 +186,14 @@ package. No runtime package resolution.
 5. For sync-out: synthesizing `return record.new([userReturnExpr, syncOut0, …])`. This is done structurally
    for each lowered return path; the implementation does not scan or post-process JSON text.
 
+Kernel collections are values: `list.Add`/`map[key] = value` lower to `set x = list.add(var x, item)` /
+`map.set`, so only the mutated local observes the change. InvokeAsync and `[ServerExtension]` bodies
+therefore report `DBXK100` when a mutated list/map is not a freshly created local (or by-value parameter)
+used through direct collection operations: copying it into another local, passing it to a constructor or
+method, or enumerating it in a `foreach` that also mutates it. Returning it, and enumerating it in a loop
+that does not mutate it, remain supported. `using` declarations also report `DBXK100`, because the CLR
+`Dispose` call cannot run in kernel IR.
+
 ---
 
 ## 6. Capture marshalling (the central mechanism)

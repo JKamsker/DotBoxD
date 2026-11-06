@@ -62,6 +62,12 @@ internal static class RpcJsonStatementLowerer
         LocalDeclarationStatementSyntax local,
         List<string> output)
     {
+        if (!local.UsingKeyword.IsKind(SyntaxKind.None))
+        {
+            throw new NotSupportedException(
+                "Server extension 'using' declarations are unsupported: kernel IR cannot run the CLR Dispose call; dispose the resource outside the kernel or use a remote handler.");
+        }
+
         foreach (var declarator in local.Declaration.Variables)
         {
             if (declarator.Initializer is not { } initializer)

@@ -155,7 +155,7 @@ internal static partial class DotBoxDExpressionModelFactory
     {
         if (expression is InterpolatedStringExpressionSyntax interpolated)
         {
-            lowered = DotBoxDInterpolatedStringExpressionLowerer.Lower(interpolated, part => Lower(part, context));
+            lowered = DotBoxDInterpolatedStringExpressionLowerer.Lower(interpolated, context, part => Lower(part, context));
             return true;
         }
 

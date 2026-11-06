@@ -182,6 +182,8 @@ internal static partial class DotBoxDPatternExpressionLowerer
             throw new NotSupportedException("Relational patterns require numeric input expressions.");
         }
 
+        DotBoxDOperatorSemanticsGuard.ValidateRelationalPattern(pattern, context);
+
         var comparand = LowerPatternValue(pattern.Expression, value.Type, context, lowerExpression);
         var (helper, symbol) = RelationalOperator(pattern);
         return DotBoxDNumericExpressionLowerer.Binary(

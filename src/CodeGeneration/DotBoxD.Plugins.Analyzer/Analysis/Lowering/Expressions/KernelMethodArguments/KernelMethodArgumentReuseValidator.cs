@@ -185,8 +185,10 @@ internal static class KernelMethodArgumentReuseValidator
             MemberAccessExpressionSyntax member =>
                 IsRepeatableMemberAccess(member, callSiteSemanticModel, cancellationToken),
             PrefixUnaryExpressionSyntax unary =>
+                !KernelMethodTrappingOperators.CanTrapOrMutate(unary, callSiteSemanticModel, cancellationToken) &&
                 IsRepeatableArgument(unary.Operand, callSiteSemanticModel, cancellationToken),
             BinaryExpressionSyntax binary =>
+                !KernelMethodTrappingOperators.CanTrap(binary, callSiteSemanticModel, cancellationToken) &&
                 IsRepeatableBinary(binary, callSiteSemanticModel, cancellationToken),
             _ => false
         };

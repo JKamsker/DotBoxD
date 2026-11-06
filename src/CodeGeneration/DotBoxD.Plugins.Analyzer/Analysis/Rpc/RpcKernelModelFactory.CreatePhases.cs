@@ -211,6 +211,12 @@ internal static partial class RpcKernelModelFactory
         var bodyJson = body.Block is { } block
             ? lowerer.LowerBody(block, returnValueType)
             : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid, returnValueType);
+        SyntaxNode bodySyntax = body.Block ?? (SyntaxNode)body.Expression!;
+        RpcLocalCollectionAliasValidator.Validate(
+            bodySyntax,
+            context.SemanticModel.Compilation.GetSemanticModel(bodySyntax.SyntaxTree),
+            cancellationToken,
+            valueBoundary: true);
         AddBodyEffects(lowerer, effects);
         return new RpcBodyLowering(bodyJson, effects, capabilities, hasReceiverId);
     }
