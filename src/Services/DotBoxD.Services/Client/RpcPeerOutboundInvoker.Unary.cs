@@ -197,13 +197,8 @@ internal sealed partial class RpcPeerOutboundInvoker
             // A synchronous send can complete the response and cancel the caller before this
             // continuation gets a chance to register the token callback. Cancellation still
             // wins while the send is in progress, even when the response was delivered inline.
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested && TryEndUnaryForCanceledCaller(messageId, pending, requestSent))
             {
-                if (_pending.TryCancel(messageId, pending, PendingCancellationKind.Caller))
-                {
-                    _cancelFrames.TrySend(messageId);
-                }
-
                 ct.ThrowIfCancellationRequested();
             }
 
@@ -251,6 +246,35 @@ internal sealed partial class RpcPeerOutboundInvoker
 
             ReleasePendingSlotUnlessDetached(sendDetached);
         }
+    }
+
+    // Ends a call whose caller cancelled before the response wait began, sending the one cancel frame
+    // a written request owes when it ends by caller cancellation or by a timeout that won the race.
+    // A caller cancellation that won while the request was being written already sent its frame. A
+    // pending another outcome claimed but has not completed yet is left to the response wait, whose
+    // handlers send the frame for a timeout; returns false then.
+    private bool TryEndUnaryForCanceledCaller<TResponse>(
+        int messageId,
+        PendingUnaryResponse<TResponse> pending,
+        bool requestSent)
+    {
+        if (_pending.TryCancel(messageId, pending, PendingCancellationKind.Caller))
+        {
+            _cancelFrames.TrySend(messageId);
+            return true;
+        }
+
+        if (!pending.Task.IsCompleted)
+        {
+            return false;
+        }
+
+        if (requestSent && pending.CancellationKind == PendingCancellationKind.Timeout)
+        {
+            _cancelFrames.TrySend(messageId);
+        }
+
+        return true;
     }
 
     private static Task<T> ToFaultedTask<T>(Exception error) =>

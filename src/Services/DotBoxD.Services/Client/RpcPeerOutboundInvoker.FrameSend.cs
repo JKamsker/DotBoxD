@@ -119,9 +119,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             await new ValueTask(send).ConfigureAwait(false);
 
-            // A detached send means the call ended before the request was written: its streams
-            // never start, and the detached send owns the slot and the late cancel frame.
-            requestSent = !sendDetached;
+            // A detached send means the call ended before the request was known to be written: the
+            // detached send owns the slot and the late cancel frame, and its streams never start.
+            // A response that already arrived proves the remote holds the request, though, so its
+            // streams start even while the local write is unfinished: the remote may wait for them.
+            requestSent = IsRequestDelivered(pending, sendDetached);
             if (requestSent)
             {
                 outboundStreams.Start();
@@ -183,6 +185,11 @@ internal sealed partial class RpcPeerOutboundInvoker
             }
         }
     }
+
+    // Detaching needs a timed-out, caller-cancelled or already-completed pending, so a detached
+    // call's response, if any, is already here; the response is the remote's proof of receipt.
+    private static bool IsRequestDelivered(PendingReceivedResponse pending, bool sendDetached) =>
+        !sendDetached || pending.Task.IsCompletedSuccessfully;
 
     private void TrySendCancelForSentRequest(bool requestSent, int messageId)
     {

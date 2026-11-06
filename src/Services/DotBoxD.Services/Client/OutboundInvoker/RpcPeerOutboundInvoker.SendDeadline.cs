@@ -21,6 +21,12 @@ namespace DotBoxD.Services.Client;
 // slot until it finishes so MaxPendingRequests still bounds the frames queued behind a stuck send,
 // has its failure observed, and is followed by a cancel frame when a timed-out or caller-cancelled
 // request is written late.
+//
+// A response that lands while the send is still in flight proves the remote received the request. When
+// the deadline or caller cancellation then ends the wait for that send, every path keeps its existing
+// winner for a response delivered before cancellation: the Task unary path lets caller cancellation win,
+// the general and pooled paths return the response. Either way the detached send owes no cancel frame,
+// and the general path still starts the request's outbound streams, which the remote may be waiting on.
 internal sealed partial class RpcPeerOutboundInvoker
 {
     private long GetRequestDeadline() =>
