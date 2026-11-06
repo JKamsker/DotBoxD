@@ -36,7 +36,9 @@ internal readonly partial struct ExpressionEvaluator
     private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
     {
         var precedence = ResolveCallPrecedence(call);
+        // Like validation, a module function shadows an intrinsic binding with the same id.
         if (precedence == CallPrecedence.UnaryIntrinsic &&
+            !_interpreter.TryGetFunction(call.Name, out _) &&
             UnaryPureIntrinsicDispatcher.TryEvaluate(
                 call, this, frame, Context, Options, ModuleHash, frame.FunctionId, out var mathValue))
         {

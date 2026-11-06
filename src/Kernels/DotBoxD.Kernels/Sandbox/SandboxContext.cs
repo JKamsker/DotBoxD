@@ -227,6 +227,8 @@ public sealed partial class SandboxContext : IDisposable
         {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.QuotaExceeded, "call depth exceeded"));
         }
+
+        EnsureSufficientExecutionStack();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

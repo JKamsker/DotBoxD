@@ -62,8 +62,8 @@ internal static class BinaryRuntimeCalls
         ("*", nameof(Kernels.Runtime.CompiledRuntime.Mul)),
         ("/", nameof(Kernels.Runtime.CompiledRuntime.Div)),
         ("%", nameof(Kernels.Runtime.CompiledRuntime.Rem)),
-        ("==", nameof(Kernels.Runtime.CompiledRuntime.Eq)),
-        ("!=", nameof(Kernels.Runtime.CompiledRuntime.Ne)),
+        ("==", nameof(Kernels.Runtime.CompiledRuntime.EqCharged)),
+        ("!=", nameof(Kernels.Runtime.CompiledRuntime.NeCharged)),
         ("<", nameof(Kernels.Runtime.CompiledRuntime.Lt)),
         ("<=", nameof(Kernels.Runtime.CompiledRuntime.Lte)),
         (">", nameof(Kernels.Runtime.CompiledRuntime.Gt)),
@@ -84,6 +84,14 @@ internal static class BinaryRuntimeCalls
         call = default;
         return false;
     }
+
+    /// <summary>
+    /// Structural equality charges fuel proportional to the compared elements, so its runtime
+    /// helper takes the <c>SandboxContext</c> (argument 0) ahead of the operands.
+    /// </summary>
+    public static bool TakesContext(string method)
+        => method is nameof(Kernels.Runtime.CompiledRuntime.EqCharged) or
+            nameof(Kernels.Runtime.CompiledRuntime.NeCharged);
 
     public static bool TryGetBoxed(string op, out string method)
     {
