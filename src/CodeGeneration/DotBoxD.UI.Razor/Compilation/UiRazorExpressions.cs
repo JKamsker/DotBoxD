@@ -7,14 +7,16 @@ namespace DotBoxD.UI.Razor;
 internal sealed class UiRazorExpressions
 {
     private readonly Compilation _compilation;
+    private readonly INamedTypeSymbol _component;
     private readonly IReadOnlyList<string> _endpointConstants;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _resources = new(StringComparer.Ordinal);
 
-    public UiRazorExpressions(Compilation compilation, IReadOnlyList<string> endpointConstants)
+    public UiRazorExpressions(Compilation compilation, INamedTypeSymbol component, IReadOnlyList<string> endpointConstants)
     {
         _compilation = compilation;
+        _component = component;
         _endpointConstants = endpointConstants;
     }
 
@@ -56,11 +58,31 @@ internal sealed class UiRazorExpressions
         if (call.Count is < 1 or > 2)
         { throw new NotSupportedException("Use @kernel name = Ui.Bind(LocalMethod[, state]); with a [UiLocalHandler] method."); }
         var method = QualifiedName(call[0]);
+        if (!GeneratesLocalKernel(call[0]))
+        { throw new NotSupportedException("Local kernel handler '" + call[0] + "' must be an accessible [UiLocalHandler] method that generates a kernel."); }
         if (call.Count == 2 && !_states.Contains(call[1]))
         { throw new NotSupportedException("Kernel inputs must name a declared typed state slot."); }
         Add(parts.Name, "kernel");
         return "var " + parts.Name + " = builder.Kernel(" + method + "UiKernel()" +
             (call.Count == 2 ? ", " + call[1] : "") + ");";
+    }
+
+    private bool GeneratesLocalKernel(string name)
+    {
+        var parts = name.Split('.');
+        if (parts.Length > 2 || parts.Length == 2 && parts[0] != _component.Name)
+        { return false; }
+        var handlerName = parts[parts.Length - 1];
+        for (var type = _component; type is not null; type = type.BaseType)
+        {
+            if (type.GetMembers(handlerName).OfType<IMethodSymbol>().Any(method =>
+                _compilation.IsSymbolAccessibleWithin(method, _component) &&
+                method.GetAttributes().Any(attribute =>
+                    attribute.AttributeClass?.ToDisplayString() == "DotBoxD.UI.Authoring.UiLocalHandlerAttribute" &&
+                    !attribute.NamedArguments.Any(argument => argument.Key == "GenerateKernel" && argument.Value.Value is false))))
+            { return true; }
+        }
+        return false;
     }
 
     public string Resource(string declaration)

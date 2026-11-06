@@ -19,7 +19,7 @@ internal static class UiRazorDocument
         { throw new NotSupportedException("Safe Razor source exceeds 256 KiB. Split it into IUiComponent compositions."); }
         var statements = new StringBuilder();
         var markup = new StringBuilder();
-        var expressions = new UiRazorExpressions(compilation, endpointConstants);
+        var expressions = new UiRazorExpressions(compilation, component, endpointConstants);
         var inMarkup = false;
         foreach (var line in text.Split('\n'))
         {
