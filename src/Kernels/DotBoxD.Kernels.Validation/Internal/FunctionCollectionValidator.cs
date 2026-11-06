@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Validation.Internal;
 
@@ -12,10 +13,33 @@ internal static class FunctionCollectionValidator
     {
         CheckNullFunctions(functions, diagnostics);
         CheckDuplicateFunctionIds(functions, diagnostics);
+        CheckIntrinsicShadowing(functions, diagnostics);
 
         if (!HasEntrypoint(functions))
         {
             diagnostics.Add(new SandboxDiagnostic("E-STRUCT-ENTRY", "module must declare at least one entry function"));
+        }
+    }
+
+    // Built-in intrinsics resolve before module functions in the validator and boxed backends but
+    // after them in inline fast paths, so a module function may not reuse an intrinsic name.
+    // (Shadowing a host catalog binding is intentional: user functions take precedence.)
+    private static bool IsIntrinsicCallName(string name)
+        => SandboxCollectionFuel.IsCollectionIntrinsic(name) ||
+           name is "record.new" or "record.get" or "numeric.toI64" or "numeric.toF64";
+
+    private static void CheckIntrinsicShadowing(
+        IReadOnlyList<SandboxFunction> functions,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        for (var i = 0; i < functions.Count; i++)
+        {
+            if (functions[i]?.Id is { } id && IsIntrinsicCallName(id))
+            {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "E-STRUCT-FN-SHADOW",
+                    $"function id '{id}' shadows the built-in intrinsic with the same name"));
+            }
         }
     }
 

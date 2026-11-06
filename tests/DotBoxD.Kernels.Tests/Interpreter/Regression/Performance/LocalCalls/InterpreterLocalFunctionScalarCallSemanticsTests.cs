@@ -1,7 +1,7 @@
 using DotBoxD.Kernels.Interpreter;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Kernels.Sandbox.Values;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 
@@ -67,17 +67,14 @@ public sealed class InterpreterLocalFunctionScalarCallSemanticsTests
     }
 
     [Fact]
-    public async Task Collection_intrinsic_name_keeps_precedence_over_same_named_function()
+    public async Task Function_named_like_a_collection_intrinsic_is_rejected()
     {
         using var host = SandboxTestHost.Create();
-        var plan = await PrepareAsync(host, LocalFunctionScalarCallModules.CollectionNamePrecedence);
 
-        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit, Options());
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await PrepareAsync(host, LocalFunctionScalarCallModules.CollectionNamePrecedence));
 
-        Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        var list = Assert.IsType<ListValue>(result.Value);
-        Assert.Equal(SandboxType.I32, list.ItemType);
-        Assert.Equal(7, ((I32Value)Assert.Single(list.Values)).Value);
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-STRUCT-FN-SHADOW" && d.Message.Contains("list.of", StringComparison.Ordinal));
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(

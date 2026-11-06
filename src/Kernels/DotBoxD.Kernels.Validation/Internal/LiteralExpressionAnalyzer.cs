@@ -9,9 +9,12 @@ internal static class LiteralExpressionAnalyzer
 {
     private const int MaxTextLiteralLength = 65_536;
 
-    public static SandboxType Analyze(LiteralExpression literal, ref SandboxEffect effects)
+    public static SandboxType Analyze(
+        LiteralExpression literal,
+        ref SandboxEffect effects,
+        IReadOnlySet<string> declaredOpaqueIdTypes)
     {
-        var allocates = LiteralValueSafety.Validate(literal.Value);
+        var allocates = LiteralValueSafety.Validate(literal.Value, declaredOpaqueIdTypes);
         ValidateLiteralValue(literal.Value);
         if (allocates)
         {

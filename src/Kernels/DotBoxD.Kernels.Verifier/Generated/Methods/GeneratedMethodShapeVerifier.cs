@@ -134,7 +134,8 @@ internal static class GeneratedMethodShapeVerifier
 
     private static string? PreviousStringLiteral(GeneratedMethodFlow analysis, GeneratedInstruction instruction)
     {
-        if (!analysis.IndexByOffset.TryGetValue(instruction.Offset, out var index) || index == 0)
+        if (!analysis.IndexByOffset.TryGetValue(instruction.Offset, out var index) ||
+            !GeneratedInstructionPredecessors.PreviousIsSoleReachablePredecessor(analysis, index))
         {
             return null;
         }

@@ -103,6 +103,24 @@ public sealed class ModuleValidatorNestedNullValidationTests
                         new ForRangeStatement("i", null!, I32(1), [UnitReturn()], Span)
                     ]),
                 ["for range start", "null"]
+            },
+            {
+                "literal value",
+                ModuleWithBody(
+                    SandboxType.I32,
+                    [new ReturnStatement(new LiteralExpression(null!, Span), Span)]),
+                ["literal", "null"]
+            },
+            {
+                "nested literal value",
+                ModuleWithBody(
+                    SandboxType.I32,
+                    [
+                        new ReturnStatement(
+                            new BinaryExpression(I32(1), "+", new LiteralExpression(null!, Span), Span),
+                            Span)
+                    ]),
+                ["literal", "null"]
             }
         };
 
