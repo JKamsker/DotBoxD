@@ -104,6 +104,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string method,
         CancellationToken ct)
     {
+        var deadline = GetRequestDeadline();
         ValueTask sendTask;
         try
         {
@@ -132,16 +133,31 @@ internal sealed partial class RpcPeerOutboundInvoker
             pending.EnableDirectCompletion(this);
             if (!pending.Task.IsCompleted)
             {
-                _pending.StartTimeout(pending, _timeout);
+                _pending.StartTimeout(pending, deadline);
             }
 
             return pending.Task;
+        }
+
+        // The deadline was taken before the send started; arm it while the send may still be in flight.
+        _pending.StartTimeout(pending, deadline);
+        if (_hasFiniteTimeout && !sendTask.IsCompleted)
+        {
+            return AwaitUnarySendWithinDeadlineAsync(
+                messageId,
+                pending,
+                sendTask.AsTask(),
+                deadline,
+                service,
+                method,
+                ct);
         }
 
         return AwaitUnaryResponseAsync(
             messageId,
             pending,
             sendTask,
+            sendDetached: false,
             service,
             method,
             ct);
@@ -151,6 +167,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         int messageId,
         PendingUnaryResponse<TResponse> pending,
         ValueTask sendTask,
+        bool sendDetached,
         string service,
         string method,
         CancellationToken ct)
@@ -173,7 +190,9 @@ internal sealed partial class RpcPeerOutboundInvoker
                 throw;
             }
 
-            requestSent = true;
+            // A detached send means the call ended (for example timed out) before the request was
+            // written; the detached send owns the slot and the late cancel frame.
+            requestSent = !sendDetached;
 
             // A synchronous send can complete the response and cancel the caller before this
             // continuation gets a chance to register the token callback. Cancellation still
@@ -193,7 +212,6 @@ internal sealed partial class RpcPeerOutboundInvoker
                 : default;
             using (callerCancellation)
             {
-                _pending.StartTimeout(pending, _timeout);
                 try
                 {
                     var response = await pending.Task.ConfigureAwait(false);
@@ -231,7 +249,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 _pending.Remove(messageId, pending, consumed: false);
             }
 
-            ReleasePendingSlot();
+            ReleasePendingSlotUnlessDetached(sendDetached);
         }
     }
 

@@ -36,6 +36,14 @@ public sealed class RpcPeerOptions
     /// <see cref="TimeSpan"/> (at most <see cref="int.MaxValue"/> milliseconds) or
     /// <see cref="Timeout.InfiniteTimeSpan"/> to disable the timeout.
     /// </summary>
+    /// <remarks>
+    /// The timeout covers the whole outbound call: sending the request frame and waiting for its
+    /// response. A call whose send is still blocked (for example by transport backpressure or a full
+    /// send queue) when the timeout elapses fails with the same <c>ServiceTimeoutException</c> as a
+    /// late response. The blocked send is not cancelled, because interrupting a partially written
+    /// frame would close the connection; it keeps the call's <see cref="MaxPendingRequests"/> slot
+    /// until it finishes, and if it later writes the request, a cancel frame follows it.
+    /// </remarks>
     public TimeSpan RequestTimeout
     {
         get => _requestTimeout;

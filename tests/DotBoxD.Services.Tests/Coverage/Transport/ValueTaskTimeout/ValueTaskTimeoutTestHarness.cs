@@ -139,6 +139,9 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
     internal void ReleaseRequestSend() =>
         _sendRelease.TrySetResult();
 
+    internal void FailBlockedRequestSends(Exception error) =>
+        _sendRelease.TrySetException(error);
+
     internal async Task<int> WaitForCancelAsync(TimeSpan timeout) =>
         await _cancelSent.Task.WaitAsync(timeout).ConfigureAwait(false);
 
