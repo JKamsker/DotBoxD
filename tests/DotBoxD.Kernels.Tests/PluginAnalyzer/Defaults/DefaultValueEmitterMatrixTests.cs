@@ -42,6 +42,17 @@ public sealed class AnalyzerDefaultValueEmitterMatrixTests
             "mode == Mode.Slow",
             "I32(2)"),
         new DefaultCase(
+            "enum-negative",
+            "Mode mode = Mode.Neg",
+            "ReadAsync(global::Matrix.PluginServer.Game.Mode @mode = unchecked((global::Matrix.PluginServer.Game.Mode)(-1)))",
+            "Mode mode = Mode.Neg",
+            "Mode mode",
+            "EchoAsync(global::Matrix.Rpc.Mode @mode = unchecked((global::Matrix.Rpc.Mode)(-1))",
+            "Mode mode = Mode.Neg",
+            "",
+            "true",
+            KernelExpected: null),
+        new DefaultCase(
             "enum-default-literal",
             "Mode mode = default",
             "ReadAsync(global::Matrix.PluginServer.Game.Mode @mode = unchecked((global::Matrix.PluginServer.Game.Mode)0))",
@@ -170,6 +181,7 @@ public sealed class AnalyzerDefaultValueEmitterMatrixTests
 
             public enum Mode
             {
+                Neg = -1,
                 Fast = 1,
                 Slow = 2
             }
@@ -199,6 +211,7 @@ public sealed class AnalyzerDefaultValueEmitterMatrixTests
 
             public enum Mode
             {
+                Neg = -1,
                 Fast = 1,
                 Slow = 2
             }
@@ -230,6 +243,7 @@ public sealed class AnalyzerDefaultValueEmitterMatrixTests
             {
                 public enum Mode
                 {
+                    Neg = -1,
                     Fast = 1,
                     Slow = 2
                 }

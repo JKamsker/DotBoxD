@@ -1,4 +1,5 @@
 using System.Threading;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -13,17 +14,18 @@ internal static class MethodMetadataTypesFactory
     public static MethodMetadataTypes Get(
         IMethodSymbol method,
         MethodReturnKind returnKind,
+        ExternAliasTypeFormatter aliasFormatter,
         CancellationToken ct)
     {
-        var returnType = TypeOfExpressionFormatter.Format(method.ReturnType, ct);
-        var resultType = GetResultType(method.ReturnType, returnKind, method, ct);
+        var returnType = TypeOfExpressionFormatter.Format(method.ReturnType, ct, aliasFormatter);
+        var resultType = GetResultType(method.ReturnType, returnKind, aliasFormatter, ct);
         return new MethodMetadataTypes(returnType, resultType);
     }
 
     private static string? GetResultType(
         ITypeSymbol returnType,
         MethodReturnKind returnKind,
-        IMethodSymbol method,
+        ExternAliasTypeFormatter aliasFormatter,
         CancellationToken ct)
     {
         if (!HasGenericAsyncResult(returnKind))
@@ -36,7 +38,7 @@ internal static class MethodMetadataTypesFactory
             return null;
         }
 
-        return TypeOfExpressionFormatter.Format(named.TypeArguments[0], ct);
+        return TypeOfExpressionFormatter.Format(named.TypeArguments[0], ct, aliasFormatter);
     }
 
     private static bool HasGenericAsyncResult(MethodReturnKind returnKind) =>

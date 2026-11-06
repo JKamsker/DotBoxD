@@ -16,7 +16,8 @@ internal sealed record ServiceExtensionModel(
     string ExperimentalDiagnosticId,
     EquatableArray<ServicePropertyModel> Properties,
     EquatableArray<SubServiceInfo> MethodSubServices,
-    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions")
+    string GeneratedExtensionsType = "DotBoxDGeneratedExtensions",
+    EquatableArray<string> PropertySuppressionIds = default)
 {
     public static ServiceExtensionModel From(ServiceModel service)
     {
@@ -44,6 +45,7 @@ internal sealed record ServiceExtensionModel(
             service.ExperimentalDiagnosticId,
             service.Properties,
             methodSubServices.ToEquatableArray(),
-            service.GeneratedExtensionsType);
+            service.GeneratedExtensionsType,
+            (service.MemberUsageSuppressions ?? MemberUsageSuppressions.None).Properties);
     }
 }

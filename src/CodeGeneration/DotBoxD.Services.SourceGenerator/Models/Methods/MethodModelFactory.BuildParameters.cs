@@ -15,6 +15,7 @@ internal static partial class MethodModelFactory
         INamedTypeSymbol? cancellationTokenSymbol,
         INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
+        ExternAliasTypeFormatter typeFormatter,
         CancellationToken ct,
         ref string? unsupportedReason,
         ref DiagnosticLocation unsupportedLocation)
@@ -32,6 +33,7 @@ internal static partial class MethodModelFactory
                 cancellationTokenSymbol,
                 rpcStreamHandleSymbol,
                 validationCache,
+                typeFormatter,
                 ct,
                 ref cancellationTokenCount,
                 ref unsupportedReason,
@@ -50,6 +52,7 @@ internal static partial class MethodModelFactory
         INamedTypeSymbol? cancellationTokenSymbol,
         INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
+        ExternAliasTypeFormatter typeFormatter,
         CancellationToken ct,
         ref int cancellationTokenCount,
         ref string? unsupportedReason,
@@ -76,7 +79,7 @@ internal static partial class MethodModelFactory
             ref unsupportedLocation);
 
         return new ParameterBuildItem(
-            CreateParameterModel(methodSymbol, parameterIndex, parameter, isCancellationToken, streamKind, streamItemType, ct),
+            CreateParameterModel(methodSymbol, parameterIndex, parameter, isCancellationToken, streamKind, streamItemType, typeFormatter, ct),
             isCancellationToken,
             requiresUnsafeSignature);
     }
@@ -166,9 +169,10 @@ internal static partial class MethodModelFactory
         bool isCancellationToken,
         ParameterStreamKind streamKind,
         ITypeSymbol? streamItemType,
+        ExternAliasTypeFormatter typeFormatter,
         CancellationToken ct)
     {
-        var declaredType = GetDeclaredParameterType(parameter, ct);
+        var declaredType = GetDeclaredParameterType(parameter, typeFormatter, ct);
         var hasDefaultValue = ParameterDefaultValueEmitter.HasDefaultValue(parameter);
         var preserveOptionalAttributeDefault =
             ParameterDefaultValueEmitter.ShouldPreserveOptionalAttributeDefault(methodSymbol, parameterIndex);
@@ -196,7 +200,7 @@ internal static partial class MethodModelFactory
             defaultValueLiteral,
             metadataDefaultValueExpression,
             streamKind,
-            streamItemType?.ToDisplayString(s_qualifiedFormat),
+            streamItemType is null ? null : typeFormatter.Format(streamItemType, s_qualifiedFormat),
             MetadataType: declaredType.MetadataType,
             CallerInfoAttributePrefix: BuildCallerInfoAttributePrefix(
                 parameter,

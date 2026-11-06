@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -11,12 +12,6 @@ internal static partial class ReturnTypeClassifier
     private const string SystemIO = ServicesGeneratorTypeNames.SystemIoNamespace;
     private const string SystemIOPipelines = ServicesGeneratorTypeNames.SystemIoPipelinesNamespace;
     private const string SystemThreadingTasks = ServicesGeneratorTypeNames.SystemThreadingTasksNamespace;
-
-    private static readonly SymbolDisplayFormat s_qualifiedFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
-            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static string? GetUnsupportedServiceReturnReason(ITypeSymbol returnType, CancellationToken ct)
     {
@@ -52,6 +47,7 @@ internal static partial class ReturnTypeClassifier
 
     public static MethodReturnKind Classify(
         ITypeSymbol returnType,
+        Func<ITypeSymbol, string> format,
         CancellationToken ct,
         out string? unwrappedReturnType,
         out SubServiceInfo? subService)
@@ -60,7 +56,7 @@ internal static partial class ReturnTypeClassifier
 
         subService = null;
 
-        if (TryClassifyGenericTaskLike(returnType, ct, out var genericKind, out unwrappedReturnType, out subService))
+        if (TryClassifyGenericTaskLike(returnType, format, ct, out var genericKind, out unwrappedReturnType, out subService))
         {
             return genericKind;
         }
@@ -77,12 +73,12 @@ internal static partial class ReturnTypeClassifier
             return MethodReturnKind.Void;
         }
 
-        if (TryClassifyDirectShape(returnType, out var directKind, out unwrappedReturnType))
+        if (TryClassifyDirectShape(returnType, format, out var directKind, out unwrappedReturnType))
         {
             return directKind;
         }
 
-        unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+        unwrappedReturnType = format(returnType);
         if (TryGetSubServiceInfo(returnType, ct, out var syncSubService))
         {
             subService = syncSubService;
@@ -94,6 +90,7 @@ internal static partial class ReturnTypeClassifier
 
     private static bool TryClassifyGenericTaskLike(
         ITypeSymbol returnType,
+        Func<ITypeSymbol, string> format,
         CancellationToken ct,
         out MethodReturnKind kind,
         out string? unwrappedReturnType,
@@ -111,13 +108,13 @@ internal static partial class ReturnTypeClassifier
 
         if (named.Name == "Task")
         {
-            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: false, ct, out unwrappedReturnType, out subService);
+            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: false, format, ct, out unwrappedReturnType, out subService);
             return true;
         }
 
         if (named.Name == "ValueTask")
         {
-            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: true, ct, out unwrappedReturnType, out subService);
+            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: true, format, ct, out unwrappedReturnType, out subService);
             return true;
         }
 
@@ -127,6 +124,7 @@ internal static partial class ReturnTypeClassifier
     private static MethodReturnKind ClassifyTaskPayload(
         ITypeSymbol payloadType,
         bool valueTask,
+        Func<ITypeSymbol, string> format,
         CancellationToken ct,
         out string unwrappedReturnType,
         out SubServiceInfo? subService)
@@ -134,23 +132,23 @@ internal static partial class ReturnTypeClassifier
         subService = null;
         if (TryGetAsyncEnumerableItemType(payloadType, out var itemType))
         {
-            unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
+            unwrappedReturnType = format(itemType);
             return valueTask ? MethodReturnKind.ValueTaskOfAsyncEnumerable : MethodReturnKind.TaskOfAsyncEnumerable;
         }
 
         if (IsStream(payloadType))
         {
-            unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+            unwrappedReturnType = format(payloadType);
             return valueTask ? MethodReturnKind.ValueTaskOfStream : MethodReturnKind.TaskOfStream;
         }
 
         if (IsPipe(payloadType))
         {
-            unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+            unwrappedReturnType = format(payloadType);
             return valueTask ? MethodReturnKind.ValueTaskOfPipe : MethodReturnKind.TaskOfPipe;
         }
 
-        unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+        unwrappedReturnType = format(payloadType);
         return ClassifyTaskPayloadCore(payloadType, valueTask, ct, ref subService);
     }
 
@@ -227,18 +225,19 @@ internal static partial class ReturnTypeClassifier
 
     private static bool TryClassifyDirectShape(
         ITypeSymbol returnType,
+        Func<ITypeSymbol, string> format,
         out MethodReturnKind kind,
         out string? unwrappedReturnType)
     {
         if (TryGetAsyncEnumerableItemType(returnType, out var enumerableItemType))
         {
             kind = MethodReturnKind.AsyncEnumerable;
-            unwrappedReturnType = enumerableItemType.ToDisplayString(s_qualifiedFormat);
+            unwrappedReturnType = format(enumerableItemType);
             return true;
         }
 
         kind = IsStream(returnType) ? MethodReturnKind.Stream : MethodReturnKind.Pipe;
-        unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+        unwrappedReturnType = format(returnType);
         return IsStream(returnType) || IsPipe(returnType);
     }
 

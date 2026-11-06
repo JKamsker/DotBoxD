@@ -1,5 +1,6 @@
 using Mono.Cecil;
 using Mono.Cecil.Cil;
+using Mono.Cecil.Rocks;
 using Mono.Collections.Generic;
 
 namespace DotBoxD.Plugins.Fody;
@@ -7,6 +8,25 @@ namespace DotBoxD.Plugins.Fody;
 internal static class InvokeAsyncCaptureAccessRewriter
 {
     public static int Rewrite(
+        MethodDefinition method,
+        TypeDefinition closure,
+        MethodReference targetGetter,
+        Action<string> warning)
+    {
+        // Expand short branches before inserting instructions so no br.s offset can overflow,
+        // then let Cecil pick the shortest valid forms again.
+        method.Body.SimplifyMacros();
+        try
+        {
+            return RewriteCore(method, closure, targetGetter, warning);
+        }
+        finally
+        {
+            method.Body.OptimizeMacros();
+        }
+    }
+
+    private static int RewriteCore(
         MethodDefinition method,
         TypeDefinition closure,
         MethodReference targetGetter,
@@ -59,8 +79,9 @@ internal static class InvokeAsyncCaptureAccessRewriter
             return false;
         }
 
-        instructions[fieldNameIndex] = Instruction.Create(OpCodes.Callvirt, targetGetter);
-        instructions[callIndex] = Instruction.Create(OpCodes.Castclass, method.Module.ImportReference(closure));
+        // Mutate instructions in place so branch targets and handler boundaries stay attached.
+        Replace(instructions[fieldNameIndex], OpCodes.Callvirt, targetGetter);
+        Replace(instructions[callIndex], OpCodes.Castclass, method.Module.ImportReference(closure));
         instructions.Insert(callIndex + 1, Instruction.Create(OpCodes.Ldfld, method.Module.ImportReference(field)));
         return true;
     }
@@ -84,10 +105,16 @@ internal static class InvokeAsyncCaptureAccessRewriter
             return false;
         }
 
-        instructions[fieldNameIndex] = Instruction.Create(OpCodes.Callvirt, targetGetter);
+        Replace(instructions[fieldNameIndex], OpCodes.Callvirt, targetGetter);
         instructions.Insert(fieldNameIndex + 1, Instruction.Create(OpCodes.Castclass, method.Module.ImportReference(closure)));
-        instructions[callIndex + 1] = Instruction.Create(OpCodes.Stfld, method.Module.ImportReference(field));
+        Replace(instructions[callIndex + 1], OpCodes.Stfld, method.Module.ImportReference(field));
         return true;
+    }
+
+    private static void Replace(Instruction instruction, OpCode opCode, object operand)
+    {
+        instruction.OpCode = opCode;
+        instruction.Operand = operand;
     }
 
     private static bool TryGetCaptureField(
@@ -122,11 +149,18 @@ internal static class InvokeAsyncCaptureAccessRewriter
         }
 
         return fieldNameIndex >= 2 &&
-               instructions[fieldNameIndex - 2].OpCode.Code == Code.Ldarg_0 &&
+               IsFirstArgumentLoad(instructions[fieldNameIndex - 2], method) &&
                source.OpCode.Code == Code.Ldfld &&
                source.Operand is FieldReference field &&
                string.Equals(field.Name, DotBoxDInvokeAsyncWeaverNames.LambdaParameterName, StringComparison.Ordinal);
     }
+
+    // Matches ldarg.0 and, once macros are simplified, the equivalent long ldarg form.
+    private static bool IsFirstArgumentLoad(Instruction instruction, MethodDefinition method)
+        => instruction.OpCode.Code == Code.Ldarg_0 ||
+           (instruction.OpCode.Code == Code.Ldarg &&
+            instruction.Operand is ParameterDefinition parameter &&
+            (method.HasThis ? parameter == method.Body.ThisParameter : parameter.Index == 0));
 
     private static bool IsLambdaArgumentLoad(Instruction instruction, MethodDefinition method)
     {

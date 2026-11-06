@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
@@ -11,7 +12,11 @@ internal static class TypeOfExpressionFormatter
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
             SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
 
-    public static string Format(ITypeSymbol type, CancellationToken ct)
+    public static string Format(
+        ITypeSymbol type,
+        CancellationToken ct,
+        ExternAliasTypeFormatter? aliasFormatter = null,
+        List<string>? usedAliases = null)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -22,9 +27,11 @@ internal static class TypeOfExpressionFormatter
 
         if (type is INamedTypeSymbol { IsTupleType: true, TupleUnderlyingType: { } tupleUnderlyingType })
         {
-            return tupleUnderlyingType.ToDisplayString(s_format);
+            type = tupleUnderlyingType;
         }
 
-        return type.ToDisplayString(s_format);
+        return aliasFormatter is null
+            ? type.ToDisplayString(s_format)
+            : aliasFormatter.Format(type, s_format, usedAliases);
     }
 }
