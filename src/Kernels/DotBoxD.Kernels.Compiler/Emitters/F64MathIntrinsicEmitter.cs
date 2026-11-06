@@ -51,6 +51,11 @@ internal static class F64MathIntrinsicEmitter
         return true;
     }
 
+    // True when the call is the catalog's pure math.sqrt/floor/ceil/round stub (not a shadowing module
+    // function or a custom host binding), so its result is non-negative for a non-negative operand.
+    public static bool IsRawIntrinsic(CallExpression call, IBindingCatalog bindings)
+        => call.Arguments.Count == 1 && TryGetRawIntrinsic(call, bindings, out _);
+
     private static bool TryGetRawIntrinsic(CallExpression call, IBindingCatalog bindings, out string rawMethod)
     {
         rawMethod = string.Empty;
