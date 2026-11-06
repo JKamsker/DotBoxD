@@ -71,6 +71,11 @@ internal static class RpcErrors
             "Inbound request queue is full; the call was dropped.",
             RpcErrorTypes.QueueFull);
 
+    public static RpcError ResponseStreamLimit() =>
+        new(
+            "Response stream limit reached; the call was dropped.",
+            RpcErrorTypes.ResponseStreamLimit);
+
     public static RpcError Protocol(string message) =>
         new(Truncate(message), RpcErrorTypes.ProtocolError);
 

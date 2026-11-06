@@ -185,10 +185,12 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     private async Task PumpAsync(RpcStreamAttachment attachment, RpcStreamSendState state)
     {
+        Task? terminal = null;
         try
         {
             await attachment.PumpCoreAsync(_manager, _serializer, state.Token).ConfigureAwait(false);
-            await SendStreamCompleteAsync(state).ConfigureAwait(false);
+            terminal = _manager.SendStreamCompleteAsync(state.StreamId, state.Token);
+            await RpcTaskWaiter.WaitAsync(terminal, state.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (state.IsCancellationRequested)
         {
@@ -203,7 +205,8 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             RpcDiagnostics.Report("Outbound stream pump failed", ex);
             try
             {
-                await SendStreamErrorAsync(state, ex).ConfigureAwait(false);
+                terminal = _manager.SendStreamErrorAsync(state.StreamId, ex, state.Token);
+                await RpcTaskWaiter.WaitAsync(terminal, state.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (state.IsCancellationRequested)
             {
@@ -215,21 +218,50 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
         finally
         {
-            _manager.RemoveOutbound(state, completed: true);
-            attachment.ReleaseOutboundRegistration();
+            try
+            {
+                // Acknowledge before removal so the stream id stays claimed until its terminal frame.
+                if (state.CompletePump(await WasSentAsync(terminal, state).ConfigureAwait(false)))
+                {
+                    await _manager.AcknowledgeRemoteCancelAsync(state.StreamId).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _manager.RemoveOutbound(state, completed: true);
+                attachment.ReleaseOutboundRegistration();
+            }
         }
     }
 
-    private async Task SendStreamCompleteAsync(RpcStreamSendState state)
+    // A canceled wait can abandon a terminal send that still completes. After a remote cancel,
+    // observe its real outcome (its token is canceled) so the acknowledgement is not duplicated.
+    private static ValueTask<bool> WasSentAsync(Task? terminal, RpcStreamSendState state)
     {
-        var send = _manager.SendStreamCompleteAsync(state.StreamId, state.Token);
-        await RpcTaskWaiter.WaitAsync(send, state.Token).ConfigureAwait(false);
-    }
+        if (terminal is null)
+        {
+            return new ValueTask<bool>(false);
+        }
 
-    private async Task SendStreamErrorAsync(RpcStreamSendState state, Exception error)
-    {
-        var send = _manager.SendStreamErrorAsync(state.StreamId, error, state.Token);
-        await RpcTaskWaiter.WaitAsync(send, state.Token).ConfigureAwait(false);
+        if (terminal.IsCompleted || !state.IsRemoteCanceled)
+        {
+            return new ValueTask<bool>(terminal.IsCompletedSuccessfully);
+        }
+
+        return WaitForSendAsync(terminal);
+
+        static async ValueTask<bool> WaitForSendAsync(Task send)
+        {
+            try
+            {
+                await send.ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 
     private async Task WaitForPumpTasksAsync(Task[] tasks)

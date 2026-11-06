@@ -84,6 +84,8 @@ internal sealed partial class RpcStreamManager
             }
 
             receiver.Abort(new ServiceProtocolException("Inbound stream registration failed."));
+            // The sender already holds initial credit; ask it for the terminal frame that clears the tombstone.
+            SendCancelInBackground(streamId);
         }
     }
 

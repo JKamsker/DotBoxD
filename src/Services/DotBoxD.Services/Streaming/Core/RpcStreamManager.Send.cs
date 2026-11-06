@@ -55,6 +55,36 @@ internal sealed partial class RpcStreamManager
     public Task SendCancelAsync(int streamId, CancellationToken ct) =>
         SendControlAsync(streamId, MessageType.StreamCancel, ct);
 
+    internal void SendCancelInBackground(int streamId) => _ = SendCancelBestEffortAsync(streamId);
+
+    internal void AcknowledgeRemoteCancelInBackground(int streamId) => _ = AcknowledgeRemoteCancelAsync(streamId);
+
+    // A receiver that sent StreamCancel keeps a tombstone until a terminal frame arrives. Send it
+    // even though the stream's own token is canceled; connection close still fails a stalled send.
+    internal async Task AcknowledgeRemoteCancelAsync(int streamId)
+    {
+        try
+        {
+            await SendStreamCompleteAsync(streamId, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Stream cancel acknowledgement failed", ex);
+        }
+    }
+
+    private async Task SendCancelBestEffortAsync(int streamId)
+    {
+        try
+        {
+            await SendCancelAsync(streamId, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Stream cancel notification failed", ex);
+        }
+    }
+
     public async Task SendCreditAsync(int streamId, int count, CancellationToken ct)
     {
         var frame = RpcRawFrame.RentInt32Frame(streamId, MessageType.StreamCredit, count);

@@ -23,12 +23,14 @@ internal sealed partial class RpcPeerInboundDispatcher
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
     private readonly bool _disableInboundRequestCancellation;
     private readonly int _maxInboundStreamsPerRequest;
+    private readonly int _maxResponseStreams;
     private readonly RpcPeerInboundRequestQueue? _queue;
     private TaskCompletionSource<bool>? _activeRequestsDrained;
     private TaskCompletionSource<bool>? _activeStreamsDrained;
     private CancellationTokenRegistration _loopCancellation;
     private int _activeRequestCount;
     private int _activeStreamCount;
+    private int _responseStreamCount;
     private int _dispatchersFrozen;
     private int _stopped;
 
@@ -67,6 +69,7 @@ internal sealed partial class RpcPeerInboundDispatcher
         _exceptionTransformer = options.ExceptionTransformer;
         _disableInboundRequestCancellation = options.DisableInboundRequestCancellation;
         _maxInboundStreamsPerRequest = options.MaxInboundStreamsPerRequest;
+        _maxResponseStreams = options.MaxResponseStreamsPerPeer;
         if (options.InboundQueueCapacity is not { } capacity)
         {
             return;
