@@ -238,6 +238,13 @@ internal sealed class ResultHookSlot<TEvent, TContext>
     {
         lock (_gate)
         {
+            // Same contract as KernelHandlerSet.Add: revocation flags the kernel before RemoveKernel takes this
+            // gate, so skipping a revoked kernel here closes the wire-vs-revoke window.
+            if (kernel is { IsRevoked: true })
+            {
+                return;
+            }
+
             var entry = new Entry(priority, _nextOrder(), kernel, remote, invoke, filter);
             var next = new List<Entry>(_entries.Length + 1);
             next.AddRange(_entries);

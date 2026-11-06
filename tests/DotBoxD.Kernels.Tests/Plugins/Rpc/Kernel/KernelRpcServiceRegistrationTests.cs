@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins;
 using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
@@ -101,6 +103,38 @@ public sealed class ServerExtensionRegistrationTests
         var ex = Assert.Throws<InvalidOperationException>(
             () => server.ServerExtension<IMonsterKillerService>());
         Assert.Contains("No server extension is registered", ex.Message);
+    }
+
+    [Fact]
+    public async Task Event_kernel_replacement_clears_server_extension_registration()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var pluginId = await server.RegisterServerExtensionAsync<IMonsterKillerService, BatchKillerKernel>();
+        _ = server.ServerExtension<IMonsterKillerService>();
+
+        await server.InstallAsync(
+            WithPluginId(FireDamagePluginPackage.Create(), pluginId),
+            PluginAddendumTestPolicies.LongWall());
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => server.ServerExtension<IMonsterKillerService>());
+        Assert.Contains("No server extension is registered", ex.Message);
+    }
+
+    private static PluginPackage WithPluginId(PluginPackage package, string pluginId)
+    {
+        var metadata = new Dictionary<string, string>(package.Module.Metadata, StringComparer.Ordinal)
+        {
+            ["pluginId"] = pluginId
+        };
+
+        return package with
+        {
+            Manifest = package.Manifest with { PluginId = pluginId },
+            Module = package.Module with { Id = pluginId, Metadata = metadata }
+        };
     }
 
     private sealed class DisposedRegisterKernel;

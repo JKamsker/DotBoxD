@@ -28,6 +28,10 @@ public sealed partial class HookRegistry
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
 
+    // Pipelines a wire created and may still roll back. Any other lookup that hands one out claims it, so a
+    // failing wire never removes a pipeline another caller has started using.
+    private readonly HashSet<object> _provisionalWirePipelines = new(ReferenceEqualityComparer.Instance);
+
     // Writers clone under _gate and publish the completed dictionary; a published instance is never mutated.
     private Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)> _pipelineFanout = [];
     private readonly IPluginMessageSink _messages;
@@ -122,6 +126,7 @@ public sealed partial class HookRegistry
             {
                 var pipeline = (HookPipeline<TEvent, HookContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
+                _provisionalWirePipelines.Remove(existing);
                 return pipeline;
             }
 
