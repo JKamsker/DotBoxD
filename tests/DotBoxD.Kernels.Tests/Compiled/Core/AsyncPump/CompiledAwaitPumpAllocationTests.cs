@@ -9,7 +9,8 @@ public sealed class CompiledAwaitPumpAllocationTests(ITestOutputHelper output)
 {
     [Theory]
     [InlineData(false, 144)]
-    [InlineData(true, 312)]
+    // Queued: the leftover post is forwarded to the thread pool on disposal (one work item, ~48 B).
+    [InlineData(true, 368)]
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public void Inline_cleanup_keeps_only_necessary_snapshot_allocations(bool queued, int bytesPerCall)
     {
