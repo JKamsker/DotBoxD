@@ -162,4 +162,34 @@ internal sealed class RpcStreamSendState : IDisposable
         _credits.Dispose();
         _cts.Dispose();
     }
+
+    // A canceled wait can abandon a terminal send that still completes. After a remote cancel,
+    // observe its real outcome (its token is canceled) so the acknowledgement is not duplicated.
+    internal ValueTask<bool> WasTerminalSentAsync(Task? terminal)
+    {
+        if (terminal is null)
+        {
+            return new ValueTask<bool>(false);
+        }
+
+        if (terminal.IsCompleted || !IsRemoteCanceled)
+        {
+            return new ValueTask<bool>(terminal.IsCompletedSuccessfully);
+        }
+
+        return WaitForSendAsync(terminal);
+
+        static async ValueTask<bool> WaitForSendAsync(Task send)
+        {
+            try
+            {
+                await send.ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 }

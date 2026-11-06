@@ -221,7 +221,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             try
             {
                 // Acknowledge before removal so the stream id stays claimed until its terminal frame.
-                if (state.CompletePump(await WasSentAsync(terminal, state).ConfigureAwait(false)))
+                if (state.CompletePump(await state.WasTerminalSentAsync(terminal).ConfigureAwait(false)))
                 {
                     await _manager.AcknowledgeRemoteCancelAsync(state.StreamId).ConfigureAwait(false);
                 }
@@ -230,36 +230,6 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             {
                 _manager.RemoveOutbound(state, completed: true);
                 attachment.ReleaseOutboundRegistration();
-            }
-        }
-    }
-
-    // A canceled wait can abandon a terminal send that still completes. After a remote cancel,
-    // observe its real outcome (its token is canceled) so the acknowledgement is not duplicated.
-    private static ValueTask<bool> WasSentAsync(Task? terminal, RpcStreamSendState state)
-    {
-        if (terminal is null)
-        {
-            return new ValueTask<bool>(false);
-        }
-
-        if (terminal.IsCompleted || !state.IsRemoteCanceled)
-        {
-            return new ValueTask<bool>(terminal.IsCompletedSuccessfully);
-        }
-
-        return WaitForSendAsync(terminal);
-
-        static async ValueTask<bool> WaitForSendAsync(Task send)
-        {
-            try
-            {
-                await send.ConfigureAwait(false);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

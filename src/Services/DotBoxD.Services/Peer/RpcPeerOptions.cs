@@ -150,18 +150,10 @@ public sealed class RpcPeerOptions
     public int MaxPendingRequests
     {
         get => _maxPendingRequests;
-        init
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(MaxPendingRequests),
-                    value,
-                    "Maximum pending requests must be greater than zero.");
-            }
-
-            _maxPendingRequests = value;
-        }
+        init => _maxPendingRequests = RequirePositive(
+            value,
+            nameof(MaxPendingRequests),
+            "Maximum pending requests must be greater than zero.");
     }
 
     /// <summary>
@@ -175,18 +167,10 @@ public sealed class RpcPeerOptions
     public int MaxConcurrentInboundDispatch
     {
         get => _maxConcurrentInboundDispatch;
-        init
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(MaxConcurrentInboundDispatch),
-                    value,
-                    "Maximum concurrent inbound dispatch must be greater than zero.");
-            }
-
-            _maxConcurrentInboundDispatch = value;
-        }
+        init => _maxConcurrentInboundDispatch = RequirePositive(
+            value,
+            nameof(MaxConcurrentInboundDispatch),
+            "Maximum concurrent inbound dispatch must be greater than zero.");
     }
 
     /// <summary>
@@ -196,18 +180,10 @@ public sealed class RpcPeerOptions
     public int MaxInboundStreamsPerRequest
     {
         get => _maxInboundStreamsPerRequest;
-        init
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(MaxInboundStreamsPerRequest),
-                    value,
-                    "Maximum inbound streams per request must be greater than zero.");
-            }
-
-            _maxInboundStreamsPerRequest = value;
-        }
+        init => _maxInboundStreamsPerRequest = RequirePositive(
+            value,
+            nameof(MaxInboundStreamsPerRequest),
+            "Maximum inbound streams per request must be greater than zero.");
     }
 
     /// <summary>
@@ -217,18 +193,10 @@ public sealed class RpcPeerOptions
     public int MaxInboundStreamsPerPeer
     {
         get => _maxInboundStreamsPerPeer;
-        init
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(MaxInboundStreamsPerPeer),
-                    value,
-                    "Maximum inbound streams per peer must be greater than zero.");
-            }
-
-            _maxInboundStreamsPerPeer = value;
-        }
+        init => _maxInboundStreamsPerPeer = RequirePositive(
+            value,
+            nameof(MaxInboundStreamsPerPeer),
+            "Maximum inbound streams per peer must be greater than zero.");
     }
 
     /// <summary>
@@ -239,18 +207,10 @@ public sealed class RpcPeerOptions
     public int MaxResponseStreamsPerPeer
     {
         get => _maxResponseStreamsPerPeer;
-        init
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(MaxResponseStreamsPerPeer),
-                    value,
-                    "Maximum response streams per peer must be greater than zero.");
-            }
-
-            _maxResponseStreamsPerPeer = value;
-        }
+        init => _maxResponseStreamsPerPeer = RequirePositive(
+            value,
+            nameof(MaxResponseStreamsPerPeer),
+            "Maximum response streams per peer must be greater than zero.");
     }
 
     /// <summary>
@@ -319,4 +279,7 @@ public sealed class RpcPeerOptions
             _queueFullMode = value;
         }
     }
+
+    private static int RequirePositive(int value, string paramName, string message)
+        => value > 0 ? value : throw new ArgumentOutOfRangeException(paramName, value, message);
 }

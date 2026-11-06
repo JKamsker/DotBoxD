@@ -128,14 +128,7 @@ public sealed partial class RpcPeer
 
         // Notify the owner before completing so an awaited dispose observes the released state.
         Interlocked.Exchange(ref _disposedCallback, null)?.Invoke(this);
-        if (failure is null)
-        {
-            completion.TrySetResult(null);
-        }
-        else
-        {
-            completion.TrySetException(failure);
-        }
+        _ = failure is null ? completion.TrySetResult(null) : completion.TrySetException(failure);
     }
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
