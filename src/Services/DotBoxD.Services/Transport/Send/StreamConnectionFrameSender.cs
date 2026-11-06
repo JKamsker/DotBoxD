@@ -52,7 +52,7 @@ internal static class StreamConnectionFrameSender
 
             // Frames are atomic: the caller's token covers only the gate wait (see StreamFrameSendDriver).
             writeStarted = true;
-            var write = connection.SendStream.WriteAsync(data, CancellationToken.None);
+            var write = connection.SendStream.WriteAsync(data, connection.WriteLifetimeToken);
             if (!write.IsCompleted)
             {
                 pendingHandoffStarted = true;
@@ -69,7 +69,7 @@ internal static class StreamConnectionFrameSender
             write.GetAwaiter().GetResult();
             if (connection.SendStream is not PipeStream)
             {
-                var flush = connection.SendStream.FlushAsync(CancellationToken.None);
+                var flush = connection.SendStream.FlushAsync(connection.WriteLifetimeToken);
                 if (!flush.IsCompleted)
                 {
                     pendingHandoffStarted = true;

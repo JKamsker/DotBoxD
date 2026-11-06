@@ -17,6 +17,13 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     private readonly TimeSpan _frameReadIdleTimeout;
     private readonly FrameReadTimeoutSource? _frameReadTimeout;
     private readonly byte[] _lengthBuffer = new byte[StreamFrameReadOperations.LengthPrefixSize];
+
+    // Frames are atomic, so a started write or flush ignores the caller's token and observes only this
+    // connection-lifetime token, which close cancels. A borrowed stream is not disposed on close, so this
+    // is the only way to end a stalled write there. The token is cached because sends may still read it
+    // after close has disposed the source.
+    private readonly CancellationTokenSource _writeLifetime = new();
+    private readonly CancellationToken _writeLifetimeToken;
     private StreamFrameReceiveBuffer _receiveBuffer;
     private Task? _closeTask;
     private int _activeReceives;
@@ -51,6 +58,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         _maxMessageSize = maxMessageSize;
         _frameReadIdleTimeout = timeout;
         _frameReadTimeout = timeout == Timeout.InfiniteTimeSpan ? null : new FrameReadTimeoutSource();
+        _writeLifetimeToken = _writeLifetime.Token;
     }
 
     /// <summary>Configured idle timeout for frame reads.</summary>
@@ -58,6 +66,9 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     internal Stream SendStream => _stream;
     internal SemaphoreSlim SendGate => _sendLock;
     internal int MaxOutgoingMessageSize => _maxMessageSize;
+
+    /// <summary>Cancelled only when the connection closes; started writes and flushes observe it.</summary>
+    internal CancellationToken WriteLifetimeToken => _writeLifetimeToken;
     internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
     internal void ReleaseSendGate() =>
         TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
@@ -90,17 +101,18 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             try
             {
                 // Frames are atomic: the caller's token covers only the gate wait, so cancelling one
-                // call never truncates a frame and tears down the shared connection.
-                await _stream.WriteAsync(data, CancellationToken.None).ConfigureAwait(false);
+                // call never truncates a frame and tears down the shared connection. Only close
+                // (through the lifetime token) or an I/O failure ends a started write.
+                await _stream.WriteAsync(data, _writeLifetimeToken).ConfigureAwait(false);
                 if (_stream is not PipeStream)
                 {
-                    await _stream.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+                    await _stream.FlushAsync(_writeLifetimeToken).ConfigureAwait(false);
                 }
             }
             catch
             {
-                // A failed write may have put part of the frame on the stream; never let a later frame
-                // follow a truncated one.
+                // A failed or close-cancelled write may have put part of the frame on the stream; never
+                // let a later frame follow a truncated one.
                 AbortAfterFailedWrite();
                 throw;
             }
@@ -223,9 +235,30 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         TransportSendGate.WakeDisposedWaiters(_sendLock);
         StreamFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
-        if (_ownsStream)
+        try
         {
-            await _stream.DisposeAsync().ConfigureAwait(false);
+            CancelStartedWrites();
+        }
+        finally
+        {
+            if (_ownsStream)
+            {
+                await _stream.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // Disposed state is already published, so no new write starts after this. A sender that raced past
+    // its disposed check holds the cached, already-cancelled token and fails without touching the source.
+    private void CancelStartedWrites()
+    {
+        try
+        {
+            _writeLifetime.Cancel();
+        }
+        finally
+        {
+            _writeLifetime.Dispose();
         }
     }
 

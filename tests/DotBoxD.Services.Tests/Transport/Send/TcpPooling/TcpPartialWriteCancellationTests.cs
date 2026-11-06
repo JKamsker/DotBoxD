@@ -71,6 +71,30 @@ public sealed class TcpPartialWriteCancellationTests
             () => pair.Connection.SendValueAsync(next).AsTask().WaitAsync(Guard));
     }
 
+    [Theory]
+    [InlineData((int)SendPath.Raw)]
+    [InlineData((int)SendPath.Owned)]
+    [InlineData((int)SendPath.RawFallback)]
+    public async Task Dispose_FailsWriteStalledMidFrame(int pathValue)
+    {
+        // A started write ignores the caller's token, so close must end it. TcpConnection always owns its
+        // socket, and disposing it closes the socket, which fails the stalled write.
+        await using var pair = await TcpSendTestPair.CreateAsync();
+        var large = TcpSendTestFrames.CreateBytes(messageId: 735, bodyLength: LargeBodyLength);
+        var (send, _) = await SendUntilWriteStallsAsync(
+            pair,
+            large,
+            CancellationToken.None,
+            (SendPath)pathValue);
+
+        await pair.Connection.DisposeAsync().AsTask().WaitAsync(Guard);
+
+        var error = await Record.ExceptionAsync(() => send.WaitAsync(Guard));
+        Assert.NotNull(error);
+        Assert.IsNotType<TimeoutException>(error);
+        Assert.False(pair.Connection.IsConnected);
+    }
+
     private static async Task<(Task Send, long CompletedBytes)> SendUntilWriteStallsAsync(
         TcpSendTestPair pair,
         byte[] frame,

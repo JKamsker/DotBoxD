@@ -31,11 +31,11 @@ internal static class StreamFrameSendDriver
                 goto case StreamFrameSendStage.Write;
             case StreamFrameSendStage.Write:
                 // Frames are atomic: once the write starts, cancelling the caller must not truncate the
-                // frame and poison the shared connection. Only genuine I/O failures (including the
-                // stream being disposed by connection close) end a started write.
+                // frame and poison the shared connection. Only genuine I/O failures or connection close
+                // (through the lifetime token, which also covers borrowed streams) end a started write.
                 pendingOperation = connection.SendStream.WriteAsync(
                     state.Data,
-                    CancellationToken.None);
+                    connection.WriteLifetimeToken);
                 if (!pendingOperation.IsCompleted)
                 {
                     return false;
@@ -53,7 +53,7 @@ internal static class StreamFrameSendDriver
                 goto case StreamFrameSendStage.Flush;
             case StreamFrameSendStage.Flush:
                 pendingOperation = new ValueTask(
-                    connection.SendStream.FlushAsync(CancellationToken.None));
+                    connection.SendStream.FlushAsync(connection.WriteLifetimeToken));
                 if (!pendingOperation.IsCompleted)
                 {
                     return false;

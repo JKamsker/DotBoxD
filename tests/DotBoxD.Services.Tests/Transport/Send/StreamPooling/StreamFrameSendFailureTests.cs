@@ -60,17 +60,20 @@ public sealed class StreamFrameSendFailureTests
         await entered.WaitAsync(Guard);
 
         // Frames are atomic: cancelling after the write started must not truncate the frame or
-        // poison the shared connection, so the token is never forwarded to the stream.
+        // poison the shared connection, so the token is never forwarded to the stream: it sees only the
+        // connection-lifetime token, which stays live until close.
         cancellation.Cancel();
         Assert.False(send.IsCompleted);
-        Assert.False(stream.WriteToken.CanBeCanceled);
+        Assert.Equal(connection.WriteLifetimeToken, stream.WriteToken);
+        Assert.False(stream.WriteToken.IsCancellationRequested);
         if (stage == PendingStreamSendStage.Write)
         {
             stream.CompleteWrite();
         }
         else
         {
-            Assert.False(stream.FlushToken.CanBeCanceled);
+            Assert.Equal(connection.WriteLifetimeToken, stream.FlushToken);
+            Assert.False(stream.FlushToken.IsCancellationRequested);
             stream.CompleteFlush();
         }
 
