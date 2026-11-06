@@ -21,7 +21,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     // Frames are atomic, so a started write or flush ignores the caller's token and observes only this
     // connection-lifetime token, which close cancels. A borrowed stream is not disposed on close, so this
     // is the only way to end a stalled write there. The token is cached because sends may still read it
-    // after close has disposed the source.
+    // after close has disposed the source. A write it ends fails with the ObjectDisposedException of a
+    // send after close, not with cancellation the caller never requested (StreamFrameSendFailure).
     private readonly CancellationTokenSource _writeLifetime = new();
     private readonly CancellationToken _writeLifetimeToken;
     private StreamFrameReceiveBuffer _receiveBuffer;
@@ -109,10 +110,16 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                     await _stream.FlushAsync(_writeLifetimeToken).ConfigureAwait(false);
                 }
             }
+            catch (Exception error) when (StreamFrameSendFailure.IsCloseCancelledWrite(this, error, ct))
+            {
+                // Close ended the write: the caller lost the connection, it did not cancel.
+                AbortAfterFailedWrite();
+                throw StreamFrameSendFailure.CreateClosed();
+            }
             catch
             {
-                // A failed or close-cancelled write may have put part of the frame on the stream; never
-                // let a later frame follow a truncated one.
+                // A failed write may have put part of the frame on the stream; never let a later frame
+                // follow a truncated one.
                 AbortAfterFailedWrite();
                 throw;
             }

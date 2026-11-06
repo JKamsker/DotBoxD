@@ -88,10 +88,10 @@ internal static class StreamConnectionFrameSender
         }
         catch (Exception error) when (!pendingHandoffStarted)
         {
-            return CompleteSynchronously(connection, frame, gateHeld, error, writeStarted);
+            return CompleteSynchronously(connection, frame, gateHeld, error, writeStarted, cancellationToken);
         }
 
-        return CompleteSynchronously(connection, frame, gateHeld, error: null, writeStarted);
+        return CompleteSynchronously(connection, frame, gateHeld, error: null, writeStarted, cancellationToken);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -141,14 +141,16 @@ internal static class StreamConnectionFrameSender
         PooledBufferWriter frame,
         bool gateHeld,
         Exception? error,
-        bool writeStarted)
+        bool writeStarted,
+        CancellationToken cancellationToken)
     {
-        var cleanupError = StreamFrameSendCleanup.Finish(
+        error = StreamFrameSendCleanup.Complete(
             connection,
             frame,
             gateHeld,
-            abortConnection: error is not null && writeStarted);
-        error = cleanupError ?? error;
+            error,
+            writeStarted,
+            cancellationToken);
         return error is null
             ? default
             : StreamFrameSendFailure.Create(error);
