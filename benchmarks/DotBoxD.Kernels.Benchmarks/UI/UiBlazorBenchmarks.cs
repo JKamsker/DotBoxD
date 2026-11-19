@@ -37,7 +37,10 @@ public class UiBlazorBenchmarks
     public void Setup()
     {
         _sandbox = SandboxHost.Create(b => b.AddDefaultPureBindings());
-        _host = new UiHost(_sandbox, SandboxPolicyBuilder.Create().Build(), new UiPolicy { MaxNodes = 4_000 });
+        // The session input loop enforces the host policy's rate limit independently of the renderer's
+        // admission policy and disconnects on overflow, so both must be lifted for throughput runs.
+        _host = new UiHost(_sandbox, SandboxPolicyBuilder.Create().Build(),
+            new UiPolicy { MaxNodes = 4_000, MaxInputEventsPerSecond = int.MaxValue });
         _rows = [.. Enumerable.Range(0, Items).Select(i => new UiListItem(i.ToString(System.Globalization.CultureInfo.InvariantCulture), "row"))];
         _reverse = [.. _rows.Reverse()];
         _batch = [.. Enumerable.Range(3, 100).Select(i => new UiStateValue(i, UiValue.FromInt32(1)))];
