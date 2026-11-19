@@ -79,10 +79,7 @@ internal static class JsonImportBudgetGuard
             }
 
             HandleToken(reader.TokenType, reader.ValueSpan.Length, stack, ref depth, ref totalStringBytes);
-            if (reader.TokenType is JsonTokenType.String or JsonTokenType.PropertyName)
-            {
-                JsonEscapedStringValidator.Validate(ref reader);
-            }
+            JsonEscapedStringValidator.Validate(ref reader);
         }
     }
 
@@ -107,7 +104,9 @@ internal static class JsonImportBudgetGuard
                 depth--;
                 break;
             case JsonTokenType.PropertyName:
-                CountObjectProperty(stack, depth);
+                // Utf8JsonReader only yields property names directly inside an object,
+                // so the innermost frame is always that object.
+                IncrementCount(stack, depth, "object");
                 CountStringBytes(valueBytes, ref totalStringBytes);
                 break;
             case JsonTokenType.String:
@@ -139,16 +138,6 @@ internal static class JsonImportBudgetGuard
         }
 
         IncrementCount(stack, depth, "array");
-    }
-
-    private static void CountObjectProperty(ContainerFrame[] stack, int depth)
-    {
-        if (depth < 0 || stack[depth].Kind != ContainerKind.Object)
-        {
-            return;
-        }
-
-        IncrementCount(stack, depth, "object");
     }
 
     private static void IncrementCount(ContainerFrame[] stack, int depth, string container)

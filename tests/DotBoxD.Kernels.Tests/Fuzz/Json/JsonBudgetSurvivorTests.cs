@@ -34,6 +34,19 @@ public sealed class JsonBudgetSurvivorTests
     }
 
     [Theory]
+    [InlineData("[1,]")]
+    [InlineData("""{"x":1,}""")]
+    public void Budget_scan_rejects_trailing_commas_before_later_limits(string trailingComma)
+    {
+        // The scan must stop at the trailing comma; a lenient scan would continue and
+        // report the oversized string that follows instead.
+        var json = $$"""{"a":{{trailingComma}},"b":"{{new string('s', 65_537)}}"}""";
+        var exception = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
+        Assert.Contains(exception.Diagnostics, d => d.Code == "E-JSON-INVALID");
+        Assert.DoesNotContain(exception.Diagnostics, d => d.Code == "E-JSON-LIMIT");
+    }
+
+    [Theory]
     [InlineData("\u007f")]
     [InlineData("\u0080")]
     [InlineData("\u07ff")]
