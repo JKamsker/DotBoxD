@@ -11,6 +11,7 @@ internal static class CollectionMaterializationPolicy
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private static readonly HashSet<string> EnumerableMaterializationMethodNames = new(StringComparer.Ordinal)
     {
+        "Chunk",
         "Except",
         "ExceptBy",
         "GroupJoin",
