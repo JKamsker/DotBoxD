@@ -110,7 +110,10 @@ public sealed class PluginAnalyzerForbiddenApiUserSecretsConfigurationReachabili
         var runtimeDirectory = Directory.GetParent(typeof(object).Assembly.Location)!.FullName;
         var sharedRoot = Directory.GetParent(Directory.GetParent(runtimeDirectory)!.FullName)!.FullName;
         var frameworkRoot = Path.Combine(sharedRoot, "Microsoft.AspNetCore.App");
+        // Stay on the running runtime's major version: newer side-by-side shared frameworks
+        // (e.g. .NET 11 on the runner image) reference newer Abstractions than the TPA set.
         var assembly = Directory.EnumerateDirectories(frameworkRoot)
+            .Where(directory => ParseFrameworkDirectoryVersion(directory).Major == Environment.Version.Major)
             .OrderByDescending(ParseFrameworkDirectoryVersion)
             .Select(directory => Path.Combine(directory, fileName))
             .First(File.Exists);
