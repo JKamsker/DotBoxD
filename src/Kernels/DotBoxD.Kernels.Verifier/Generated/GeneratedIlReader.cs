@@ -149,17 +149,12 @@ internal static class GeneratedIlReader
 
     private static EntityHandle ReadHandle(ref BlobReader il)
     {
+        // ECMA-335 tokens never set bit 31; System.Reflection.Metadata accepts it as a "virtual"
+        // handle whose typed cast throws InvalidCastException, so reject it as malformed IL.
         var token = il.ReadInt32();
-
-        // Bit 31 is never set in an ECMA-335 token, but System.Reflection.Metadata accepts it and
-        // produces a "virtual" handle: Kind looks like the table, yet casting it to the typed handle
-        // throws InvalidCastException. Reject it here as malformed IL.
-        if (token < 0)
-        {
-            throw new BadImageFormatException($"metadata token 0x{token:X8} is not a valid ECMA-335 token");
-        }
-
-        return MetadataTokens.EntityHandle(token);
+        return token >= 0
+            ? MetadataTokens.EntityHandle(token)
+            : throw new BadImageFormatException($"metadata token 0x{token:X8} is not a valid ECMA-335 token");
     }
 
     private static bool TryReadInlineInt32(ILOpCode opcode, ref BlobReader il, out int value)
