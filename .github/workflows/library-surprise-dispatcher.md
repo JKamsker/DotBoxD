@@ -30,6 +30,10 @@ network:
     - github
     - threat-detection
 
+# ubuntu-latest is ubuntu-26.04, whose sudo-rs ignores `sudo -E`; the v0.82 AWF launcher then
+# loses RUNNER_TEMP/OPENAI_BASE_URL inside the firewall container. Pin until gh-aw runs AWF rootless.
+runs-on: ubuntu-24.04
+
 sandbox:
   agent:
     targets:
@@ -42,6 +46,8 @@ tools:
     min-integrity: none
 
 safe-outputs:
+  threat-detection:
+    runs-on: ubuntu-24.04
   mentions: false
   allowed-github-references: []
   dispatch-workflow:
