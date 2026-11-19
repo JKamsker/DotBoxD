@@ -176,7 +176,9 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
         var runtimeDirectory = Directory
             .EnumerateDirectories(runtimeRoot)
             .Select(path => (Path: path, Version: RuntimeVersionPrefix(path)))
-            .Where(candidate => candidate.Version is not null)
+            // Stay on the running runtime's major version: newer side-by-side shared frameworks
+            // (e.g. .NET 11 on the runner image) reference newer Abstractions than the TPA set.
+            .Where(candidate => candidate.Version?.Major == Environment.Version.Major)
             .OrderByDescending(candidate => candidate.Version)
             .Select(candidate => candidate.Path)
             .FirstOrDefault();
