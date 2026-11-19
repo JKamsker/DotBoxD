@@ -41,7 +41,7 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
             }
             else
             {
-                var reader = peReader.GetMetadataReader();
+                var reader = OpenMetadataReader(peReader);
                 VerifyMetadata(peReader, reader, policy, diagnostics, cancellationToken);
             }
         }
@@ -56,6 +56,20 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
             assemblyHash,
             policy.VerifierVersion,
             DateTimeOffset.UtcNow));
+    }
+
+    private static MetadataReader OpenMetadataReader(PEReader peReader)
+    {
+        try
+        {
+            return peReader.GetMetadataReader();
+        }
+        catch (OverflowException ex)
+        {
+            // System.Reflection.Metadata reads the stream count as Int16 and allocates an array of
+            // that size, so a negative count escapes as OverflowException rather than a format error.
+            throw new BadImageFormatException("metadata stream headers are malformed", ex);
+        }
     }
 
     private static string ComputeSha256LowerHex(ReadOnlySpan<byte> source)

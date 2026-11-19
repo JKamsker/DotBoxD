@@ -69,7 +69,58 @@ public sealed class VerifierIlFormatTests
     [InlineData(0x01000001)]
     public async Task Verifier_reports_non_member_call_token_as_il_format(int token)
     {
-        var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        var bytes = BuildPatchableExecute();
+        var ilBytes = ReadExecuteIl(bytes);
+        var ilStart = IndexOf(bytes, ilBytes);
+        bytes[ilStart] = 0x28;
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(ilStart + 1, sizeof(int)), token);
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code is "V-IL-FORMAT" or "V-MEMBER");
+    }
+
+    // Regression for a coverage-guided fuzz crash: bit 31 of a token makes System.Reflection.Metadata
+    // return a "virtual" handle whose typed cast throws InvalidCastException instead of a format error.
+    [Theory]
+    [InlineData(0x28, unchecked((int)0x8A000001))]
+    [InlineData(0x28, unchecked((int)0x86000001))]
+    [InlineData(0x6F, unchecked((int)0x8A000001))]
+    [InlineData(0x73, unchecked((int)0x86000001))]
+    [InlineData(0x8D, unchecked((int)0x81000001))]
+    public async Task Verifier_reports_virtual_bit_token_as_il_format(byte opcode, int token)
+    {
+        var bytes = BuildPatchableExecute();
+        var ilStart = IndexOf(bytes, ReadExecuteIl(bytes));
+        bytes[ilStart] = opcode;
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(ilStart + 1, sizeof(int)), token);
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == "V-IL-FORMAT");
+    }
+
+    // Regression for a coverage-guided fuzz crash: a negative metadata stream count made
+    // System.Reflection.Metadata throw OverflowException out of the verifier.
+    [Fact]
+    public async Task Verifier_reports_negative_metadata_stream_count_as_pe_format()
+    {
+        var bytes = BuildPatchableExecute();
+        var root = bytes.AsSpan().IndexOf("BSJB"u8);
+        var versionLength = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(root + 12, sizeof(int)));
+        var streamCount = root + 16 + versionLength + sizeof(short);
+        BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(streamCount, sizeof(short)), -1);
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == "V-PE-FORMAT");
+    }
+
+    private static byte[] BuildPatchableExecute()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
             var method = type.DefineMethod(
                 "Execute",
@@ -85,16 +136,6 @@ public sealed class VerifierIlFormatTests
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ret);
         });
-        var ilBytes = ReadExecuteIl(bytes);
-        var ilStart = IndexOf(bytes, ilBytes);
-        bytes[ilStart] = 0x28;
-        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(ilStart + 1, sizeof(int)), token);
-
-        var result = await VerifierTestHelpers.VerifyAsync(bytes);
-
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code is "V-IL-FORMAT" or "V-MEMBER");
-    }
 
     private static byte[] ReadExecuteIl(byte[] assemblyBytes)
     {
