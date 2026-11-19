@@ -107,8 +107,10 @@ bash eng/scripts/check-fuzz-findings.sh artifacts/fuzz/findings/framing
 The harness uses SharpFuzz's out-of-process driver. `AFL_SKIP_BIN_CHECK` allows the managed
 launcher; do not use AFL's `-n` mode, which disables coverage guidance. The scheduled/manual CI
 campaign runs each target for five minutes, fails for missing/empty run statistics or saved
-crashes/hangs, and uploads the raw findings, queue, statistics, and minimized reproducers.
-Minimization has a per-input timeout and preserves originals if it cannot finish.
+crashes/hangs, and uploads the raw findings, queue, statistics, and minimized reproducers as a
+single `fuzz-findings-<target>.tar.gz` (AFL++ file names contain `:`, which artifact uploads reject;
+the tarball keeps them intact). Minimization has a per-input timeout and preserves originals if it
+cannot finish.
 
 Replay findings with a fresh **uninstrumented** publish and `--replay <file>`. Add a focused
 regression test and retain useful minimized inputs in the corpus. A short run with no findings
