@@ -93,6 +93,14 @@ after the structured-output path in threat-detection runs; without the explicit
 separator it generates `detection_result.json-c ...`. Remove the leading space
 only after the fork emits that separator itself.
 
+All compiled workflows pin `runs-on: ubuntu-24.04` and `safe-outputs.threat-detection.runs-on:
+ubuntu-24.04`. `ubuntu-latest` now resolves to Ubuntu 26.04, whose `sudo` (sudo-rs) ignores `-E`;
+the `v0.82.0-jk.2` launcher runs `sudo -E awf`, so on 26.04 the firewall container loses
+`RUNNER_TEMP` and `OPENAI_BASE_URL` and the agent fails with
+`Cannot find module '/gh-aw/actions/codex_harness.cjs'`. Drop the pin only after moving to a fork
+release that runs AWF rootless (upstream does since AWF v0.27.32) *and* still carries
+`base-url-secret`. `v0.88.7-jk.1` is a plain upstream sync without it.
+
 All compiled workflows disable `features.group-concurrency-queue`. Fan-out workers use
 `concurrency.job-discriminator` to scope generated cleanup groups to their lens, run, or PR;
 retaining every stale pending cleanup job with gh-aw's `queue: max` extension would only consume
