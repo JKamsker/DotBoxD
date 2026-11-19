@@ -123,13 +123,30 @@ jobs:
                 dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll ${{ matrix.target }} || cp "$input" "$output"
             done
           done
+      - name: Archive findings and statistics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # AFL++ names inputs like id:000000,sig:02,...; upload-artifact rejects ':' in paths, so
+          # ship one tarball that keeps the original names for triage and --replay.
+          archive="artifacts/fuzz/upload/fuzz-findings-${{ matrix.target }}.tar.gz"
+          mkdir -p "$(dirname "$archive")"
+          dirs=()
+          for dir in "artifacts/fuzz/findings/${{ matrix.target }}" "artifacts/fuzz/minimized/${{ matrix.target }}"; do
+            [[ ! -d "$dir" ]] || dirs+=("$dir")
+          done
+          if (( ${#dirs[@]} == 0 )); then
+            echo "No fuzz output to archive."
+            exit 0
+          fi
+          tar -czf "$archive" "${dirs[@]}"
+          tar -tzf "$archive" | grep -E '/(crashes|hangs)/id:|/minimized/' || true
       - name: Upload findings and statistics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-findings-${{ matrix.target }}
-          path: |
-            artifacts/fuzz/minimized/${{ matrix.target }}/**/*
-            artifacts/fuzz/findings/${{ matrix.target }}/**/*
+          path: artifacts/fuzz/upload/fuzz-findings-${{ matrix.target }}.tar.gz
           if-no-files-found: warn
           retention-days: 30
