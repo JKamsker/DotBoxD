@@ -102,6 +102,23 @@ public sealed class VerifierIlFormatTests
         Assert.Contains(result.Diagnostics, d => d.Code == "V-IL-FORMAT");
     }
 
+    // Regression for a coverage-guided fuzz crash: a negative metadata stream count made
+    // System.Reflection.Metadata throw OverflowException out of the verifier.
+    [Fact]
+    public async Task Verifier_reports_negative_metadata_stream_count_as_pe_format()
+    {
+        var bytes = BuildPatchableExecute();
+        var root = bytes.AsSpan().IndexOf("BSJB"u8);
+        var versionLength = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(root + 12, sizeof(int)));
+        var streamCount = root + 16 + versionLength + sizeof(short);
+        BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(streamCount, sizeof(short)), -1);
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == "V-PE-FORMAT");
+    }
+
     private static byte[] BuildPatchableExecute()
         => VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
