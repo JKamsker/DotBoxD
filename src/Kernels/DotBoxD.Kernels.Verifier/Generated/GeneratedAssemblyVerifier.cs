@@ -20,6 +20,7 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
 
         var diagnostics = new List<VerificationDiagnostic>();
         var assemblyHash = ComputeSha256LowerHex(assemblyBytes.Span);
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(manifest.AssemblyHash))
         {
             diagnostics.Add(new VerificationDiagnostic("V-MANIFEST-HASH", "assembly hash is required"));
