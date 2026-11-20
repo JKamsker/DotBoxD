@@ -85,10 +85,16 @@ internal sealed class UiRazorExpressions
         var name = arguments[0];
         if (input && !_states.Contains(name))
         { throw new NotSupportedException("Two-way inputs require a typed state slot, not a kernel."); }
-        if (_values[name] is var valueType && valueType != "kernel" && valueType != type)
-        { throw new NotSupportedException("Binding '" + name + "' has type '" + valueType + "', but this property requires '" + type + "'."); }
+        ValidateBindingType(name, type);
         return input ? "global::DotBoxD.UI.Authoring.UiBinding<" + type + ">.Input(" + name + ")"
             : "((global::DotBoxD.UI.Authoring.UiBinding<" + type + ">)" + name + ")";
+    }
+
+    private void ValidateBindingType(string name, string propertyType)
+    {
+        var valueType = _values[name];
+        if (valueType != "kernel" && valueType != propertyType)
+        { throw new NotSupportedException("Binding '" + name + "' has type '" + valueType + "', but this property requires '" + propertyType + "'."); }
     }
 
     public string Image(string text)
