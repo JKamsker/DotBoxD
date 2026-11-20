@@ -31,7 +31,11 @@ internal static class F64LoopFastPathEmitter
             return false;
         }
 
-        nonNegativeTarget = expression.PreservesNonNegative ? assignment.Name : null;
+        // An empty range leaves the target at its prior value, so the loop only proves it non-negative
+        // when it already was before the loop and every iteration assigns a non-negative value.
+        nonNegativeTarget = expression.PreservesNonNegative && nonNegativeF64Locals.Contains(assignment.Name)
+            ? assignment.Name
+            : null;
         EmitLoop(range, il, declare, assignment.Name, expression);
         return true;
     }

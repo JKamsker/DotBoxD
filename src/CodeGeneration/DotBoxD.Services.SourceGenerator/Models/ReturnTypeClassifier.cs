@@ -79,7 +79,7 @@ internal static partial class ReturnTypeClassifier
         }
 
         unwrappedReturnType = format(returnType);
-        if (TryGetSubServiceInfo(returnType, ct, out var syncSubService))
+        if (SubServiceReturnTypeReader.TryGetSubServiceInfo(returnType, ct, out var syncSubService, format))
         {
             subService = syncSubService;
             return MethodReturnKind.SyncSubService;
@@ -149,16 +149,17 @@ internal static partial class ReturnTypeClassifier
         }
 
         unwrappedReturnType = format(payloadType);
-        return ClassifyTaskPayloadCore(payloadType, valueTask, ct, ref subService);
+        return ClassifyTaskPayloadCore(payloadType, valueTask, format, ct, ref subService);
     }
 
     private static MethodReturnKind ClassifyTaskPayloadCore(
         ITypeSymbol payloadType,
         bool valueTask,
+        Func<ITypeSymbol, string> format,
         CancellationToken ct,
         ref SubServiceInfo? subService)
     {
-        if (TryGetSubServiceInfo(payloadType, ct, out var sub))
+        if (SubServiceReturnTypeReader.TryGetSubServiceInfo(payloadType, ct, out var sub, format))
         {
             subService = sub;
             return valueTask ? MethodReturnKind.ValueTaskOfSubService : MethodReturnKind.TaskOfSubService;

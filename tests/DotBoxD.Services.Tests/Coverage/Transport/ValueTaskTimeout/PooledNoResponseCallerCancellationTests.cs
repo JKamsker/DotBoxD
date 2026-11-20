@@ -174,16 +174,18 @@ public sealed class PooledNoResponseCallerCancellationTests
         var messageId = harness.LastRequestMessageId;
         var source = harness.GetPendingResponse(messageId);
         cancellation.Cancel();
-        harness.CompleteNoResponse(messageId);
 
-        Assert.False(call.IsCompleted);
-        await Assert.ThrowsAsync<ServiceException>(
-            () => Invoke(harness, request: 23, CancellationToken.None).AsTask());
-
-        harness.ReleaseRequestSend();
+        // Caller cancellation ends the call while the send is still in flight; the late response
+        // loses the pending's single removal, and the detached send keeps the slot.
         var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => call.AsTask().WaitAsync(Guard));
         Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(harness.TryCompleteNoResponse(messageId));
+        await Assert.ThrowsAsync<ServiceException>(
+            () => Invoke(harness, request: 23, CancellationToken.None).AsTask());
+        Assert.Equal(0, harness.CancelCount);
+
+        harness.ReleaseRequestSend();
         Assert.Equal(messageId, await harness.WaitForCancelAsync(Guard));
         Assert.Equal(1, harness.CancelCount);
         await AssertSourceReusedAsync(harness, source);

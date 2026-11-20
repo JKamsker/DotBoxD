@@ -7,7 +7,7 @@ internal enum SendBlockPoint
     Flush,
 }
 
-internal sealed class ControlledSendStream : Stream
+internal class ControlledSendStream : Stream
 {
     private readonly SendBlockPoint _blockPoint;
     private Exception? _writeFailure;

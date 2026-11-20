@@ -40,7 +40,8 @@ internal static partial class MethodModelFactory
         var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
         var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, typeFormatter, ct);
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
-        var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol, ct);
+        var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol, typeFormatter, ct);
+        var explicitImplementationType = GetExplicitImplementationType(methodSymbol.ContainingType, typeFormatter);
         string? unsupportedReason = null;
         methodLocation = DiagnosticLocationFactory.FromSymbol(methodSymbol);
         var unsupportedLocation = methodLocation;
@@ -99,7 +100,7 @@ internal static partial class MethodModelFactory
         var configuredRpcName = configuredMethodName ?? methodSymbol.Name;
         return new MethodModel(
             Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
-            ExplicitImplementationType: GetExplicitImplementationType(methodSymbol.ContainingType),
+            ExplicitImplementationType: explicitImplementationType,
             RpcName: LiteralHelpers.EscapeStringLiteral(configuredRpcName),
             ExternAliases: typeFormatter.UsedAliases.ToEquatableArray(),
             ReturnKind: returnKind,
@@ -116,6 +117,7 @@ internal static partial class MethodModelFactory
             TypeParameterCount: methodSymbol.Arity,
             TypeParameterList: typeParameterList,
             ConstraintClauses: constraintClauses,
+            ExplicitConstraintClauses: MethodSignatureFormatter.GetExplicitImplementationConstraintClauses(methodSymbol, ct),
             UnsupportedReason: unsupportedReason,
             SubService: subService,
             RawRpcName: configuredRpcName,
@@ -124,8 +126,13 @@ internal static partial class MethodModelFactory
             IsLookalikeTaskLike: isLookalikeTaskLike);
     }
 
-    internal static string GetExplicitImplementationType(INamedTypeSymbol type) =>
-        type.ToDisplayString(s_qualifiedFormat);
+    // Explicit-implementation and dispatcher-cast targets name the declaring interface, which may live in an
+    // assembly referenced only through an extern alias, so it is spelled with that alias instead of global::.
+    internal static string GetExplicitImplementationType(
+        INamedTypeSymbol type,
+        ExternAliasTypeFormatter typeFormatter,
+        List<string>? usedAliases = null) =>
+        typeFormatter.Format(type, s_qualifiedFormat, usedAliases);
 
     private static (string Type, string MetadataType, EquatableArray<string> ExternAliases) GetDeclaredParameterType(
         IParameterSymbol parameter,

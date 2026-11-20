@@ -104,6 +104,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string method,
         CancellationToken ct)
     {
+        var deadline = GetRequestDeadline();
         ValueTask sendTask;
         try
         {
@@ -132,16 +133,31 @@ internal sealed partial class RpcPeerOutboundInvoker
             pending.EnableDirectCompletion(this);
             if (!pending.Task.IsCompleted)
             {
-                _pending.StartTimeout(pending, _timeout);
+                _pending.StartTimeout(pending, deadline);
             }
 
             return pending.Task;
+        }
+
+        // The deadline was taken before the send started; arm it while the send may still be in flight.
+        _pending.StartTimeout(pending, deadline);
+        if (ShouldRaceSend(sendTask.IsCompleted, ct))
+        {
+            return AwaitUnarySendWithinDeadlineAsync(
+                messageId,
+                pending,
+                sendTask.AsTask(),
+                deadline,
+                service,
+                method,
+                ct);
         }
 
         return AwaitUnaryResponseAsync(
             messageId,
             pending,
             sendTask,
+            sendDetached: false,
             service,
             method,
             ct);
@@ -151,6 +167,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         int messageId,
         PendingUnaryResponse<TResponse> pending,
         ValueTask sendTask,
+        bool sendDetached,
         string service,
         string method,
         CancellationToken ct)
@@ -173,18 +190,15 @@ internal sealed partial class RpcPeerOutboundInvoker
                 throw;
             }
 
-            requestSent = true;
+            // A detached send means the call ended (for example timed out) before the request was
+            // written; the detached send owns the slot and the late cancel frame.
+            requestSent = !sendDetached;
 
             // A synchronous send can complete the response and cancel the caller before this
             // continuation gets a chance to register the token callback. Cancellation still
             // wins while the send is in progress, even when the response was delivered inline.
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested && TryEndUnaryForCanceledCaller(messageId, pending, requestSent))
             {
-                if (_pending.TryCancel(messageId, pending, PendingCancellationKind.Caller))
-                {
-                    _cancelFrames.TrySend(messageId);
-                }
-
                 ct.ThrowIfCancellationRequested();
             }
 
@@ -193,7 +207,6 @@ internal sealed partial class RpcPeerOutboundInvoker
                 : default;
             using (callerCancellation)
             {
-                _pending.StartTimeout(pending, _timeout);
                 try
                 {
                     var response = await pending.Task.ConfigureAwait(false);
@@ -231,8 +244,37 @@ internal sealed partial class RpcPeerOutboundInvoker
                 _pending.Remove(messageId, pending, consumed: false);
             }
 
-            ReleasePendingSlot();
+            ReleasePendingSlotUnlessDetached(sendDetached);
         }
+    }
+
+    // Ends a call whose caller cancelled before the response wait began, sending the one cancel frame
+    // a written request owes when it ends by caller cancellation or by a timeout that won the race.
+    // A caller cancellation that won while the request was being written already sent its frame. A
+    // pending another outcome claimed but has not completed yet is left to the response wait, whose
+    // handlers send the frame for a timeout; returns false then.
+    private bool TryEndUnaryForCanceledCaller<TResponse>(
+        int messageId,
+        PendingUnaryResponse<TResponse> pending,
+        bool requestSent)
+    {
+        if (_pending.TryCancel(messageId, pending, PendingCancellationKind.Caller))
+        {
+            _cancelFrames.TrySend(messageId);
+            return true;
+        }
+
+        if (!pending.Task.IsCompleted)
+        {
+            return false;
+        }
+
+        if (requestSent && pending.CancellationKind == PendingCancellationKind.Timeout)
+        {
+            _cancelFrames.TrySend(messageId);
+        }
+
+        return true;
     }
 
     private static Task<T> ToFaultedTask<T>(Exception error) =>

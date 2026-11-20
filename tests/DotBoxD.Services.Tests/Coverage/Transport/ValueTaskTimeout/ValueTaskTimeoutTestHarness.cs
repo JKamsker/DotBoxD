@@ -84,6 +84,9 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
 
     internal bool FailRequestSend { get; set; }
 
+    // Replaces the frame sender's request send result, for sends whose completion state is scripted.
+    internal Func<ValueTask>? FrameSendResult { get; set; }
+
     internal int LastRequestMessageId => Volatile.Read(ref _lastRequestMessageId);
 
     internal IPendingResponse LastSentPendingResponse =>
@@ -139,6 +142,9 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
     internal void ReleaseRequestSend() =>
         _sendRelease.TrySetResult();
 
+    internal void FailBlockedRequestSends(Exception error) =>
+        _sendRelease.TrySetException(error);
+
     internal async Task<int> WaitForCancelAsync(TimeSpan timeout) =>
         await _cancelSent.Task.WaitAsync(timeout).ConfigureAwait(false);
 
@@ -192,7 +198,7 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
             frame.Dispose();
         }
 
-        return new ValueTask(GetRequestSendTask(cancellationToken));
+        return FrameSendResult?.Invoke() ?? new ValueTask(GetRequestSendTask(cancellationToken));
     }
 
     private void RecordRequest(int messageId)

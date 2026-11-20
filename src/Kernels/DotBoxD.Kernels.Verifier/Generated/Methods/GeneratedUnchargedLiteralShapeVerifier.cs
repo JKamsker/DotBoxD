@@ -3,9 +3,16 @@ using System.Reflection.Metadata;
 namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
 using static GeneratedMethodShapeSignatures;
+using static Verifier.VerifierTypeNames;
 
 internal static class GeneratedUnchargedLiteralShapeVerifier
 {
+    // Read-only consumers the compiler feeds an uncharged literal key before charging it.
+    private static readonly string CanBulkChargeSandboxValueSignature =
+        $"{CompiledRuntimeName}.CanBulkChargeSandboxValue({SandboxContextName},{SandboxValueName},{Int32Name}):{BooleanName}";
+    private static readonly string MapGetI32RawSignature =
+        $"{CompiledRuntimeName}.MapGetI32Raw({SandboxValueName},{SandboxValueName}):{Int32Name}";
+
     public static void Verify(
         string methodName,
         GeneratedMethodFlow analysis,
@@ -15,14 +22,14 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         {
             if (!IsReachable(analysis, instruction) ||
                 IsImmediatelyStoredIntoLiteralArray(analysis, instruction) ||
-                IsStoredIntoLocalChargedBeforeReturn(analysis, instruction))
+                IsStoredIntoLocalChargedBeforeUse(analysis, instruction))
             {
                 continue;
             }
 
             diagnostics.Add(new VerificationDiagnostic(
                 "V-COMPILED-SHAPE",
-                $"method '{methodName}' must store uncharged literal helper '{instruction.CalledMember}' directly into a literal array"));
+                $"method '{methodName}' must store uncharged literal helper '{instruction.CalledMember}' directly into a literal array or charge it before any other use"));
         }
     }
 
@@ -39,7 +46,11 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         return analysis.Instructions[index + 1].Opcode == ILOpCode.Stelem_ref;
     }
 
-    private static bool IsStoredIntoLocalChargedBeforeReturn(
+    // The literal stored in a local is uncharged until a proven ChargeSandboxValue(s) call charges it.
+    // On every path from the store until that charge (or until the local is overwritten), each read
+    // of the local must be the proven operand of a non-escaping consumer; any other read could copy
+    // the uncharged value out (into another local, onto a shared ret, into a call), so it is rejected.
+    private static bool IsStoredIntoLocalChargedBeforeUse(
         GeneratedMethodFlow analysis,
         GeneratedInstruction instruction)
     {
@@ -50,45 +61,67 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
             return false;
         }
 
-        var store = analysis.Instructions[index + 1];
-        var queue = new Queue<ChargeSearchState>();
-        var visited = new HashSet<ChargeSearchState>();
-        EnqueueSuccessors(analysis, store, charged: false, queue, visited);
+        var queue = new Queue<int>();
+        var visited = new HashSet<int>();
+        EnqueueSuccessors(analysis, analysis.Instructions[index + 1], queue, visited);
         while (queue.Count > 0)
         {
-            var state = queue.Dequeue();
-            if (!analysis.ByOffset.TryGetValue(state.Offset, out var candidate) ||
+            if (!analysis.ByOffset.TryGetValue(queue.Dequeue(), out var candidate) ||
                 !IsReachable(analysis, candidate))
             {
                 continue;
             }
 
             var currentIndex = analysis.IndexByOffset[candidate.Offset];
-            var charged = state.Charged ||
-                IsChargeForLocal(analysis, currentIndex, localIndex);
-            if (candidate.Opcode == ILOpCode.Ret)
+            if (IsChargeForLocal(analysis, currentIndex, localIndex) ||
+                (IsStoreLocal(candidate, out var storedLocal) && storedLocal == localIndex))
             {
-                if (!charged &&
-                    PreviousInstructionLoadsLocal(analysis.Instructions, currentIndex, localIndex))
-                {
-                    return false;
-                }
-
+                // Charged, or overwritten: the uncharged literal no longer lives in the local on this path.
                 continue;
             }
 
-            EnqueueSuccessors(analysis, candidate, charged, queue, visited);
+            if (IsLoadLocal(candidate, localIndex) &&
+                !IsNonEscapingUnchargedRead(analysis, currentIndex))
+            {
+                return false;
+            }
+
+            EnqueueSuccessors(analysis, candidate, queue, visited);
         }
 
         return true;
     }
 
+    // The load at loadIndex must be consumed, by straight-line fall-through, as the SandboxValue operand
+    // of a call that only reads it (charges, bulk-charge probes, map lookups) and never returns it.
+    private static bool IsNonEscapingUnchargedRead(GeneratedMethodFlow analysis, int loadIndex)
+    {
+        var instructions = analysis.Instructions;
+        if (loadIndex + 1 < instructions.Count &&
+            instructions[loadIndex + 1].CalledMember is { } lastOperandConsumer &&
+            (lastOperandConsumer == ChargeSandboxValueSignature || lastOperandConsumer == MapGetI32RawSignature))
+        {
+            return GeneratedInstructionPredecessors.PreviousRunIsStraightLine(analysis, loadIndex + 1, 1);
+        }
+
+        return loadIndex + 2 < instructions.Count &&
+               instructions[loadIndex + 2].CalledMember is { } countConsumer &&
+               (countConsumer == ChargeSandboxValuesSignature || countConsumer == CanBulkChargeSandboxValueSignature) &&
+               IsSinglePush(instructions[loadIndex + 1]) &&
+               GeneratedInstructionPredecessors.PreviousRunIsStraightLine(analysis, loadIndex + 2, 2);
+    }
+
+    private static bool IsSinglePush(GeneratedInstruction instruction)
+        => instruction.Opcode is ILOpCode.Ldloc or ILOpCode.Ldloc_s or ILOpCode.Ldloc_0 or ILOpCode.Ldloc_1
+                or ILOpCode.Ldloc_2 or ILOpCode.Ldloc_3 or ILOpCode.Ldarg or ILOpCode.Ldarg_s or ILOpCode.Ldarg_0
+                or ILOpCode.Ldarg_1 or ILOpCode.Ldarg_2 or ILOpCode.Ldarg_3 ||
+            instruction.Int32Value is not null;
+
     private static void EnqueueSuccessors(
         GeneratedMethodFlow analysis,
         GeneratedInstruction instruction,
-        bool charged,
-        Queue<ChargeSearchState> queue,
-        HashSet<ChargeSearchState> visited)
+        Queue<int> queue,
+        HashSet<int> visited)
     {
         if (!analysis.SuccessorsByOffset.TryGetValue(instruction.Offset, out var successors))
         {
@@ -97,10 +130,9 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
 
         foreach (var successor in successors)
         {
-            var state = new ChargeSearchState(successor, charged);
-            if (visited.Add(state))
+            if (visited.Add(successor))
             {
-                queue.Enqueue(state);
+                queue.Enqueue(successor);
             }
         }
     }
@@ -165,6 +197,4 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         localIndex = -1;
         return false;
     }
-
-    private readonly record struct ChargeSearchState(int Offset, bool Charged);
 }

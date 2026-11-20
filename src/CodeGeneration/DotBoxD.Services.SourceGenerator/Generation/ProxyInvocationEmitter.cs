@@ -204,7 +204,7 @@ internal static class ProxyInvocationEmitter
         string indent)
     {
         var info = method.SubService!;
-        var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.QualifiedInterfaceName);
+        var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.EmittedInterfaceName);
         var handleName = locals.Reserve("__dotboxd_handle", ct);
         sb.AppendLine($"{indent}var {handleName} = await {invocation};");
         EmitCallerCancellationRecheck(sb, method, ct, indent);
@@ -237,7 +237,7 @@ internal static class ProxyInvocationEmitter
         string indent)
     {
         var info = method.SubService!;
-        var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.QualifiedInterfaceName);
+        var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.EmittedInterfaceName);
         var handleName = locals.Reserve("__dotboxd_handle", ct);
         sb.AppendLine($"{indent}var {handleName} = {invocation}.GetAwaiter().GetResult();");
         EmitCallerCancellationRecheck(sb, method, ct, indent);

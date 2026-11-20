@@ -56,14 +56,17 @@ internal enum ParameterStreamKind
 
 /// <summary>
 /// Information needed to wire a method returning a nested sub-service: the fully-qualified
-/// interface name (so the proxy can construct a sibling proxy) and the RPC service name
+/// interface name (the <c>global::</c> identity used to match generated services), the interface
+/// name as generated source must spell it (extern-alias qualified when its assembly is referenced
+/// only through an alias, so the proxy can construct a sibling proxy), and the RPC service name
 /// (so the wire instance dispatch hits the right registry slot).
 /// </summary>
 internal sealed record SubServiceInfo(
     string QualifiedInterfaceName,
     string ServiceName,
     bool AllowsNull,
-    bool HasProxyCompanion);
+    bool HasProxyCompanion,
+    string EmittedInterfaceName);
 
 /// <summary>
 /// Immutable, value-equatable representation of a DotBoxD service.
@@ -102,7 +105,8 @@ internal sealed record ServicePropertyModel(
     string PropertyAttributePrefix,
     bool IsInstanceId,
     SubServiceInfo? SubService,
-    string MemberAttributePrefix = "");
+    string MemberAttributePrefix = "",
+    EquatableArray<string> ExternAliases = default);
 
 /// <summary>
 /// Immutable, value-equatable representation of a service method. When
@@ -127,6 +131,7 @@ internal sealed record MethodModel(
     int TypeParameterCount = 0,
     string TypeParameterList = "",
     string ConstraintClauses = "",
+    string ExplicitConstraintClauses = "",
     bool RequiresDispatcherReceiverCast = false,
     string? UnsupportedReason = null,
     SubServiceInfo? SubService = null,

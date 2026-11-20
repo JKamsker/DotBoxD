@@ -79,7 +79,7 @@ public sealed class TcpFrameSendOperationTests
     }
 
     [Fact]
-    public async Task PendingWriteCancellation_PreservesCancellationAndCleansOwnership()
+    public async Task PendingWriteCanceledFault_PreservesCancellationAndCleansOwnership()
     {
         await using var pair = await TcpSendTestPair.CreateAsync();
         Assert.True(pair.Connection.SendGate.Wait(0));
@@ -101,8 +101,9 @@ public sealed class TcpFrameSendOperationTests
         Assert.True(send.IsCanceled);
         Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
 
-        // The write had started, so a partial frame may be on the wire: the connection must be poisoned
-        // rather than left reusable for a later frame to be appended after a truncated one.
+        // Real sends never hand the caller's token to a started write (see TcpPartialWriteCancellationTests),
+        // so a started write that still faults - even with a cancellation shape - is a transport failure:
+        // a partial frame may be on the wire and the connection must be poisoned, never left reusable.
         Assert.False(pair.Connection.IsConnected);
         TcpSendTestFrames.AssertDisposed(frame);
     }

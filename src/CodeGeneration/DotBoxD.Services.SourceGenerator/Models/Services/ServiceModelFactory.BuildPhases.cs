@@ -201,7 +201,8 @@ internal static partial class ServiceModelFactory
         var existingIndex = seenSignatureIndexes[signatureKey];
         methods[existingIndex] = InheritedMethodDeduplicator.AddAdditionalExplicitImplementation(
             methods[existingIndex],
-            methodSymbol.ContainingType);
+            methodSymbol.ContainingType,
+            compilation);
         return true;
     }
 

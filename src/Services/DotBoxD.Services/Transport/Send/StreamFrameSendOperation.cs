@@ -77,16 +77,15 @@ internal sealed class StreamFrameSendOperation :
         }
     }
 
-    private void CompleteException(Exception error)
-    {
-        var cleanupError = FinishAndClear(error);
-        PublishException(cleanupError ?? error);
-    }
+    // Cleanup decides the published exception: a cleanup failure, a close-cancelled started write
+    // reported as connection loss, or the original failure.
+    private void CompleteException(Exception error) =>
+        PublishException(FinishAndClear(error) ?? error);
 
     private Exception? FinishAndClear(Exception? error)
     {
         var state = _state;
         _state = default;
-        return StreamFrameSendCleanup.Finish(ref state, error);
+        return StreamFrameSendCleanup.Complete(ref state, error);
     }
 }

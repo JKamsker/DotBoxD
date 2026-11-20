@@ -14,6 +14,8 @@ internal struct TcpFrameSendState
     public TcpConnection? Connection;
     public PooledBufferWriter? Frame;
     public ReadOnlyMemory<byte> Data;
+
+    // The caller's token covers only the gate wait; a started write is never cancelled by it.
     public CancellationToken CancellationToken;
     public TcpFrameSendStage PendingStage;
     public bool OwnsGate;

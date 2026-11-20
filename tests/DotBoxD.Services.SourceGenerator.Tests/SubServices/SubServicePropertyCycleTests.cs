@@ -99,6 +99,51 @@ public sealed class SubServicePropertyCycleTests
             .Should().Contain(g => g.HintName.Contains("IRoot.DotBoxDRpcProxy", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void GenericSubServicePropertyReachedTransitively_Terminates()
+    {
+        var compilation = GeneratorTestHelper.CreateCompilation("""
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.SubServiceGenericExpansion
+            {
+                [RpcService]
+                public interface INode<T>
+                {
+                    INode<INode<T>> Child { get; }
+                }
+
+                [RpcService]
+                public interface IMid
+                {
+                    INode<int> Node { get; }
+                }
+
+                [RpcService]
+                public interface IRoot
+                {
+                    IMid Mid { get; }
+
+                    Task PingAsync();
+                }
+            }
+            """);
+
+        // Every INode<...> construction is a distinct symbol, so following generic property types
+        // expands forever; the token turns a regression into a clean failure instead of a hang.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var runResult = GeneratorTestHelper.CreateDriver()
+            .RunGenerators(compilation, timeout.Token)
+            .GetRunResult();
+
+        runResult.Diagnostics.Should().NotContain(d =>
+            d.GetMessage().Contains("leads back to", StringComparison.Ordinal));
+        runResult.Diagnostics.Should().Contain(d =>
+            d.Id == "DBXS003" &&
+            d.GetMessage().Contains("interface property 'Node' is not supported", StringComparison.Ordinal));
+    }
+
     private static void AssertCycleDiagnostic(
         Microsoft.CodeAnalysis.GeneratorDriverRunResult runResult,
         string interfaceName,

@@ -88,7 +88,7 @@ internal static class SubServicePropertyCycleDetector
         if (property.IsStatic ||
             property.Parameters.Length != 0 ||
             property.Type is not INamedTypeSymbol namedType ||
-            !SubServiceReturnTypeReader.IsRpcServiceInterface(namedType, ct))
+            !IsProxyableSubServiceType(namedType, ct))
         {
             return false;
         }
@@ -96,4 +96,13 @@ internal static class SubServicePropertyCycleDetector
         type = namedType;
         return true;
     }
+
+    // Mirrors SubServiceReturnTypeReader.TryGetSubServiceInfo: generic and nested interfaces never get
+    // sub-service proxies, so they cannot recurse. Following them would also never terminate for
+    // self-expanding shapes such as INode<T> { INode<INode<T>> Child { get; } }, because each
+    // construction is a new symbol for the visited set.
+    private static bool IsProxyableSubServiceType(INamedTypeSymbol type, CancellationToken ct)
+        => !type.IsGenericType &&
+           type.ContainingType is null &&
+           SubServiceReturnTypeReader.IsRpcServiceInterface(type, ct);
 }

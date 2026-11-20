@@ -26,6 +26,14 @@ internal sealed class PendingRequestTimeoutScheduler : IDisposable
         return Stopwatch.GetTimestamp() + timeoutTicks;
     }
 
+    public static int GetRemainingMilliseconds(long deadline)
+    {
+        var remainingTicks = deadline - Stopwatch.GetTimestamp();
+        return remainingTicks <= 0
+            ? 0
+            : (int)Math.Min(int.MaxValue, Math.Max(1, StopwatchTicksToMilliseconds(remainingTicks)));
+    }
+
     public void Schedule(long deadline)
     {
         if (Volatile.Read(ref _disposed) != 0 || deadline >= Volatile.Read(ref _nextTimeoutTimestamp))

@@ -227,7 +227,7 @@ public sealed record VerificationPolicy(
                 "System.GC", "System.Delegate", "System.IServiceProvider",
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
-            RuntimeFacadeIdentityDefaults(), "dotboxd-verifier-13");
+            RuntimeFacadeIdentityDefaults(), "dotboxd-verifier-14");
 
     public bool IsMemberAllowed(string memberSignature)
     {

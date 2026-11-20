@@ -331,8 +331,7 @@ internal sealed class MethodEmitter
         {
             LiteralExpression { Value: F64Value value } => value.Value >= 0,
             VariableExpression variable => _nonNegativeF64Locals.Contains(variable.Name),
-            CallExpression { Name: "math.sqrt", Arguments.Count: 1 } call => IsNonNegativeF64(call.Arguments[0]),
-            CallExpression { Name: "math.floor" or "math.ceil" or "math.round", Arguments.Count: 1 } call
+            CallExpression call when F64MathIntrinsicEmitter.IsRawIntrinsic(call, _bindings)
                 => IsNonNegativeF64(call.Arguments[0]),
             _ => false
         };
