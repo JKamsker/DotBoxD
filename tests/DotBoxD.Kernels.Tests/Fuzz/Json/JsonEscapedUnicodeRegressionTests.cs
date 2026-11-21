@@ -44,4 +44,24 @@ public sealed class JsonEscapedUnicodeRegressionTests
             Assert.Equal(padding + expected, JsonImporter.Import(json).Id);
         }
     }
+
+    [Fact]
+    public void Raw_unpaired_surrogate_is_rejected_without_replacement()
+    {
+        var rawSurrogate = new string((char)0xD800, 1);
+        var json = """{"id":"prefix-""" + rawSurrogate + """-suffix","version":"1.0.0","functions":[]}""";
+
+        var exception = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
+
+        Assert.Contains(exception.Diagnostics, diagnostic => diagnostic.Code == "E-JSON-INVALID");
+    }
+
+    [Fact]
+    public void Raw_surrogate_pair_keeps_its_value()
+    {
+        var pair = new string([(char)0xD83D, (char)0xDE80]);
+        var json = """{"id":"prefix-""" + pair + """-suffix","version":"1.0.0","functions":[]}""";
+
+        Assert.Equal("prefix-" + pair + "-suffix", JsonImporter.Import(json).Id);
+    }
 }

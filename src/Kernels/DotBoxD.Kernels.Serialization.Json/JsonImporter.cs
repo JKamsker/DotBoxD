@@ -24,6 +24,10 @@ public static class JsonImporter
         {
             throw Error("E-JSON-INVALID", ex.Message);
         }
+        catch (ArgumentException ex) when (ex is not ArgumentNullException)
+        {
+            throw Error("E-JSON-INVALID", ex.Message);
+        }
         catch (FormatException ex)
         {
             throw Error("E-JSON-VERSION", ex.Message);
