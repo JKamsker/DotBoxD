@@ -66,9 +66,12 @@ internal sealed class UiRazorExpressions
     public string Resource(string declaration)
     {
         var parts = Assignment(declaration);
+        var literal = SyntaxFactory.ParseExpression(parts.Value) as LiteralExpressionSyntax;
+        if (literal?.Token.Value is not string handle || literal.ContainsDiagnostics || !ValidResourceHandle(handle))
+        { throw new NotSupportedException("Resource handles must be opaque host-granted identifiers; URLs and filesystem paths are forbidden."); }
         Add(parts.Name, "resource");
         _resources.Add(parts.Name);
-        return "var " + parts.Name + " = builder.Resource(" + Literal(parts.Value, "string") + ");";
+        return "var " + parts.Name + " = builder.Resource(" + SymbolDisplay.FormatLiteral(handle, quote: true) + ");";
     }
 
     public string Property(string text, string type)
@@ -185,6 +188,11 @@ internal sealed class UiRazorExpressions
 
     private static string Identifier(string name) => SyntaxFacts.IsValidIdentifier(name) && SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None
         ? name : throw new NotSupportedException("Use ordinary C# identifiers for declared UI values.");
+
+    private static bool ValidResourceHandle(string handle) => handle.Length is > 0 and <= 128 && handle.All(IsResourceHandleCharacter);
+
+    private static bool IsResourceHandleCharacter(char character) => character is >= 'a' and <= 'z' or
+        >= 'A' and <= 'Z' or >= '0' and <= '9' or '.' or '_' or '-';
 
     private static string QualifiedName(string name)
         => string.Join(".", name.Split('.').Select(Identifier));
