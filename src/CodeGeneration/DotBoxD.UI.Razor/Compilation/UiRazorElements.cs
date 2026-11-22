@@ -116,6 +116,8 @@ internal static class UiRazorElements
 
     private static (List<string> Properties, string? Click) Properties(XElement node, string primitive, UiRazorExpressions expressions)
     {
+        if (node.Name.LocalName == "UiWhen" && node.Attribute("Condition") is null)
+        { throw new NotSupportedException("UiWhen requires a Condition binding. Use Condition=\"@Ui.Bind(declaredBooleanStateOrKernel)\"."); }
         var properties = new List<string>();
         var names = new HashSet<string>(StringComparer.Ordinal);
         string? click = null;
