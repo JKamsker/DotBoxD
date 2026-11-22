@@ -27,7 +27,8 @@ internal static class CollectionMaterializationPolicy
         "ToArray",
         "ToHashSet",
         "ToList",
-        "ToLookup"
+        "ToLookup",
+        "Union"
     };
     private static readonly IReadOnlyDictionary<string, string> ListDisplayNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
