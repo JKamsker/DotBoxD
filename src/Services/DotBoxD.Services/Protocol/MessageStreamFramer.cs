@@ -83,6 +83,7 @@ internal static class MessageStreamFramer
         var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
         using var writer = PooledBufferWriter.Rent(totalLength);
         MessageFramer.WriteFrame(writer, messageId, type, payload.Span);
+        ct.ThrowIfCancellationRequested();
         await stream.WriteAsync(writer.WrittenMemory, ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         await stream.FlushAsync(ct).ConfigureAwait(false);
