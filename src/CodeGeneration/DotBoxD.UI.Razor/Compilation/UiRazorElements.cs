@@ -155,5 +155,24 @@ internal static class UiRazorElements
             !((primitive == "TextBox" && property == "Text") || (primitive == "CheckBox" && property == "Checked") ||
               (primitive == "Slider" && property == "Value")))
         { throw new NotSupportedException("TwoWay is supported only on TextBox.Text, CheckBox.Checked and Slider.Value."); }
+        if (!value.StartsWith("@", StringComparison.Ordinal) && TryNumberLiteral(value, out var number) &&
+            ((property == "Maximum" && (number <= 0 || number > 1_000_000_000)) ||
+             (property == "Value" && (number < 0 || number > 1_000_000_000))))
+        { throw new NotSupportedException("Numeric Value and Maximum literals must be within the supported UI range."); }
+    }
+
+    private static bool TryNumberLiteral(string value, out double number)
+    {
+        var syntax = SyntaxFactory.ParseExpression(value);
+        var negative = syntax is PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.UnaryMinusExpression };
+        var literal = negative ? ((PrefixUnaryExpressionSyntax)syntax).Operand as LiteralExpressionSyntax : syntax as LiteralExpressionSyntax;
+        var literalValue = literal?.Token.Value;
+        if (literalValue is not byte and not sbyte and not short and not ushort and not int and not uint and not long and not ulong and
+            not float and not double and not decimal)
+        { number = 0; return false; }
+        number = Convert.ToDouble(literalValue, System.Globalization.CultureInfo.InvariantCulture);
+        if (negative)
+        { number = -number; }
+        return true;
     }
 }
