@@ -166,14 +166,11 @@ internal static class UiRazorElements
         var syntax = SyntaxFactory.ParseExpression(value);
         var negative = syntax is PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.UnaryMinusExpression };
         var literal = negative ? ((PrefixUnaryExpressionSyntax)syntax).Operand as LiteralExpressionSyntax : syntax as LiteralExpressionSyntax;
-        number = literal?.Token.Value switch
-        {
-            int integer => integer,
-            double parsed => parsed,
-            _ => 0
-        };
-        if (literal?.Token.Value is not int and not double)
-        { return false; }
+        var literalValue = literal?.Token.Value;
+        if (literalValue is not byte and not sbyte and not short and not ushort and not int and not uint and not long and not ulong and
+            not float and not double and not decimal)
+        { number = 0; return false; }
+        number = Convert.ToDouble(literalValue, System.Globalization.CultureInfo.InvariantCulture);
         if (negative)
         { number = -number; }
         return true;
