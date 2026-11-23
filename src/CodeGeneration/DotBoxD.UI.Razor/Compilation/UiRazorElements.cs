@@ -155,5 +155,27 @@ internal static class UiRazorElements
             !((primitive == "TextBox" && property == "Text") || (primitive == "CheckBox" && property == "Checked") ||
               (primitive == "Slider" && property == "Value")))
         { throw new NotSupportedException("TwoWay is supported only on TextBox.Text, CheckBox.Checked and Slider.Value."); }
+        if (!value.StartsWith("@", StringComparison.Ordinal) && TryNumberLiteral(value, out var number) &&
+            ((property == "Maximum" && (number <= 0 || number > 1_000_000_000)) ||
+             (property == "Value" && (number < 0 || number > 1_000_000_000))))
+        { throw new NotSupportedException("Numeric Value and Maximum literals must be within the supported UI range."); }
+    }
+
+    private static bool TryNumberLiteral(string value, out double number)
+    {
+        var syntax = SyntaxFactory.ParseExpression(value);
+        var negative = syntax is PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.UnaryMinusExpression };
+        var literal = negative ? ((PrefixUnaryExpressionSyntax)syntax).Operand as LiteralExpressionSyntax : syntax as LiteralExpressionSyntax;
+        number = literal?.Token.Value switch
+        {
+            int integer => integer,
+            double parsed => parsed,
+            _ => 0
+        };
+        if (literal?.Token.Value is not int and not double)
+        { return false; }
+        if (negative)
+        { number = -number; }
+        return true;
     }
 }
