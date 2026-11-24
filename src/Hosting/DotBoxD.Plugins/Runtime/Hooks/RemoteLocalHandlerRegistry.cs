@@ -128,14 +128,14 @@ public sealed class RemoteLocalHandlerRegistry
         return RegisterEntry(subscriptionId, new RegistrationEntry(entry));
     }
 
-    private IDisposable RegisterKernelHandler(string subscriptionId, Func<KernelRpcValue, HookContext, ValueTask> invoke)
-        => RegisterRawHandler(subscriptionId, (payload, context) =>
+    private IDisposable RegisterKernelHandler(string subscriptionId, Func<KernelRpcValue, HookContext, CancellationToken, ValueTask> invoke)
+        => RegisterRawHandler(subscriptionId, (payload, context, cancellationToken) =>
         {
             var wireValue = KernelRpcBinaryCodec.DecodeValue(payload);
-            return invoke(wireValue, context);
+            return invoke(wireValue, context, cancellationToken);
         });
 
-    private IDisposable RegisterRawHandler(string subscriptionId, Func<ReadOnlyMemory<byte>, HookContext, ValueTask> invoke)
+    private IDisposable RegisterRawHandler(string subscriptionId, Func<ReadOnlyMemory<byte>, HookContext, CancellationToken, ValueTask> invoke)
     {
         var entry = new Handler(invoke);
         return RegisterEntry(subscriptionId, new RegistrationEntry(entry));
@@ -177,7 +177,7 @@ public sealed class RemoteLocalHandlerRegistry
 
         try
         {
-            await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+            await handler.Invoke(projectedValue, context, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception) when (cancellationToken.IsCancellationRequested || context.CancellationToken.IsCancellationRequested)
         {
@@ -212,11 +212,11 @@ public sealed class RemoteLocalHandlerRegistry
         context.CancellationToken.ThrowIfCancellationRequested();
     }
 
-    private static Func<TInput, HookContext, ValueTask> DecodeAndInvoke<TInput, TProjected>(
+    private static Func<TInput, HookContext, CancellationToken, ValueTask> DecodeAndInvoke<TInput, TProjected>(
         string subscriptionId,
         Func<TProjected, HookContext, ValueTask> handler,
         Func<TInput, TProjected> decoder)
-        => (input, context) =>
+        => (input, context, cancellationToken) =>
         {
             TProjected projected;
             try
@@ -228,7 +228,7 @@ public sealed class RemoteLocalHandlerRegistry
                 throw ProjectedPayloadDecoderFailed(subscriptionId, typeof(TProjected), ex);
             }
 
-            context.CancellationToken.ThrowIfCancellationRequested();
+            ThrowIfDispatchCanceled(context, cancellationToken);
             return handler(projected, context);
         };
 
@@ -264,9 +264,9 @@ public sealed class RemoteLocalHandlerRegistry
         _registrations.Clear();
     }
 
-    private sealed class Handler(Func<ReadOnlyMemory<byte>, HookContext, ValueTask> invoke)
+    private sealed class Handler(Func<ReadOnlyMemory<byte>, HookContext, CancellationToken, ValueTask> invoke)
     {
-        public Func<ReadOnlyMemory<byte>, HookContext, ValueTask> Invoke { get; } = invoke;
+        public Func<ReadOnlyMemory<byte>, HookContext, CancellationToken, ValueTask> Invoke { get; } = invoke;
     }
 
     private sealed class ResultHandler(
