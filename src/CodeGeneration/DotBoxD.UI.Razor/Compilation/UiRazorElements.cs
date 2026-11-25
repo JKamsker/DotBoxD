@@ -153,12 +153,13 @@ internal static class UiRazorElements
         if (attribute is null || attribute.Value.StartsWith("@", StringComparison.Ordinal))
         { return null; }
         var syntax = SyntaxFactory.ParseExpression(attribute.Value);
-        var value = syntax is PrefixUnaryExpressionSyntax prefix && prefix.IsKind(SyntaxKind.UnaryMinusExpression)
-            ? prefix.Operand : syntax;
+        var prefix = syntax as PrefixUnaryExpressionSyntax;
+        var negative = prefix?.IsKind(SyntaxKind.UnaryMinusExpression) == true;
+        var value = negative ? prefix!.Operand : syntax;
         return !syntax.ContainsDiagnostics && value is LiteralExpressionSyntax { Token.Value: int integer }
-            ? integer
+            ? negative ? -integer : integer
             : value is LiteralExpressionSyntax { Token.Value: double number } && !double.IsNaN(number) && !double.IsInfinity(number)
-                ? number
+                ? negative ? -number : number
                 : null;
     }
 
