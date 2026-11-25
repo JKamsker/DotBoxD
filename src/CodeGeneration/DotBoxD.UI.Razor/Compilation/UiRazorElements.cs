@@ -132,9 +132,32 @@ internal static class UiRazorElements
             { continue; }
             properties.Add(Property(attribute, node.Name.LocalName, primitive, names, expressions));
         }
+        ValidateLiteralRange(node, primitive);
         if (primitive == "Image" && !names.Contains("Resource"))
         { throw new NotSupportedException("UiImage requires a Resource from an @resource host-granted handle declaration."); }
         return (properties, click);
+    }
+
+    private static void ValidateLiteralRange(XElement node, string primitive)
+    {
+        if (primitive is not ("Slider" or "ProgressBar"))
+        { return; }
+        var value = LiteralNumber(node.Attribute("Value"));
+        var maximum = LiteralNumber(node.Attribute("Maximum"));
+        if (value is not null && maximum is not null && value > maximum)
+        { throw new NotSupportedException("Value cannot exceed Maximum when both are literal UI values."); }
+    }
+
+    private static double? LiteralNumber(XAttribute? attribute)
+    {
+        if (attribute is null || attribute.Value.StartsWith("@", StringComparison.Ordinal))
+        { return null; }
+        var syntax = SyntaxFactory.ParseExpression(attribute.Value);
+        var value = syntax is PrefixUnaryExpressionSyntax prefix && prefix.IsKind(SyntaxKind.UnaryMinusExpression)
+            ? prefix.Operand : syntax;
+        return !syntax.ContainsDiagnostics && value is LiteralExpressionSyntax { Token.Value: int integer }
+            ? integer
+            : value is LiteralExpressionSyntax { Token.Value: double number } && double.IsFinite(number) ? number : null;
     }
 
     private static string Property(XAttribute attribute, string tag, string primitive, HashSet<string> names, UiRazorExpressions expressions)
