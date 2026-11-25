@@ -157,7 +157,9 @@ internal static class UiRazorElements
             ? prefix.Operand : syntax;
         return !syntax.ContainsDiagnostics && value is LiteralExpressionSyntax { Token.Value: int integer }
             ? integer
-            : value is LiteralExpressionSyntax { Token.Value: double number } && double.IsFinite(number) ? number : null;
+            : value is LiteralExpressionSyntax { Token.Value: double number } && !double.IsNaN(number) && !double.IsInfinity(number)
+                ? number
+                : null;
     }
 
     private static string Property(XAttribute attribute, string tag, string primitive, HashSet<string> names, UiRazorExpressions expressions)
