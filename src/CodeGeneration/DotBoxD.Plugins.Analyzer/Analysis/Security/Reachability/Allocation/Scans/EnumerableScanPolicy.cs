@@ -9,7 +9,7 @@ internal static class EnumerableScanPolicy
     {
         "Contains", "Any", "Count", "SequenceEqual", "All", "LongCount", "FirstOrDefault", "LastOrDefault",
         "SingleOrDefault", "Single", "Aggregate", "First", "Max", "Min", "Sum", "Average", "MaxBy",
-        "ElementAt", "ElementAtOrDefault", "Skip", "Last"
+        "ElementAt", "ElementAtOrDefault", "OfType", "Skip", "Last"
     };
 
     public static bool IsScan(IInvocationOperation invocation, string typeName, Compilation compilation)
