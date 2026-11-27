@@ -114,7 +114,12 @@ public sealed class BlazorUiRenderer : IUiRenderer, IUiInputSource
             changed = _changed;
         }
         if (changed is not null)
-        { await changed().ConfigureAwait(false); }
+        {
+            try
+            { await changed().ConfigureAwait(false); }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            { throw new OperationCanceledException(cancellationToken); }
+        }
     }
 
     /// <summary>
