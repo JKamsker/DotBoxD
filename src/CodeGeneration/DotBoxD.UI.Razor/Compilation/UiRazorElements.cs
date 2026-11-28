@@ -126,6 +126,8 @@ internal static class UiRazorElements
         }
         foreach (var attribute in node.Attributes())
         {
+            if (node.Name.LocalName == "UiVertical" && attribute.Name.LocalName == "Horizontal")
+            { throw new NotSupportedException("UiVertical is always vertical; remove Horizontal or use UiStack for a dynamic orientation."); }
             if (attribute.Name.LocalName == "OnClick" && primitive == "Button")
             { click = attribute.Value; continue; }
             if (attribute.Name.LocalName == "Key" && primitive == "Items" && attribute.Value == "Key")
