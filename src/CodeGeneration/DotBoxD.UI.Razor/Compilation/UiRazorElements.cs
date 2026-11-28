@@ -126,8 +126,7 @@ internal static class UiRazorElements
         }
         foreach (var attribute in node.Attributes())
         {
-            if (node.Name.LocalName == "UiVertical" && attribute.Name.LocalName == "Horizontal")
-            { throw new NotSupportedException("UiVertical is always vertical; remove Horizontal or use UiStack for a dynamic orientation."); }
+            RejectContradictoryVerticalOrientation(node.Name.LocalName, attribute.Name.LocalName);
             if (attribute.Name.LocalName == "OnClick" && primitive == "Button")
             { click = attribute.Value; continue; }
             if (attribute.Name.LocalName == "Key" && primitive == "Items" && attribute.Value == "Key")
@@ -137,6 +136,12 @@ internal static class UiRazorElements
         if (primitive == "Image" && !names.Contains("Resource"))
         { throw new NotSupportedException("UiImage requires a Resource from an @resource host-granted handle declaration."); }
         return (properties, click);
+    }
+
+    private static void RejectContradictoryVerticalOrientation(string tag, string attributeName)
+    {
+        if (tag == "UiVertical" && attributeName == "Horizontal")
+        { throw new NotSupportedException("UiVertical is always vertical; remove Horizontal or use UiStack for a dynamic orientation."); }
     }
 
     private static string Property(XAttribute attribute, string tag, string primitive, HashSet<string> names, UiRazorExpressions expressions)
